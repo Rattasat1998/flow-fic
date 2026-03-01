@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | Flow Fic",
-  description: "How Flow Fic collects, uses, and protects your data.",
+  title: "นโยบายความเป็นส่วนตัว | FlowFic",
+  description: "นโยบายความเป็นส่วนตัวสำหรับผู้ใช้งานแพลตฟอร์ม FlowFic",
 };
 
 export default function PrivacyPage() {
@@ -16,55 +16,74 @@ export default function PrivacyPage() {
         lineHeight: 1.7,
       }}
     >
-      <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>Privacy Policy</h1>
-      <p style={{ color: "#666", marginBottom: "2rem" }}>Last updated: March 1, 2026</p>
+      <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>นโยบายความเป็นส่วนตัว (Privacy Policy)</h1>
+      <p style={{ color: "#666", marginBottom: "2rem" }}>อัปเดตล่าสุด: March 1, 2026</p>
 
       <section style={{ marginBottom: "1.5rem" }}>
-        <h2>1. Information We Collect</h2>
+        <h2>1. ข้อมูลที่เราเก็บ</h2>
         <p>
-          We may collect account details, profile data, story content, and usage analytics to
-          provide and improve Flow Fic.
+          เมื่อคุณใช้งาน FlowFic เราอาจเก็บข้อมูลที่จำเป็นต่อการให้บริการ เช่น ข้อมูลบัญชีผู้ใช้จากการล็อกอิน
+          ด้วย Google/Facebook (เช่น อีเมล ชื่อ และรูปโปรไฟล์), เนื้อหาที่คุณสร้างในระบบ
+          (นิยาย ตอน ตัวละคร รูปปก/รูปตัวละคร), และข้อมูลการใช้งานทางเทคนิค (เช่น บันทึกเหตุขัดข้อง
+          และข้อมูลอุปกรณ์โดยรวม)
         </p>
       </section>
 
       <section style={{ marginBottom: "1.5rem" }}>
-        <h2>2. How We Use Information</h2>
+        <h2>2. วัตถุประสงค์ในการใช้ข้อมูล</h2>
         <p>
-          We use your information to operate the service, authenticate users, support features,
-          maintain security, and communicate important updates.
+          เราใช้ข้อมูลเพื่อให้บริการหลักของแพลตฟอร์ม เช่น ยืนยันตัวตนผู้ใช้ แสดงและจัดการผลงานนิยาย
+          ปรับปรุงประสิทธิภาพระบบ ดูแลความปลอดภัย และแจ้งข้อมูลสำคัญเกี่ยวกับบริการ
         </p>
       </section>
 
       <section style={{ marginBottom: "1.5rem" }}>
-        <h2>3. Data Sharing</h2>
+        <h2>3. การเปิดเผยหรือแบ่งปันข้อมูล</h2>
         <p>
-          We do not sell your personal data. We may share data with service providers only as
-          needed to run the product (for example, hosting, storage, or authentication).
+          เราไม่ขายข้อมูลส่วนบุคคลของคุณให้บุคคลที่สาม ข้อมูลอาจถูกประมวลผลโดยผู้ให้บริการที่จำเป็นต่อระบบ
+          เช่น Supabase (ฐานข้อมูล/การยืนยันตัวตน/ไฟล์), และผู้ให้บริการล็อกอิน OAuth (Google/Facebook)
+          เท่าที่จำเป็นต่อการทำงานของแพลตฟอร์ม
         </p>
       </section>
 
       <section style={{ marginBottom: "1.5rem" }}>
-        <h2>4. Data Retention</h2>
+        <h2>4. เนื้อหาสาธารณะของผู้ใช้</h2>
         <p>
-          We keep data only as long as necessary for service operations, legal obligations, and
-          legitimate business purposes.
+          เนื้อหาที่คุณเผยแพร่ (เช่น นิยาย ตอน รูปปก และข้อมูลตัวละคร) อาจถูกแสดงต่อสาธารณะตามการตั้งค่า
+          ของระบบ โปรดหลีกเลี่ยงการใส่ข้อมูลส่วนบุคคลที่ไม่ต้องการเปิดเผยในเนื้อหาที่เผยแพร่
         </p>
       </section>
 
       <section style={{ marginBottom: "1.5rem" }}>
-        <h2>5. Your Rights</h2>
+        <h2>5. การเก็บรักษาและลบข้อมูล</h2>
         <p>
-          Depending on your location, you may have rights to access, correct, or delete your data.
-          Contact us to request support.
+          เราจะเก็บข้อมูลเท่าที่จำเป็นต่อการให้บริการและตามข้อกำหนดทางกฎหมาย หากคุณต้องการแก้ไขหรือลบข้อมูล
+          สามารถติดต่อทีมงานผ่านช่องทางซัพพอร์ตของระบบเพื่อดำเนินการตามคำขอ
+        </p>
+      </section>
+
+      <section style={{ marginBottom: "1.5rem" }}>
+        <h2>6. คุกกี้และเซสชัน</h2>
+        <p>
+          ระบบอาจใช้คุกกี้หรือข้อมูลเซสชันที่จำเป็นเพื่อคงสถานะการล็อกอินและการทำงานพื้นฐานของแอป
+          การปิดใช้งานคุกกี้บางประเภทอาจทำให้บริการบางส่วนใช้งานไม่ได้
         </p>
       </section>
 
       <section style={{ marginBottom: "2rem" }}>
-        <h2>6. Contact</h2>
-        <p>For privacy inquiries, contact us through the support channel in the app.</p>
+        <h2>7. การเปลี่ยนแปลงนโยบาย</h2>
+        <p>
+          เราอาจปรับปรุงนโยบายฉบับนี้เป็นครั้งคราว โดยจะอัปเดตวันที่ด้านบนของหน้านี้ และให้ฉบับใหม่มีผลทันที
+          หลังประกาศบนแพลตฟอร์ม
+        </p>
       </section>
 
-      <Link href="/">Back to home</Link>
+      <section style={{ marginBottom: "2rem" }}>
+        <h2>8. ติดต่อเรา</h2>
+        <p>หากมีคำถามเกี่ยวกับความเป็นส่วนตัว กรุณาติดต่อผ่านช่องทางซัพพอร์ตภายในแอป FlowFic</p>
+      </section>
+
+      <Link href="/">กลับหน้าแรก</Link>
     </main>
   );
 }
