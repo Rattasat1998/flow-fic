@@ -83,6 +83,9 @@ export default function PrivacyPage() {
         <p>หากมีคำถามเกี่ยวกับความเป็นส่วนตัว กรุณาติดต่อผ่านช่องทางซัพพอร์ตภายในแอป FlowFic</p>
       </section>
 
+      <p style={{ marginBottom: "0.75rem" }}>
+        <Link href="/data-deletion">คำแนะนำการลบข้อมูล (Data Deletion)</Link>
+      </p>
       <Link href="/">กลับหน้าแรก</Link>
     </main>
   );
