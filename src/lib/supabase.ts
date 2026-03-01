@@ -1,3 +1,5 @@
+"use client";
+
 import { createClient } from '@supabase/supabase-js';
 
 // Use dummy values to prevent build/prerender crashes 
