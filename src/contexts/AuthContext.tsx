@@ -53,10 +53,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
     }, []);
 
+    const getOAuthRedirectUrl = () => {
+        if (typeof window === 'undefined') return undefined;
+        return `${window.location.origin}/auth/callback`;
+    };
+
     const signInWithFacebook = async () => {
         try {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'facebook',
+                options: {
+                    redirectTo: getOAuthRedirectUrl(),
+                    scopes: 'email,public_profile',
+                },
             });
             if (error) throw error;
         } catch (error) {
@@ -69,6 +78,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
+                options: {
+                    redirectTo: getOAuthRedirectUrl(),
+                },
             });
             if (error) throw error;
         } catch (error) {

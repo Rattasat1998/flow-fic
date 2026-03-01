@@ -26,6 +26,7 @@ export default function HomePage() {
     const [stories, setStories] = useState<HomeStory[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
+    const [authError, setAuthError] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchStories = async () => {
@@ -53,6 +54,26 @@ export default function HomePage() {
         if (selectedCategory === 'all') return true;
         return story.main_category === selectedCategory;
     });
+
+    const handleGoogleSignIn = async () => {
+        setAuthError(null);
+        try {
+            await signInWithGoogle();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Google login failed';
+            setAuthError(message);
+        }
+    };
+
+    const handleFacebookSignIn = async () => {
+        setAuthError(null);
+        try {
+            await signInWithFacebook();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Facebook login failed';
+            setAuthError(message);
+        }
+    };
 
     return (
         <main className={styles.main}>
@@ -85,11 +106,11 @@ export default function HomePage() {
                         </div>
                     ) : (
                         <div className={styles.authButtons}>
-                            <button onClick={signInWithGoogle} className={styles.googleBtn}>
+                            <button onClick={handleGoogleSignIn} className={styles.googleBtn}>
                                 <img src="/google-logo.svg" alt="G" className={styles.providerIcon} onError={(e) => e.currentTarget.style.display = 'none'} />
                                 เข้าระบบด้วย Google
                             </button>
-                            <button onClick={signInWithFacebook} className={styles.loginBtn}>
+                            <button onClick={handleFacebookSignIn} className={styles.loginBtn}>
                                 <img src="/facebook-logo.svg" alt="f" className={styles.providerIcon} onError={(e) => e.currentTarget.style.display = 'none'} />
                                 Facebook
                             </button>
@@ -101,6 +122,11 @@ export default function HomePage() {
             </nav>
 
             <div className={styles.content}>
+                {authError && (
+                    <div className={styles.emptyMyNovels} style={{ color: '#b00020' }}>
+                        Login error: {authError}
+                    </div>
+                )}
                 <section className={styles.section}>
                     <div className={styles.sectionHeader}>
                         <h2 className={styles.sectionTitle}>นิยายที่เผยแพร่ล่าสุด</h2>
