@@ -2,9 +2,13 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Use dummy values to prevent build/prerender crashes 
-// when environment variables are not immediately available (e.g. during Vercel build phase).
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'dummy_key';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error(
+    'Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY. Check environment variables.'
+  );
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);  
