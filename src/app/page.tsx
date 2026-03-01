@@ -1,66 +1,166 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+'use client';
 
-export default function Home() {
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { Search, Menu } from 'lucide-react';
+import styles from './home.module.css';
+import { supabase } from '@/lib/supabase';
+import { MAIN_CATEGORIES } from '@/lib/categories';
+import { useAuth } from '@/contexts/AuthContext';
+
+type HomeStory = {
+    id: string;
+    title: string;
+    pen_name: string;
+    cover_url: string | null;
+    synopsis: string | null;
+    category: string;
+    main_category: string | null;
+    status: string;
+    completion_status: string | null;
+    created_at: string | null;
+};
+
+export default function HomePage() {
+    const { user, isLoading: isLoadingAuth, signInWithFacebook, signInWithGoogle, signOut } = useAuth();
+    const [stories, setStories] = useState<HomeStory[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [selectedCategory, setSelectedCategory] = useState<string>('all');
+
+    useEffect(() => {
+        const fetchStories = async () => {
+            const { data, error } = await supabase
+                .from('stories')
+                .select('id, title, pen_name, cover_url, synopsis, category, main_category, status, completion_status, created_at')
+                .eq('status', 'published')
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('Failed to fetch stories:', error);
+                setStories([]);
+            } else {
+                setStories((data || []) as HomeStory[]);
+            }
+
+            setIsLoading(false);
+        };
+
+        fetchStories();
+    }, []);
+
+    // Filter stories based on selected category
+    const filteredStories = stories.filter(story => {
+        if (selectedCategory === 'all') return true;
+        return story.main_category === selectedCategory;
+    });
+
+    return (
+        <main className={styles.main}>
+            {/* Top Navbar */}
+            <nav className={styles.navbar}>
+                <div className={styles.navLeft}>
+                    <div className={styles.logo}>FlowFic</div>
+                    <div className={styles.navLinks}>
+                        <Link href="/" className={styles.activeLink}>นิยาย</Link>
+                        <Link href="/">แฟนฟิค</Link>
+                        <Link href="/">การ์ตูน</Link>
+                    </div>
+                </div>
+                <div className={styles.navRight}>
+                    <button className={styles.iconBtn}><Search size={18} /></button>
+                    <Link href="/pricing" className={styles.pricingLink}>แพ็กเกจ</Link>
+                    <Link href="/dashboard" className={styles.dashboardLink}>แดชบอร์ดนักเขียน</Link>
+
+                    {isLoadingAuth ? (
+                        <div className={styles.authLoading}>...</div>
+                    ) : user ? (
+                        <div className={styles.userProfile}>
+                            {user.user_metadata?.avatar_url ? (
+                                <img src={user.user_metadata.avatar_url} alt="Profile" className={styles.userAvatar} />
+                            ) : (
+                                <div className={styles.userAvatarPlaceholder}>{user.email?.charAt(0).toUpperCase() || 'U'}</div>
+                            )}
+                            <span className={styles.userName}>{user.user_metadata?.full_name || user.email?.split('@')[0]}</span>
+                            <button onClick={signOut} className={styles.logoutBtn}>ออกจากระบบ</button>
+                        </div>
+                    ) : (
+                        <div className={styles.authButtons}>
+                            <button onClick={signInWithGoogle} className={styles.googleBtn}>
+                                <img src="/google-logo.svg" alt="G" className={styles.providerIcon} onError={(e) => e.currentTarget.style.display = 'none'} />
+                                เข้าระบบด้วย Google
+                            </button>
+                            <button onClick={signInWithFacebook} className={styles.loginBtn}>
+                                <img src="/facebook-logo.svg" alt="f" className={styles.providerIcon} onError={(e) => e.currentTarget.style.display = 'none'} />
+                                Facebook
+                            </button>
+                        </div>
+                    )}
+
+                    <button className={styles.mobileMenuBtn}><Menu size={24} /></button>
+                </div>
+            </nav>
+
+            <div className={styles.content}>
+                <section className={styles.section}>
+                    <div className={styles.sectionHeader}>
+                        <h2 className={styles.sectionTitle}>นิยายที่เผยแพร่ล่าสุด</h2>
+                        <span className={styles.viewAll}>{filteredStories.length} เรื่อง</span>
+                    </div>
+
+                    {/* Category Filters */}
+                    <div className={styles.categoryFilters}>
+                        <button
+                            className={`${styles.filterBtn} ${selectedCategory === 'all' ? styles.activeFilter : ''}`}
+                            onClick={() => setSelectedCategory('all')}
+                        >
+                            ทั้งหมด
+                        </button>
+                        {MAIN_CATEGORIES.map(category => (
+                            <button
+                                key={category.id}
+                                className={`${styles.filterBtn} ${selectedCategory === category.id ? styles.activeFilter : ''}`}
+                                onClick={() => setSelectedCategory(category.id)}
+                            >
+                                {category.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {isLoading ? (
+                        <div className={styles.emptyMyNovels}>กำลังโหลดข้อมูลจากฐานข้อมูล...</div>
+                    ) : filteredStories.length === 0 ? (
+                        <div className={styles.emptyMyNovels}>ไม่พบหน้าที่มีหมวดหมู่นี้</div>
+                    ) : (
+                        <div className={styles.storiesGrid}>
+                            {stories.map(story => (
+                                <Link key={story.id} href={`/story/${story.id}`} className={styles.storyCard}>
+                                    <div className={styles.storyCoverWrap}>
+                                        {story.cover_url ? (
+                                            <img src={story.cover_url} alt={story.title} className={styles.storyCover} />
+                                        ) : (
+                                            <div className={styles.storyCoverPlaceholder}>No Cover</div>
+                                        )}
+                                    </div>
+                                    <div className={styles.storyInfo}>
+                                        <h3 className={styles.storyTitle}>{story.title}</h3>
+                                        <p className={styles.storyAuthor}>{story.pen_name}</p>
+                                        <div className={styles.storyBadges}>
+                                            <span className={styles.storyBadge}>
+                                                {story.category === 'fanfic' ? 'แฟนฟิค' : 'ออริจินัล'}
+                                            </span>
+                                            {story.main_category && (
+                                                <span className={styles.storyBadge}>
+                                                    {MAIN_CATEGORIES.find(c => c.id === story.main_category)?.label || story.main_category}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </Link>
+                            ))}
+                        </div>
+                    )}
+                </section>
+            </div>
+        </main>
+    );
 }

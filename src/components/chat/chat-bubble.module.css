@@ -1,0 +1,71 @@
+.messageWrapper {
+    display: flex;
+    width: 100%;
+    margin-bottom: 1rem;
+    align-items: flex-end;
+}
+
+.playerWrapper {
+    justify-content: flex-end;
+}
+
+.characterWrapper {
+    justify-content: flex-start;
+}
+
+.avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin-right: 0.75rem;
+    object-fit: cover;
+    border: 2px solid var(--border);
+}
+
+.bubble {
+    max-width: 75%;
+    padding: 0.75rem 1rem;
+    border-radius: 18px;
+    position: relative;
+    font-size: 0.95rem;
+    line-height: 1.4;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.playerBubble {
+    background-color: var(--primary);
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+
+.characterBubble {
+    background-color: white;
+    color: var(--foreground);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+}
+
+.emotionTag {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.7;
+    margin-top: 0.25rem;
+    text-align: right;
+    display: block;
+}
+
+.systemMessage {
+    display: flex;
+    justify-content: center;
+    margin: 1.5rem 0;
+}
+
+.systemMessage span {
+    font-size: 0.75rem;
+    color: #4b5563;
+    background-color: var(--surface);
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    border: 1px solid var(--border);
+}

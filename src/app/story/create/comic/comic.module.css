@@ -1,0 +1,373 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background-color: var(--surface);
+    overflow: hidden;
+}
+
+.header {
+    height: 60px;
+    background-color: white;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.5rem;
+    flex-shrink: 0;
+    z-index: 10;
+}
+
+.headerLeft {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.backBtn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #64748b;
+    font-weight: 500;
+    text-decoration: none;
+}
+
+.backBtn:hover {
+    color: var(--foreground);
+}
+
+.titleInfo {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.titleInfo h1 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--foreground);
+}
+
+.titleInput {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--foreground);
+    border: none;
+    background: transparent;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    width: 250px;
+    transition: background-color 0.2s;
+}
+
+.titleInput:hover,
+.titleInput:focus {
+    background-color: #f1f5f9;
+    outline: none;
+}
+
+.titleInput::placeholder {
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+.pageCount {
+    font-size: 0.85rem;
+    background-color: #f1f5f9;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    color: #475569;
+    font-weight: 600;
+}
+
+.publishBtn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: var(--primary);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.publishBtn:hover {
+    opacity: 0.9;
+}
+
+/* Workspace Layout */
+.workspace {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Toolbar */
+.toolbar {
+    width: 260px;
+    background-color: white;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem;
+    gap: 2rem;
+    overflow-y: auto;
+}
+
+.toolSection {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.toolSection h3 {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #64748b;
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.toolGrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+}
+
+.toolBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem;
+    background-color: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.toolBtn:hover:not(:disabled) {
+    background-color: #e2e8f0;
+}
+
+.toolBtn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    background-color: transparent;
+    border-color: transparent;
+}
+
+.activeTool {
+    background-color: rgba(28, 198, 172, 0.1);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.colorsGrid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.colorSwatch {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform 0.1s, border-color 0.1s;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.colorSwatch:hover {
+    transform: scale(1.1);
+}
+
+.activeColor {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px white inset, 0 0 0 1px var(--border);
+}
+
+.colorPickerWrapper {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    border: 2px solid #e2e8f0;
+    transition: border-color 0.2s;
+}
+
+.colorPickerWrapper:hover {
+    border-color: #cbd5e1;
+}
+
+.colorPicker {
+    width: 200%;
+    height: 200%;
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    padding: 0;
+    border: none;
+    cursor: pointer;
+}
+
+.slider {
+    width: 100%;
+    accent-color: var(--primary);
+}
+
+.actionBtn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background-color: #f1f5f9;
+    border: 1px dashed #94a3b8;
+    color: #475569;
+    padding: 0.75rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.actionBtn:hover {
+    background-color: #e2e8f0;
+    border-color: #64748b;
+    color: #1e293b;
+}
+
+.bottomTools {
+    margin-top: auto;
+    border-top: 1px solid var(--border);
+    padding-top: 1.5rem;
+}
+
+.clearBtn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background-color: transparent;
+    border: 1px solid #ef4444;
+    color: #ef4444;
+    padding: 0.75rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.clearBtn:hover {
+    background-color: #fef2f2;
+}
+
+/* Canvas Area */
+.canvasArea {
+    flex: 1;
+    background-color: #cbd5e1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-y: auto;
+    padding: 2rem;
+    gap: 2rem;
+}
+
+.canvasWrapper {
+    background-color: white;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    /* Responsive aspect ratio container */
+    width: 100%;
+    max-width: 800px;
+    /* Real canvas width */
+    aspect-ratio: 800 / 1131;
+    position: relative;
+}
+
+.canvas {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    cursor: crosshair;
+    /* Prevent touch scrolling on mobile while drawing */
+    touch-action: none;
+}
+
+.selectedImage {
+    outline: 2px dashed var(--primary);
+    outline-offset: 2px;
+}
+
+/* Pagination */
+.paginationControls {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    background-color: white;
+    padding: 1rem 2rem;
+    border-radius: 999px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.pageNavBtn {
+    display: flex;
+    align-items: center;
+    background: transparent;
+    border: none;
+    color: #4b5563;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.95rem;
+}
+
+.pageNavBtn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.pageNavBtn:not(:disabled):hover {
+    color: var(--primary);
+}
+
+.pageIndicator {
+    font-weight: 700;
+    color: var(--foreground);
+    font-size: 1.05rem;
+    min-width: 80px;
+    text-align: center;
+}
+
+.addPageBtn {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    background-color: var(--primary);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 999px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.addPageBtn:hover {
+    opacity: 0.9;
+}
