@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Check, Sparkles, Coins, Zap } from 'lucide-react';
 import styles from './pricing.module.css';
@@ -13,7 +13,7 @@ type VipEntitlementRow = {
     current_period_end: string | null;
 };
 
-export default function PricingPage() {
+function PricingContent() {
     const { user, session } = useAuth();
     const searchParams = useSearchParams();
 
@@ -209,5 +209,13 @@ export default function PricingPage() {
 
             </div>
         </main>
+    );
+}
+
+export default function PricingPage() {
+    return (
+        <Suspense fallback={<main className={styles.main} />}>
+            <PricingContent />
+        </Suspense>
     );
 }
