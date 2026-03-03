@@ -125,9 +125,18 @@ export async function POST(request: NextRequest) {
     const stripeRes = await createStripeCheckoutSession(formData);
     if (!stripeRes.ok || !stripeRes.data.url) {
       const errorPayload = stripeRes.data as StripeErrorResponse;
+      const stripeStatus =
+        stripeRes.status >= 400 && stripeRes.status < 600 ? stripeRes.status : 502;
+      const stripeMessage = errorPayload.error?.message || 'Failed to create checkout session';
+      console.error('Stripe checkout failed (Next API):', {
+        stripeStatus,
+        stripeMessage,
+        kind: body.kind,
+        packageId: body.packageId ?? null,
+      });
       return NextResponse.json(
-        { error: errorPayload.error?.message || 'Failed to create checkout session' },
-        { status: 502 }
+        { error: stripeMessage, stripeStatus },
+        { status: stripeStatus }
       );
     }
 
@@ -139,6 +148,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Checkout creation failed:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

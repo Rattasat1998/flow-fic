@@ -28,6 +28,9 @@ function getStripeSecretKey() {
   if (!secretKey) {
     throw new Error('Missing STRIPE_SECRET_KEY');
   }
+  if (!secretKey.startsWith('sk_')) {
+    throw new Error('Invalid STRIPE_SECRET_KEY: must be a Stripe secret key (sk_...)');
+  }
   return secretKey;
 }
 
@@ -45,7 +48,19 @@ async function stripeRequest<T>(
     cache: 'no-store',
   });
 
-  const data = (await response.json()) as T;
+  const rawBody = await response.text();
+  let data: T;
+
+  try {
+    data = (rawBody ? JSON.parse(rawBody) : {}) as T;
+  } catch {
+    data = ({
+      error: {
+        message: rawBody || `Stripe API request failed with status ${response.status}`,
+      },
+    } as unknown) as T;
+  }
+
   return { ok: response.ok, status: response.status, data };
 }
 

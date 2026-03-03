@@ -166,9 +166,18 @@ Deno.serve(async (request) => {
     const stripeRes = await createStripeCheckoutSession(formData);
     if (!stripeRes.ok || !stripeRes.data.url) {
       const errorPayload = stripeRes.data as StripeErrorResponse;
+      const stripeStatus =
+        stripeRes.status >= 400 && stripeRes.status < 600 ? stripeRes.status : 502;
+      const stripeMessage = errorPayload.error?.message || 'Failed to create checkout session';
+      console.error('Stripe checkout failed (Edge):', {
+        stripeStatus,
+        stripeMessage,
+        kind: body.kind,
+        packageId: body.packageId ?? null,
+      });
       return jsonResponse(
-        { error: errorPayload.error?.message || 'Failed to create checkout session' },
-        502
+        { error: stripeMessage, stripeStatus },
+        stripeStatus
       );
     }
 
@@ -180,6 +189,7 @@ Deno.serve(async (request) => {
     });
   } catch (error) {
     console.error('stripe-checkout failed:', error);
-    return jsonResponse({ error: 'Internal server error' }, 500);
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    return jsonResponse({ error: message }, 500);
   }
 });
