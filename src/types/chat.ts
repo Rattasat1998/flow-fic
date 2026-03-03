@@ -7,6 +7,9 @@ export interface ChatMessage {
     text: string;
     emotion?: Emotion;
     timestamp: number;
+    type?: 'paragraph' | 'image';
+    imageUrl?: string;
+    characterId?: string | null;
 }
 
 export interface Character {

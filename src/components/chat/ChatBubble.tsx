@@ -16,7 +16,11 @@ export function ChatBubble({ message, character }: ChatBubbleProps) {
     if (isSystem) {
         return (
             <div className={styles.systemMessage}>
-                <span>{message.text}</span>
+                {message.type === 'image' && message.imageUrl ? (
+                    <img src={message.imageUrl} alt="System Image" style={{ maxWidth: '240px', borderRadius: '8px', marginTop: '4px' }} />
+                ) : (
+                    <span>{message.text}</span>
+                )}
             </div>
         );
     }
@@ -36,12 +40,29 @@ export function ChatBubble({ message, character }: ChatBubbleProps) {
                 />
             )}
 
-            <div className={`${styles.bubble} ${isPlayer ? styles.playerBubble : styles.characterBubble}`}>
-                <div className={styles.text}>{message.text}</div>
-                {message.emotion && !isPlayer && (
-                    <div className={styles.emotionTag}>{message.emotion}</div>
+            <div className={`${styles.bubbleContainer} ${isPlayer ? styles.playerContainer : styles.characterContainer}`}>
+                {character && (
+                    <div className={styles.characterName} style={isPlayer ? { textAlign: 'right' } : undefined}>{character.name}</div>
                 )}
+                <div className={`${styles.bubble} ${isPlayer ? styles.playerBubble : styles.characterBubble}`} style={{ padding: message.type === 'image' ? '4px' : undefined, backgroundColor: message.type === 'image' ? (isPlayer ? '#3b82f6' : 'white') : undefined }}>
+                    {message.type === 'image' && message.imageUrl ? (
+                        <img src={message.imageUrl} alt="Chat Image" style={{ maxWidth: '240px', maxHeight: '300px', objectFit: 'contain', borderRadius: '12px', display: 'block' }} />
+                    ) : (
+                        <div className={styles.text}>{message.text}</div>
+                    )}
+                    {message.emotion && !isPlayer && (
+                        <div className={styles.emotionTag}>{message.emotion}</div>
+                    )}
+                </div>
             </div>
+
+            {isPlayer && character && (
+                <img
+                    src={character.avatarUrl}
+                    alt={character.name}
+                    className={styles.avatar}
+                />
+            )}
         </motion.div>
     );
 }

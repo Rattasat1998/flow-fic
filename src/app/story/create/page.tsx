@@ -31,9 +31,6 @@ export default function CreateSelectionPage() {
         <main className={styles.main}>
             {/* Header */}
             <header className={styles.header}>
-                <button onClick={() => router.back()} className={styles.backBtn}>
-                    <ArrowLeft size={20} /> กลับ
-                </button>
                 <h1 className={styles.pageTitle}>สร้างผลงานใหม่</h1>
                 <div style={{ width: 68 }}></div> {/* Spacer for centering */}
             </header>

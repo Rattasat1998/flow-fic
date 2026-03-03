@@ -1,16 +1,29 @@
 'use client';
 
-import { useState, Suspense, useRef } from 'react';
+import { useState, Suspense, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Save, ImagePlus, Upload, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, ImagePlus, Upload, Loader2, Search, X } from 'lucide-react';
 import styles from './text.module.css';
 import { supabase } from '@/lib/supabase';
 import { MAIN_CATEGORIES, SUB_CATEGORIES } from '@/lib/categories';
+import { useAuth } from '@/contexts/AuthContext';
+
+type UnsplashImage = {
+    id: string;
+    alt: string;
+    thumb: string;
+    regular: string;
+    full: string;
+    author: string;
+    authorUrl: string;
+    unsplashUrl: string;
+};
 
 function CreateTextForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const { user } = useAuth();
 
     // Initialize state directly from URL query
     const initialStyle = searchParams.get('style') || 'narrative';
@@ -32,15 +45,8 @@ function CreateTextForm() {
 
     // Settings Checkboxes
     const [settings, setSettings] = useState({
-        allowScreenCapture: true,
-        allowTextToSpeech: true,
-        allowOfflineReading: true,
         allowComments: true,
-        allowStickerComments: true,
-        allowGuestComments: true,
         hideHeartCount: false,
-        lockAge18: false,
-        lockAppOnly: false,
     });
 
     const [synopsis, setSynopsis] = useState('');
@@ -50,6 +56,31 @@ function CreateTextForm() {
     const [coverImage, setCoverImage] = useState<string | null>(null);
     const [coverFile, setCoverFile] = useState<File | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showUnsplashModal, setShowUnsplashModal] = useState(false);
+    const [unsplashQuery, setUnsplashQuery] = useState('');
+    const [unsplashResults, setUnsplashResults] = useState<UnsplashImage[]>([]);
+    const [isUnsplashLoading, setIsUnsplashLoading] = useState(false);
+    const [unsplashError, setUnsplashError] = useState<string | null>(null);
+
+    // Fetch user profile for default pen_name
+    useEffect(() => {
+        const fetchProfile = async () => {
+            if (!user) return;
+            const { data } = await supabase
+                .from('profiles')
+                .select('pen_name')
+                .eq('id', user.id)
+                .single();
+
+            if (data?.pen_name) {
+                setPenName(data.pen_name);
+            } else if (user.user_metadata?.full_name) {
+                setPenName(user.user_metadata.full_name);
+            }
+        };
+
+        fetchProfile();
+    }, [user]);
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -63,12 +94,64 @@ function CreateTextForm() {
         }
     };
 
+    const handleSearchUnsplash = async (rawQuery?: string) => {
+        const query = (rawQuery ?? unsplashQuery).trim();
+        if (!query) {
+            setUnsplashResults([]);
+            setUnsplashError(null);
+            return;
+        }
+
+        setIsUnsplashLoading(true);
+        setUnsplashError(null);
+
+        try {
+            const response = await fetch(`/api/unsplash/search?q=${encodeURIComponent(query)}&perPage=18`);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data?.error || 'ค้นหารูปไม่สำเร็จ');
+            }
+
+            setUnsplashResults((data.results || []) as UnsplashImage[]);
+        } catch (error) {
+            console.error('Unsplash search failed:', error);
+            setUnsplashError('ค้นหารูปไม่สำเร็จ ลองใหม่อีกครั้ง');
+        } finally {
+            setIsUnsplashLoading(false);
+        }
+    };
+
+    const openUnsplashPicker = () => {
+        setShowUnsplashModal(true);
+        setUnsplashError(null);
+        if (!unsplashQuery) {
+            const defaultQuery = 'novel cover art';
+            setUnsplashQuery(defaultQuery);
+            handleSearchUnsplash(defaultQuery);
+        } else if (unsplashResults.length === 0) {
+            handleSearchUnsplash(unsplashQuery);
+        }
+    };
+
+    const handleSelectUnsplashCover = (image: UnsplashImage) => {
+        setCoverImage(image.regular);
+        setCoverFile(null);
+        setShowUnsplashModal(false);
+    };
+
     const handleSettingChange = (key: keyof typeof settings) => {
         setSettings(prev => ({ ...prev, [key]: !prev[key] }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!user) {
+            alert('กรุณาเข้าสู่ระบบก่อนสร้างผลงาน');
+            return;
+        }
+
         setIsSubmitting(true);
 
         try {
@@ -89,6 +172,8 @@ function CreateTextForm() {
                         .getPublicUrl(uploadData.path);
                     coverUrl = urlData.publicUrl;
                 }
+            } else if (coverImage && /^https?:\/\//.test(coverImage)) {
+                coverUrl = coverImage;
             }
 
             // 2. Parse tags from comma-separated string
@@ -101,6 +186,7 @@ function CreateTextForm() {
             const { data, error } = await supabase
                 .from('stories')
                 .insert({
+                    user_id: user.id,
                     title,
                     pen_name: penName,
                     category,
@@ -126,8 +212,8 @@ function CreateTextForm() {
                 return;
             }
 
-            // 4. Redirect to the new story's management page
-            router.push(`/story/manage/${data.id}`);
+            // 4. Redirect back to the dashboard
+            router.push('/dashboard');
         } catch (err) {
             console.error('Unexpected error:', err);
             alert('เกิดข้อผิดพลาดที่ไม่คาดคิด กรุณาลองใหม่อีกครั้ง');
@@ -139,9 +225,6 @@ function CreateTextForm() {
     return (
         <main className={styles.main}>
             <header className={styles.header}>
-                <button onClick={() => router.back()} className={styles.backBtn} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                    <ArrowLeft size={20} /> กลับ
-                </button>
                 <h1>สร้างผลงานใหม่</h1>
                 <div style={{ width: 60 }} /> {/* Spacer */}
             </header>
@@ -174,6 +257,28 @@ function CreateTextForm() {
                                 style={{ display: 'none' }}
                                 onChange={handleImageUpload}
                             />
+                            <div className={styles.coverActions}>
+                                <button
+                                    type="button"
+                                    className={styles.unsplashPickerBtn}
+                                    onClick={openUnsplashPicker}
+                                >
+                                    <Search size={15} />
+                                    เลือกรูปจาก Unsplash
+                                </button>
+                                {coverImage && (
+                                    <button
+                                        type="button"
+                                        className={styles.clearCoverBtn}
+                                        onClick={() => {
+                                            setCoverImage(null);
+                                            setCoverFile(null);
+                                        }}
+                                    >
+                                        ลบรูปปก
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
                         <div className={styles.formGroup}>
@@ -321,53 +426,13 @@ function CreateTextForm() {
 
                         <div className={styles.settingsList}>
                             <label className={styles.checkboxLabel}>
-                                <input type="checkbox" checked={settings.allowScreenCapture} onChange={() => handleSettingChange('allowScreenCapture')} />
-                                อนุญาตให้แคปหน้าจอได้
+                                <input type="checkbox" checked={settings.allowComments} onChange={() => handleSettingChange('allowComments')} />
+                                อนุญาตให้ผู้อ่านแสดงความเห็น
                             </label>
-
-                            <label className={styles.checkboxLabel}>
-                                <input type="checkbox" checked={settings.allowTextToSpeech} onChange={() => handleSettingChange('allowTextToSpeech')} />
-                                อนุญาตให้ใช้ฟีเจอร์อ่านให้ฟัง (Text to speech)
-                            </label>
-
-                            <label className={styles.checkboxLabel}>
-                                <input type="checkbox" checked={settings.allowOfflineReading} onChange={() => handleSettingChange('allowOfflineReading')} />
-                                อนุญาตให้อ่านแบบออฟไลน์ อ่านโดยไม่ใช้อินเทอร์เน็ต (อยู่ระหว่างพัฒนา)
-                            </label>
-
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <label className={styles.checkboxLabel}>
-                                    <input type="checkbox" checked={settings.allowComments} onChange={() => handleSettingChange('allowComments')} />
-                                    อนุญาตให้ผู้อ่านแสดงความเห็น
-                                </label>
-
-                                {settings.allowComments && (
-                                    <div className={styles.subSettings}>
-                                        <label className={styles.checkboxLabel}>
-                                            <input type="checkbox" checked={settings.allowStickerComments} onChange={() => handleSettingChange('allowStickerComments')} />
-                                            อนุญาตให้ผู้อ่านแสดงความเห็นด้วยสติกเกอร์
-                                        </label>
-                                        <label className={styles.checkboxLabel}>
-                                            <input type="checkbox" checked={settings.allowGuestComments} onChange={() => handleSettingChange('allowGuestComments')} />
-                                            อนุญาตให้ผู้อ่านที่ไม่ Login แสดงความคิดเห็นได้
-                                        </label>
-                                    </div>
-                                )}
-                            </div>
 
                             <label className={styles.checkboxLabel}>
                                 <input type="checkbox" checked={settings.hideHeartCount} onChange={() => handleSettingChange('hideHeartCount')} />
                                 ซ่อนจำนวนหัวใจ
-                            </label>
-
-                            <label className={styles.checkboxLabel}>
-                                <input type="checkbox" checked={settings.lockAge18} onChange={() => handleSettingChange('lockAge18')} />
-                                ล็อกเนื้อหาให้อ่านได้เฉพาะผู้ที่มีอายุ 18 ปีขึ้นไปและยืนยันอายุด้วยบัตรประชาชน
-                            </label>
-
-                            <label className={styles.checkboxLabel}>
-                                <input type="checkbox" checked={settings.lockAppOnly} onChange={() => handleSettingChange('lockAppOnly')} />
-                                ล็อกเนื้อหาให้อ่านได้เฉพาะผู้ใช้งานแอปพลิเคชันเท่านั้น
                             </label>
                         </div>
                     </div>
@@ -383,6 +448,67 @@ function CreateTextForm() {
                     </button>
                 </form>
             </div>
+
+            {showUnsplashModal && (
+                <div className={styles.modalOverlay} onClick={() => setShowUnsplashModal(false)}>
+                    <div className={`${styles.modal} ${styles.unsplashModal}`} onClick={(e) => e.stopPropagation()}>
+                        <div className={styles.modalHeader}>
+                            <h3 className={styles.modalTitle}>เลือกรูปปกจาก Unsplash</h3>
+                            <button type="button" className={styles.iconBtn} onClick={() => setShowUnsplashModal(false)}>
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className={styles.modalBody}>
+                            <div className={styles.unsplashSearchRow}>
+                                <input
+                                    type="text"
+                                    value={unsplashQuery}
+                                    onChange={(e) => setUnsplashQuery(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleSearchUnsplash();
+                                        }
+                                    }}
+                                    className={styles.unsplashSearchInput}
+                                    placeholder="เช่น fantasy book cover, mystery, anime city"
+                                />
+                                <button
+                                    type="button"
+                                    className={styles.unsplashSearchBtn}
+                                    onClick={() => handleSearchUnsplash()}
+                                    disabled={isUnsplashLoading || !unsplashQuery.trim()}
+                                >
+                                    {isUnsplashLoading ? <Loader2 size={16} className={styles.spinner} /> : 'ค้นหา'}
+                                </button>
+                            </div>
+
+                            {unsplashError && (
+                                <div className={styles.unsplashError}>{unsplashError}</div>
+                            )}
+
+                            {!isUnsplashLoading && !unsplashError && unsplashResults.length === 0 && (
+                                <div className={styles.unsplashEmpty}>ยังไม่พบรูป ลองค้นหาด้วยคำอื่น</div>
+                            )}
+
+                            <div className={styles.unsplashGrid}>
+                                {unsplashResults.map((image) => (
+                                    <button
+                                        key={image.id}
+                                        type="button"
+                                        className={styles.unsplashCard}
+                                        onClick={() => handleSelectUnsplashCover(image)}
+                                    >
+                                        <img src={image.thumb} alt={image.alt} className={styles.unsplashThumb} />
+                                        <span className={styles.unsplashCredit}>by {image.author}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </main>
     );
 }

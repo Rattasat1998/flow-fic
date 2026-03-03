@@ -3,8 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { MOCK_STORIES } from '@/lib/dummy-data';
-import { Star, BarChart2, Heart, PlaySquare, ArrowLeft } from 'lucide-react';
+import { PlaySquare } from 'lucide-react';
 import styles from './details.module.css';
 
 interface StoryDetailsProps {
@@ -29,6 +28,8 @@ type DBChapter = {
     order_index: number;
     read_count: number;
     created_at: string;
+    is_premium: boolean;
+    coin_price: number;
 };
 
 const fallbackCover = 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=600&q=80';
@@ -36,22 +37,13 @@ const fallbackCover = 'https://images.unsplash.com/photo-1544717305-2782549b5136
 export default function StoryDetailsPage({ params }: StoryDetailsProps) {
     const unwrappedParams = use(params);
     const storyId = unwrappedParams.id;
-    const mockStory = MOCK_STORIES.find(s => s.id === storyId) || null;
 
-    const [isLoading, setIsLoading] = useState(!mockStory);
+    const [isLoading, setIsLoading] = useState(true);
     const [dbStory, setDbStory] = useState<DBStory | null>(null);
     const [dbChapters, setDbChapters] = useState<DBChapter[]>([]);
+    const [likeCount, setLikeCount] = useState(0);
 
     useEffect(() => {
-        if (mockStory) {
-            // Mock chapters
-            setDbChapters([
-                { id: 'm1', title: 'ตอนที่ 1 เอาชีวิตรอด', order_index: 0, read_count: 1540, created_at: new Date().toISOString() },
-                { id: 'm2', title: 'ตอนที่ 2 ร่องรอยเดิม', order_index: 1, read_count: 810, created_at: new Date().toISOString() }
-            ]);
-            return;
-        }
-
         const fetchStoryDetails = async () => {
             setIsLoading(true);
 
@@ -69,18 +61,25 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
 
             const { data: chapterData } = await supabase
                 .from('chapters')
-                .select('id, title, order_index, read_count, created_at')
+                .select('id, title, order_index, read_count, created_at, is_premium, coin_price')
                 .eq('story_id', storyId)
                 .eq('status', 'published')
                 .order('order_index', { ascending: true });
 
+            // Fetch like count
+            const { count: likesCount } = await supabase
+                .from('likes')
+                .select('*', { count: 'exact', head: true })
+                .eq('story_id', storyId);
+
             setDbStory(storyData as DBStory);
             setDbChapters(chapterData as DBChapter[] || []);
+            setLikeCount(likesCount || 0);
             setIsLoading(false);
         };
 
         fetchStoryDetails();
-    }, [mockStory, storyId]);
+    }, [storyId]);
 
     if (isLoading) {
         return (
@@ -90,83 +89,53 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
         );
     }
 
-    const activeStory = mockStory
-        ? {
-            title: mockStory.title,
-            author: mockStory.author,
-            synopsis: mockStory.synopsis,
-            cover: (mockStory as any).coverImage || mockStory.character.avatarUrl,
-            category: (mockStory as any).type || 'Original',
-            status: 'published',
-            completion: 'ongoing',
-            score: (mockStory as any).score || 8.9,
-            views: (mockStory as any).views || 142900,
-            favorites: (mockStory as any).likes || 3890
-        }
-        : dbStory
-            ? {
-                title: dbStory.title,
-                author: dbStory.pen_name,
-                synopsis: dbStory.synopsis,
-                cover: dbStory.cover_url || fallbackCover,
-                category: dbStory.category === 'fanfic' ? 'Fanfiction' : 'Original',
-                status: dbStory.status,
-                completion: dbStory.completion_status,
-                score: 8.5, // Dummy default score for real DB stories
-                views: dbChapters.reduce((sum, ch) => sum + ch.read_count, 0),
-                favorites: 0 // Mock for now until favorites table exists
-            }
-            : null;
-
-    if (!activeStory) {
+    if (!dbStory) {
         return (
             <main className={styles.main} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
                 <h2>ไม่พบข้อมูลเรื่อง</h2>
-                <Link href="/" className={styles.backBtn}><ArrowLeft size={16} /> กลับหน้าหลัก</Link>
             </main>
         );
     }
 
+    const totalViews = dbChapters.reduce((sum, ch) => sum + ch.read_count, 0);
     const totalChapters = dbChapters.length;
+    const cover = dbStory.cover_url || fallbackCover;
 
     return (
         <main className={styles.main}>
             <div className={styles.heroBanner}>
-                <div className={styles.heroBg} style={{ backgroundImage: `url(${activeStory.cover})` }} />
+                <div className={styles.heroBg} style={{ backgroundImage: `url(${cover})` }} />
                 <div className={styles.heroOverlay}>
                     <nav className={styles.topNavigation}>
-                        <Link href="/" className={styles.backBtn}>
-                            <ArrowLeft size={18} /> หน้าหลัก
-                        </Link>
                     </nav>
 
                     <div className={styles.heroContent}>
                         <div className={styles.heroPosterContainer}>
-                            <img src={activeStory.cover} alt={activeStory.title} className={styles.heroPoster} />
+                            <img src={cover} alt={dbStory.title} className={styles.heroPoster} />
                         </div>
 
                         <div className={styles.heroDetails}>
-                            <h1 className={styles.heroTitle}>{activeStory.title}</h1>
+                            <h1 className={styles.heroTitle}>{dbStory.title}</h1>
                             <div className={styles.heroMeta}>
-                                {activeStory.category} <span className={styles.heroMetaDivider}>·</span> {activeStory.author}
+                                {dbStory.category === 'fanfic' ? 'Fanfiction' : 'Original'} <span className={styles.heroMetaDivider}>·</span> {dbStory.pen_name}
                             </div>
 
                             <p className={styles.heroSubtitle}>
-                                {activeStory.synopsis || 'ไม่มีคำโปรยสำหรับเรื่องนี้'}
+                                {dbStory.synopsis || 'ไม่มีคำโปรยสำหรับเรื่องนี้'}
                             </p>
 
                             <div className={styles.heroBadges}>
                                 <span className={styles.badge + ' ' + styles.badgeDark}>
-                                    {activeStory.category === 'Fanfiction' ? 'ออริจินัลฟิค' : 'ออริจินัล'}
+                                    {dbStory.category === 'fanfic' ? 'ออริจินัลฟิค' : 'ออริจินัล'}
                                 </span>
-                                <span className={styles.badge + ' ' + (activeStory.completion === 'completed' ? styles.badgeScore : styles.badgeActive)}>
-                                    {activeStory.completion === 'completed' ? 'จบแล้ว' : 'กำลังออนแอร์'}
-                                </span>
-                                <span className={styles.badge + ' ' + styles.badgeDark}>
-                                    👁️ {activeStory.views.toLocaleString()} Views
+                                <span className={styles.badge + ' ' + (dbStory.completion_status === 'completed' ? styles.badgeScore : styles.badgeActive)}>
+                                    {dbStory.completion_status === 'completed' ? 'จบแล้ว' : 'กำลังออนแอร์'}
                                 </span>
                                 <span className={styles.badge + ' ' + styles.badgeDark}>
-                                    ❤️ {activeStory.favorites.toLocaleString()} Loves
+                                    👁️ {totalViews.toLocaleString()} Views
+                                </span>
+                                <span className={styles.badge + ' ' + styles.badgeDark}>
+                                    ❤️ {likeCount.toLocaleString()} Loves
                                 </span>
                             </div>
                         </div>
@@ -186,24 +155,16 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
                     <div className={styles.infoBlock}>
                         <div className={styles.infoItem}>
                             <span className={styles.infoLabel}>สถานะการเผยแพร่</span>
-                            <span className={styles.infoValue}>{activeStory.status === 'published' ? 'เผยแพร่แล้ว' : 'แบบร่าง'}</span>
+                            <span className={styles.infoValue}>{dbStory.status === 'published' ? 'เผยแพร่แล้ว' : 'แบบร่าง'}</span>
                         </div>
                         <div className={styles.infoItem}>
                             <span className={styles.infoLabel}>สถานะความสมบูรณ์</span>
-                            <span className={styles.infoValue}>{activeStory.completion === 'completed' ? 'จบแล้ว' : 'ยังไม่จบ'}</span>
+                            <span className={styles.infoValue}>{dbStory.completion_status === 'completed' ? 'จบแล้ว' : 'ยังไม่จบ'}</span>
                         </div>
                         <div className={styles.infoItem}>
                             <span className={styles.infoLabel}>จำนวนตอนทั้งหมด</span>
                             <span className={styles.infoValue}>{totalChapters} ตอน</span>
                         </div>
-                        {activeStory.score > 0 && (
-                            <div className={styles.infoItem}>
-                                <span className={styles.infoLabel}>คะแนนความนิยม</span>
-                                <span className={styles.infoValue} style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#d97706' }}>
-                                    <Star size={16} fill="currentColor" /> {activeStory.score.toFixed(1)} / 10
-                                </span>
-                            </div>
-                        )}
                     </div>
                 </aside>
 
@@ -212,7 +173,7 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
                         <div className={styles.sectionHeader}>
                             <h2 className={styles.sectionTitle}>คำโปรย (Synopsis)</h2>
                         </div>
-                        <p className={styles.synopsisText}>{activeStory.synopsis || 'ไม่มีคำโปรยสำหรับเรื่องนี้'}</p>
+                        <p className={styles.synopsisText}>{dbStory.synopsis || 'ไม่มีคำโปรยสำหรับเรื่องนี้'}</p>
                     </section>
 
                     <section className={styles.section}>
@@ -232,9 +193,14 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
                                             <div className={styles.chapterMeta} style={{ marginTop: '0.25rem' }}>
                                                 <span>👁️ {chapter.read_count} วิว</span>
                                                 <span>📅 {new Date(chapter.created_at).toLocaleDateString('th-TH')}</span>
+                                                {chapter.is_premium && (
+                                                    <span style={{ color: '#b45309', fontWeight: 700 }}>
+                                                        🔒 ตอนพิเศษ {chapter.coin_price} เหรียญ
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
-                                        <span className={styles.chapterAction}>อ่านเลย &rarr;</span>
+                                        <span className={styles.chapterAction}>{chapter.is_premium ? 'ดูรายละเอียด &rarr;' : 'อ่านเลย &rarr;'}</span>
                                     </Link>
                                 ))
                             )}

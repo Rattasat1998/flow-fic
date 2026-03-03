@@ -7,6 +7,7 @@ import { DragDropContext, Droppable, Draggable, DropResult, DroppableProvided, D
 import styles from './manage.module.css';
 import { supabase } from '@/lib/supabase';
 import { MAIN_CATEGORIES, SUB_CATEGORIES } from '@/lib/categories';
+import { useAuth } from '@/contexts/AuthContext';
 
 type StoryCompletionStatus = 'ongoing' | 'completed';
 type StoryPublicationStatus = 'draft' | 'published';
@@ -29,40 +30,18 @@ export type Character = {
     created_at: string;
 };
 
-const mockStory = {
-    id: '123',
-    title: 'คดีฆาตกรรมห้องปิดตาย',
-    penName: 'Sherlock Holmes',
-    writingStyle: 'narrative',
-    status: 'published',
-    completionStatus: 'ongoing',
-    synopsis: 'เรื่องราวของนักสืบที่ต้องไขคดีฆาตกรรมที่เกิดขึ้นในห้องที่ไม่มีทางเข้าออก...',
-    category: 'original',
-    mainCategory: '',
-    subCategory: '',
-    coverImage: null as string | null,
-    readCount: 3800,
-    heartCount: 850,
-    commentCount: 120,
-    chapters: [
-        { id: '1', title: 'ปฐมบท: ศพในห้องล็อค', status: 'published', views: 1250, comments: 45, date: '2023-10-25' },
-        { id: '2', title: 'ร่องรอยที่หายไป', status: 'published', views: 980, comments: 32, date: '2023-10-28' },
-        { id: '3', title: 'ผู้ต้องสงสัยทั้งสาม', status: 'published', views: 850, comments: 28, date: '2023-11-01' },
-        { id: '4', title: 'พยานปากเอก', status: 'published', views: 720, comments: 15, date: '2023-11-05' },
-        { id: '5', title: 'แรงจูงใจที่ซ่อนเร้น', status: 'draft', views: 0, comments: 0, date: '2023-11-10' }
-    ]
-};
-
 export default function StoryManagerPage() {
     const params = useParams();
     const router = useRouter();
     const storyId = params.id as string;
+    const { user, isLoading: isLoadingAuth } = useAuth();
 
-    const [storyData, setStoryData] = useState<typeof mockStory | null>(null);
-    const [chapters, setChapters] = useState(mockStory.chapters);
+    const [storyData, setStoryData] = useState<any | null>(null);
+    const [chapters, setChapters] = useState<any[]>([]);
     const [characters, setCharacters] = useState<Character[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isFromDB, setIsFromDB] = useState(false);
+    const [authError, setAuthError] = useState(false);
 
     // Edit modal state
     const [showEditModal, setShowEditModal] = useState(false);
@@ -90,7 +69,7 @@ export default function StoryManagerPage() {
     });
     const [charImageFile, setCharImageFile] = useState<File | null>(null);
     const [isSavingChar, setIsSavingChar] = useState(false);
-    const [editingCharId, setEditingCharId] = useState<string | null>(null); // Track which character is being edited
+    const [editingCharId, setEditingCharId] = useState<string | null>(null);
 
     // Confirm Modal state
     const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -106,8 +85,23 @@ export default function StoryManagerPage() {
     useEffect(() => {
         setIsMounted(true);
 
+        const cacheKey = `flowfic_manage_${storyId}`;
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+            try {
+                const parsed = JSON.parse(cached);
+                setStoryData(parsed.storyData);
+                setChapters(parsed.chapters);
+                setCharacters(parsed.characters);
+                setIsFromDB(true);
+                setIsLoading(false);
+            } catch (e) {
+                console.error("Cache parsing error", e);
+            }
+        }
+
         const fetchStory = async () => {
-            if (!storyId) return;
+            if (!storyId || !user) return;
 
             // Try fetching from Supabase first
             const { data: storyData, error: storyError } = await supabase
@@ -116,11 +110,24 @@ export default function StoryManagerPage() {
                 .eq('id', storyId)
                 .single();
 
+            if (storyError || !storyData) {
+                console.error("Story not found or error:", storyError);
+                router.push('/dashboard');
+                return;
+            }
+
+            // Security check: only the owner can manage
+            if (storyData.user_id !== user.id) {
+                setAuthError(true);
+                setIsLoading(false);
+                return;
+            }
+
             if (!storyError && storyData) {
                 // Fetch chapters for this story
                 const { data: chaptersData, error: chaptersError } = await supabase
                     .from('chapters')
-                    .select('id, title, status, order_index, created_at, read_count')
+                    .select('id, title, status, order_index, created_at, read_count, is_premium, coin_price')
                     .eq('story_id', storyId)
                     .order('order_index', { ascending: true });
 
@@ -130,7 +137,9 @@ export default function StoryManagerPage() {
                     status: ch.status as 'draft' | 'published',
                     views: ch.read_count || 0,
                     comments: 0,
-                    date: new Date(ch.created_at).toLocaleDateString()
+                    date: new Date(ch.created_at).toLocaleDateString(),
+                    isPremium: ch.is_premium || false,
+                    coinPrice: ch.coin_price || 0,
                 }));
 
                 const dbStory = {
@@ -162,17 +171,24 @@ export default function StoryManagerPage() {
                 setChapters(formattedChapters);
                 setCharacters(charsData || []);
                 setIsFromDB(true);
-            } else {
-                // Fallback to mock data for legacy IDs
-                setStoryData(mockStory);
-                setChapters(mockStory.chapters);
-                setCharacters([]);
+
+                sessionStorage.setItem(cacheKey, JSON.stringify({
+                    storyData: dbStory,
+                    chapters: formattedChapters,
+                    characters: charsData || []
+                }));
             }
             setIsLoading(false);
         };
 
-        fetchStory();
-    }, [storyId]);
+        if (!isLoadingAuth) {
+            if (!user) {
+                router.push('/');
+            } else {
+                fetchStory();
+            }
+        }
+    }, [storyId, user, isLoadingAuth, router]);
 
     const story = storyData ? { ...storyData, chapters } : null;
     const editorStyle = story?.writingStyle || 'narrative';
@@ -232,6 +248,8 @@ export default function StoryManagerPage() {
     };
 
     const handleCreateChapter = async () => {
+        if (!user) return;
+
         if (isStoryCompleted) {
             alert("เรื่องนี้ถูกตั้งเป็น 'จบแล้ว' จึงไม่สามารถเพิ่มตอนใหม่ได้");
             return;
@@ -249,6 +267,7 @@ export default function StoryManagerPage() {
                 .insert([
                     {
                         story_id: storyId,
+                        user_id: user.id,
                         title: 'ตอนใหม่',
                         order_index: chapters.length,
                         status: 'draft'
@@ -292,7 +311,7 @@ export default function StoryManagerPage() {
         const previousCompletionStatus = normalizeCompletionStatus(story.completionStatus);
 
         // Optimistic UI update
-        setStoryData(prev => prev ? {
+        setStoryData((prev: any) => prev ? {
             ...prev,
             status: targetPublicationStatus,
             completionStatus: targetCompletionStatus,
@@ -317,7 +336,7 @@ export default function StoryManagerPage() {
             }
         } catch (err) {
             console.error('Error updating story status:', err);
-            setStoryData(prev => prev ? {
+            setStoryData((prev: any) => prev ? {
                 ...prev,
                 status: previousPublicationStatus,
                 completionStatus: previousCompletionStatus,
@@ -349,7 +368,7 @@ export default function StoryManagerPage() {
             setEditCoverFile(file);
             const reader = new FileReader();
             reader.onload = (event) => {
-                if (event.target?.result) setEditForm(f => ({ ...f, coverUrl: event.target!.result as string }));
+                if (event.target?.result) setEditForm((f: any) => ({ ...f, coverUrl: event.target!.result as string }));
             };
             reader.readAsDataURL(file);
         }
@@ -407,7 +426,7 @@ export default function StoryManagerPage() {
             }
 
             // 4. Update local state
-            setStoryData(prev => prev ? {
+            setStoryData((prev: any) => prev ? {
                 ...prev,
                 title: editForm.title,
                 penName: editForm.penName,
@@ -431,11 +450,13 @@ export default function StoryManagerPage() {
         if (file) {
             setCharImageFile(file);
             const objectUrl = URL.createObjectURL(file);
-            setCharForm(prev => ({ ...prev, imageUrl: objectUrl }));
+            setCharForm((prev: any) => ({ ...prev, imageUrl: objectUrl }));
         }
     };
 
     const handleSaveCharacter = async () => {
+        if (!user) return;
+
         if (!charForm.name.trim()) {
             alert('กรุณากรอกชื่อตัวละคร');
             return;
@@ -495,6 +516,7 @@ export default function StoryManagerPage() {
                     .from('characters')
                     .insert([{
                         story_id: storyId,
+                        user_id: user.id,
                         name: charForm.name,
                         age: charForm.age || null,
                         occupation: charForm.occupation || null,
@@ -570,6 +592,57 @@ export default function StoryManagerPage() {
                     if (error) {
                         console.error('Failed to delete character:', error);
                         alert('เกิดข้อผิดพลาดในการลบตัวละคร');
+                        return;
+                    }
+
+                    // Update any chat chapters by converting this character's blocks to narrative
+                    try {
+                        const { data: chatChapters } = await supabase
+                            .from('chapters')
+                            .select('id, content')
+                            .eq('story_id', storyId)
+                            .eq('style', 'chat');
+
+                        if (chatChapters && chatChapters.length > 0) {
+                            for (const chapter of chatChapters) {
+                                if (!chapter.content) continue;
+
+                                let needsUpdate = false;
+                                let parsedContent = typeof chapter.content === 'string'
+                                    ? JSON.parse(chapter.content)
+                                    : chapter.content;
+
+                                // Nullify POV character if matched
+                                if (parsedContent?.povCharacterId === charId) {
+                                    parsedContent.povCharacterId = null;
+                                    needsUpdate = true;
+                                }
+
+                                // Nullify block characterId if matched (converting to narrative)
+                                if (parsedContent?.blocks && Array.isArray(parsedContent.blocks)) {
+                                    parsedContent.blocks = parsedContent.blocks.map((block: any) => {
+                                        if (block.characterId === charId) {
+                                            needsUpdate = true;
+                                            return { ...block, characterId: null };
+                                        }
+                                        return block;
+                                    });
+                                }
+
+                                if (needsUpdate) {
+                                    await supabase
+                                        .from('chapters')
+                                        .update({
+                                            content: typeof chapter.content === 'string'
+                                                ? JSON.stringify(parsedContent)
+                                                : parsedContent
+                                        })
+                                        .eq('id', chapter.id);
+                                }
+                            }
+                        }
+                    } catch (updateErr) {
+                        console.error('Failed to update chapters after char deletion:', updateErr);
                     }
                 }
             }
@@ -582,9 +655,6 @@ export default function StoryManagerPage() {
     if (!story) return (
         <main className={styles.main}>
             <header className={styles.header}>
-                <button onClick={() => router.back()} className={styles.backBtn}>
-                    <ArrowLeft size={20} /> กลับ
-                </button>
             </header>
             <div className={styles.content} style={{ textAlign: 'center', padding: '4rem 2rem', color: '#64748b' }}>
                 <h2>ไม่พบข้อมูลเรื่องนี้</h2>
@@ -596,10 +666,7 @@ export default function StoryManagerPage() {
     return (
         <main className={styles.main}>
             <header className={styles.header}>
-                <button onClick={() => router.back()} className={styles.backBtn}>
-                    <ArrowLeft size={20} /> กลับไปหน้าแต่งนิยาย
-                </button>
-                <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ display: 'flex', gap: '1rem', marginLeft: 'auto' }}>
                     <button className={styles.backBtn}><BarChart2 size={18} /> สถิติ</button>
                     <button className={styles.backBtn} onClick={openEditModal}><Settings size={18} /> แก้ไขข้อมูล</button>
                 </div>
@@ -787,7 +854,7 @@ export default function StoryManagerPage() {
                                     {...provided.droppableProps}
                                     ref={provided.innerRef}
                                 >
-                                    {story.chapters.map((chapter, index) => (
+                                    {story.chapters.map((chapter: any, index: number) => (
                                         <Draggable key={chapter.id} draggableId={chapter.id} index={index}>
                                             {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
                                                 <div
@@ -817,6 +884,11 @@ export default function StoryManagerPage() {
                                                                 )}
                                                                 {chapter.status === 'published' && (
                                                                     <span style={{ marginLeft: '1rem' }}>👁️ {chapter.views} | 💬 {chapter.comments}</span>
+                                                                )}
+                                                                {chapter.isPremium && (
+                                                                    <span style={{ marginLeft: '1rem', color: '#b45309', fontWeight: 700 }}>
+                                                                        🔒 ตอนพิเศษ {chapter.coinPrice} เหรียญ
+                                                                    </span>
                                                                 )}
                                                             </div>
                                                         </div>

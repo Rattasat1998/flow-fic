@@ -5,10 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
     ArrowLeft, Trash2, PenTool, Eraser, Save, Plus, ChevronLeft, ChevronRight,
-    Highlighter, Undo2, Redo2, ImagePlus, ArrowUpToLine, ArrowDownToLine, Trash
+    Highlighter, Undo2, Redo2, ImagePlus, ArrowUpToLine, ArrowDownToLine, Trash, Loader2
 } from 'lucide-react';
 import { Rnd } from 'react-rnd';
 import styles from './comic.module.css';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 type ToolType = 'pen' | 'marker' | 'eraser';
 
@@ -24,6 +26,7 @@ type DraftImage = {
 
 export default function ComicCreatorPage() {
     const router = useRouter();
+    const { user } = useAuth();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -36,6 +39,7 @@ export default function ComicCreatorPage() {
     const [color, setColor] = useState('#0f172a');
     const [brushSize, setBrushSize] = useState(3);
     const [tool, setTool] = useState<ToolType>('pen');
+    const [isPublishing, setIsPublishing] = useState(false);
 
     // Undo/Redo History per page
     const [history, setHistory] = useState<Record<number, string[]>>({});
@@ -334,23 +338,125 @@ export default function ComicCreatorPage() {
         }
     };
 
-    const handlePublish = () => {
+    const dataURLtoBlob = (dataURL: string): Blob => {
+        const parts = dataURL.split(',');
+        const mime = parts[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+        const byteString = atob(parts[1]);
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteString.length; i++) {
+            ia[i] = byteString.charCodeAt(i);
+        }
+        return new Blob([ab], { type: mime });
+    };
+
+    const handlePublish = async () => {
         if (!title.trim()) {
             alert('กรุณาตั้งชื่อเรื่องการ์ตูนก่อนบันทึกครับ');
             return;
         }
+        if (!user) {
+            alert('กรุณาเข้าสู่ระบบก่อนบันทึก');
+            return;
+        }
+
+        setIsPublishing(true);
         saveCurrentPageToState();
-        alert(`บันทึกการ์ตูนเรื่อง "${title}" เรียบร้อยแล้ว\nรวมรูปวาดและภาพกราฟิก จำนวน ${pages.length} หน้า!`);
-        router.push('/dashboard');
+
+        try {
+            // 1. Create the story in Supabase
+            const { data: storyData, error: storyError } = await supabase
+                .from('stories')
+                .insert({
+                    title,
+                    pen_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Comic Writer',
+                    category: 'original',
+                    writing_style: 'narrative',
+                    story_format: 'single',
+                    status: 'published',
+                    user_id: user.id,
+                })
+                .select()
+                .single();
+
+            if (storyError || !storyData) {
+                throw storyError || new Error('ไม่สามารถสร้างเรื่องได้');
+            }
+
+            const storyId = storyData.id;
+
+            // 2. Upload each page as an image to Supabase Storage
+            const pageUrls: string[] = [];
+            const finalPages = [...pages];
+            // Make sure current page is saved
+            const canvas = canvasRef.current;
+            if (canvas) {
+                finalPages[currentPage] = canvas.toDataURL('image/jpeg', 0.8);
+            }
+
+            for (let i = 0; i < finalPages.length; i++) {
+                const pageData = finalPages[i];
+                if (!pageData) continue;
+
+                const blob = dataURLtoBlob(pageData);
+                const fileName = `${storyId}/page_${i + 1}_${Date.now()}.jpg`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('comics')
+                    .upload(fileName, blob, { contentType: 'image/jpeg' });
+
+                if (uploadError) {
+                    console.error(`Error uploading page ${i + 1}:`, uploadError);
+                    throw uploadError;
+                }
+
+                const { data: { publicUrl } } = supabase.storage
+                    .from('comics')
+                    .getPublicUrl(fileName);
+
+                pageUrls.push(publicUrl);
+            }
+
+            // 3. Create a chapter with the comic pages as content
+            const { error: chapterError } = await supabase
+                .from('chapters')
+                .insert({
+                    story_id: storyId,
+                    user_id: user.id,
+                    title: `${title} — หน้า 1-${pageUrls.length}`,
+                    content: {
+                        type: 'comic',
+                        pages: pageUrls,
+                    },
+                    order_index: 0,
+                    status: 'published',
+                });
+
+            if (chapterError) throw chapterError;
+
+            // 4. Set cover from first page
+            if (pageUrls.length > 0) {
+                await supabase
+                    .from('stories')
+                    .update({ cover_url: pageUrls[0] })
+                    .eq('id', storyId);
+            }
+
+            alert(`บันทึกการ์ตูนเรื่อง "${title}" เรียบร้อยแล้ว! (${pageUrls.length} หน้า)`);
+            router.push(`/story/manage/${storyId}`);
+
+        } catch (error) {
+            console.error('Error publishing comic:', error);
+            alert('เกิดข้อผิดพลาดในการบันทึก กรุณาลองใหม่');
+        } finally {
+            setIsPublishing(false);
+        }
     };
 
     return (
         <div className={styles.container}>
             <header className={styles.header}>
                 <div className={styles.headerLeft}>
-                    <Link href="/story/create" className={styles.backBtn}>
-                        <ArrowLeft size={20} /> กลับ
-                    </Link>
                     <div className={styles.titleInfo}>
                         <input
                             type="text"
@@ -363,8 +469,8 @@ export default function ComicCreatorPage() {
                         <span className={styles.pageCount}>หน้า {currentPage + 1} / {pages.length}</span>
                     </div>
                 </div>
-                <button className={styles.publishBtn} onClick={handlePublish}>
-                    <Save size={18} /> บันทึกและเผยแพร่
+                <button className={styles.publishBtn} onClick={handlePublish} disabled={isPublishing}>
+                    {isPublishing ? <><Loader2 size={18} className={styles.spinner} /> กำลังบันทึก...</> : <><Save size={18} /> บันทึกและเผยแพร่</>}
                 </button>
             </header>
 

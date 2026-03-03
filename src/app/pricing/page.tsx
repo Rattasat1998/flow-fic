@@ -1,29 +1,107 @@
 'use client';
 
-import Link from 'next/link';
-import { ArrowLeft, Check, Sparkles, Coins, Zap } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Check, Sparkles, Coins, Zap } from 'lucide-react';
 import styles from './pricing.module.css';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { COIN_PACKAGES, VIP_MONTHLY_PRICE_THB, getCoinPackageTotalCoins } from '@/lib/monetization';
 
-const COIN_PACKAGES = [
-    { id: '1', coins: 50, price: 10, bonus: 0 },
-    { id: '2', coins: 150, price: 29, bonus: 5 },
-    { id: '3', coins: 300, price: 59, bonus: 20, popular: true },
-    { id: '4', coins: 500, price: 99, bonus: 50 },
-    { id: '5', coins: 1200, price: 229, bonus: 150 },
-    { id: '6', coins: 3000, price: 549, bonus: 500 },
-];
+type VipEntitlementRow = {
+    status: string;
+    current_period_end: string | null;
+};
 
 export default function PricingPage() {
+    const { user, session } = useAuth();
+    const searchParams = useSearchParams();
+
+    const [coinBalance, setCoinBalance] = useState(0);
+    const [vipEntitlement, setVipEntitlement] = useState<VipEntitlementRow | null>(null);
+    const [isLoadingEntitlement, setIsLoadingEntitlement] = useState(true);
+    const [checkoutError, setCheckoutError] = useState<string | null>(null);
+    const [isCheckoutLoading, setIsCheckoutLoading] = useState<string | null>(null);
+
+    useEffect(() => {
+        const fetchEntitlement = async () => {
+            setIsLoadingEntitlement(true);
+            if (!user) {
+                setCoinBalance(0);
+                setVipEntitlement(null);
+                setIsLoadingEntitlement(false);
+                return;
+            }
+
+            const [{ data: walletData }, { data: vipData }] = await Promise.all([
+                supabase
+                    .from('wallets')
+                    .select('coin_balance')
+                    .eq('user_id', user.id)
+                    .maybeSingle(),
+                supabase
+                    .from('vip_entitlements')
+                    .select('status, current_period_end')
+                    .eq('user_id', user.id)
+                    .maybeSingle(),
+            ]);
+
+            setCoinBalance(walletData?.coin_balance || 0);
+            setVipEntitlement((vipData as VipEntitlementRow | null) || null);
+            setIsLoadingEntitlement(false);
+        };
+
+        fetchEntitlement();
+    }, [user]);
+
+    const isVipActive = useMemo(() => {
+        if (!vipEntitlement) return false;
+        if (vipEntitlement.status !== 'active') return false;
+        if (!vipEntitlement.current_period_end) return true;
+        return new Date(vipEntitlement.current_period_end).getTime() > Date.now();
+    }, [vipEntitlement]);
+
+    const checkoutStatus = searchParams.get('checkout');
+
+    const startCheckout = async (payload: { kind: 'coins' | 'vip'; packageId?: string }, loadingKey: string) => {
+        if (!session?.access_token || !user) {
+            alert('กรุณาเข้าสู่ระบบก่อนทำรายการ');
+            return;
+        }
+
+        setCheckoutError(null);
+        setIsCheckoutLoading(loadingKey);
+        try {
+            const response = await fetch('/api/payments/checkout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify(payload),
+            });
+
+            const result = (await response.json()) as { checkoutUrl?: string; error?: string };
+            if (!response.ok || !result.checkoutUrl) {
+                throw new Error(result.error || 'สร้างลิงก์ชำระเงินไม่สำเร็จ');
+            }
+
+            window.location.href = result.checkoutUrl;
+        } catch (error) {
+            setCheckoutError(error instanceof Error ? error.message : 'เกิดข้อผิดพลาดในการสร้างรายการชำระเงิน');
+            setIsCheckoutLoading(null);
+        }
+    };
+
     return (
         <main className={styles.main}>
             <header className={styles.header}>
                 <div className={styles.headerContent}>
-                    <Link href="/" className={styles.backBtn}>
-                        <ArrowLeft size={20} /> กลับหน้าหลัก
-                    </Link>
                     <div className={styles.balanceBadge}>
                         <Coins size={16} className={styles.coinIcon} />
-                        <span className={styles.balanceAmount}>120 เหรียญ</span>
+                        <span className={styles.balanceAmount}>
+                            {isLoadingEntitlement ? 'กำลังโหลด...' : `${coinBalance.toLocaleString('th-TH')} เหรียญ`}
+                        </span>
                     </div>
                 </div>
             </header>
@@ -44,7 +122,7 @@ export default function PricingPage() {
                             </div>
                             <div className={styles.vipPrice}>
                                 <span className={styles.currency}>฿</span>
-                                <span className={styles.amount}>99</span>
+                                <span className={styles.amount}>{VIP_MONTHLY_PRICE_THB}</span>
                                 <span className={styles.period}>/เดือน</span>
                             </div>
                         </div>
@@ -70,8 +148,16 @@ export default function PricingPage() {
                             </li>
                         </ul>
 
-                        <button className={styles.subscribeBtn}>
-                            สมัคร VIP เลย!
+                        <button
+                            className={styles.subscribeBtn}
+                            onClick={() => startCheckout({ kind: 'vip' }, 'vip')}
+                            disabled={isCheckoutLoading !== null}
+                        >
+                            {isVipActive
+                                ? 'VIP ใช้งานอยู่'
+                                : isCheckoutLoading === 'vip'
+                                    ? 'กำลังสร้างรายการ...'
+                                    : 'สมัคร VIP เลย!'}
                         </button>
                     </div>
                 </section>
@@ -92,7 +178,7 @@ export default function PricingPage() {
 
                                 <div className={styles.coinAmount}>
                                     <Coins size={28} className={styles.coinIconLg} />
-                                    <h3>{pkg.coins}</h3>
+                                    <h3>{getCoinPackageTotalCoins(pkg)}</h3>
                                 </div>
 
                                 {pkg.bonus > 0 ? (
@@ -101,13 +187,25 @@ export default function PricingPage() {
                                     <div className={styles.noBonus}>ไม่มีโบนัส</div>
                                 )}
 
-                                <button className={styles.purchaseBtn}>
-                                    ฿{pkg.price}
+                                <button
+                                    className={styles.purchaseBtn}
+                                    onClick={() => startCheckout({ kind: 'coins', packageId: pkg.id }, `coins-${pkg.id}`)}
+                                    disabled={isCheckoutLoading !== null}
+                                >
+                                    {isCheckoutLoading === `coins-${pkg.id}` ? 'กำลังสร้างรายการ...' : `฿${pkg.priceThb}`}
                                 </button>
                             </div>
                         ))}
                     </div>
                 </section>
+
+                {(checkoutStatus === 'success' || checkoutStatus === 'cancel' || checkoutError) && (
+                    <section style={{ marginTop: '-1rem', textAlign: 'center', color: checkoutStatus === 'success' ? '#15803d' : '#b91c1c' }}>
+                        {checkoutStatus === 'success' && <p>ชำระเงินสำเร็จ ระบบกำลังอัปเดตสิทธิ์ของคุณ</p>}
+                        {checkoutStatus === 'cancel' && <p>คุณยกเลิกรายการชำระเงินแล้ว</p>}
+                        {checkoutError && <p>{checkoutError}</p>}
+                    </section>
+                )}
 
             </div>
         </main>

@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { Search, Menu } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { Search, Menu, PenTool, Bookmark, Heart, Settings, LogOut, Upload, X } from 'lucide-react';
 import styles from './home.module.css';
 import { supabase } from '@/lib/supabase';
 import { MAIN_CATEGORIES } from '@/lib/categories';
@@ -21,12 +21,121 @@ type HomeStory = {
     created_at: string | null;
 };
 
+type UserProfile = {
+    pen_name: string;
+    bio: string;
+    avatar_url: string | null;
+};
+
 export default function HomePage() {
     const { user, isLoading: isLoadingAuth, signInWithFacebook, signInWithGoogle, signOut } = useAuth();
     const [stories, setStories] = useState<HomeStory[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
     const [authError, setAuthError] = useState<string | null>(null);
+    const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+    const profileMenuRef = useRef<HTMLDivElement>(null);
+
+    // Profile Settings State
+    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+    const [profile, setProfile] = useState<UserProfile>({ pen_name: 'Flow Writer', bio: '', avatar_url: null });
+    const [editProfile, setEditProfile] = useState<UserProfile>({ pen_name: '', bio: '', avatar_url: null });
+    const [avatarFile, setAvatarFile] = useState<File | null>(null);
+    const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+    const [isSavingProfile, setIsSavingProfile] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        const fetchProfile = async () => {
+            if (!user) return;
+            const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+            if (data) {
+                setProfile(data as UserProfile);
+            }
+        };
+        fetchProfile();
+    }, [user]);
+
+    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setAvatarFile(file);
+            setAvatarPreviewUrl(URL.createObjectURL(file));
+        }
+    };
+
+    const handleOpenProfileModal = () => {
+        setEditProfile({ ...profile });
+        setAvatarPreviewUrl(profile.avatar_url);
+        setAvatarFile(null);
+        setIsProfileModalOpen(true);
+    };
+
+    const handleSaveProfile = async () => {
+        if (!user) return;
+        setIsSavingProfile(true);
+
+        try {
+            let newAvatarUrl = editProfile.avatar_url;
+
+            if (avatarFile) {
+                const fileExt = avatarFile.name.split('.').pop();
+                const fileName = `${user.id}-${Math.random()}.${fileExt}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('avatars')
+                    .upload(fileName, avatarFile);
+
+                if (uploadError) throw uploadError;
+
+                const { data: publicUrlData } = supabase.storage
+                    .from('avatars')
+                    .getPublicUrl(fileName);
+
+                newAvatarUrl = publicUrlData.publicUrl;
+            }
+
+            const { error: upsertError } = await supabase
+                .from('profiles')
+                .upsert({
+                    id: user.id,
+                    pen_name: editProfile.pen_name,
+                    bio: editProfile.bio,
+                    avatar_url: newAvatarUrl,
+                    updated_at: new Date().toISOString()
+                });
+
+            if (upsertError) throw upsertError;
+
+            setProfile({
+                pen_name: editProfile.pen_name,
+                bio: editProfile.bio,
+                avatar_url: newAvatarUrl
+            });
+            setIsProfileModalOpen(false);
+        } catch (error) {
+            console.error('Error saving profile:', error);
+            alert('ไม่สามารถบันทึกโปรไฟล์ได้ กรุณาลองใหม่');
+        } finally {
+            setIsSavingProfile(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!isProfileMenuOpen) return;
+        const handleClickOutside = (event: MouseEvent) => {
+            if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as HTMLElement)) {
+                setIsProfileMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isProfileMenuOpen]);
+
+    const handleSignOut = async () => {
+        setIsProfileMenuOpen(false);
+        await signOut();
+    };
 
     useEffect(() => {
         const fetchStories = async () => {
@@ -95,22 +204,61 @@ export default function HomePage() {
                     {isLoadingAuth ? (
                         <div className={styles.authLoading}>...</div>
                     ) : user ? (
-                        <div className={styles.userProfile}>
-                            {user.user_metadata?.avatar_url ? (
-                                <img src={user.user_metadata.avatar_url} alt="Profile" className={styles.userAvatar} />
-                            ) : (
-                                <div className={styles.userAvatarPlaceholder}>{user.email?.charAt(0).toUpperCase() || 'U'}</div>
+                        <div className={styles.profileMenuWrapper} ref={profileMenuRef}>
+                            <div className={styles.profileAvatarBtn} onClick={() => setIsProfileMenuOpen(prev => !prev)}>
+                                {user.user_metadata?.avatar_url ? (
+                                    <img src={user.user_metadata.avatar_url} alt="Profile" className={styles.userAvatar} />
+                                ) : (
+                                    <div className={styles.userAvatarPlaceholder}>{user.email?.charAt(0).toUpperCase() || 'U'}</div>
+                                )}
+                            </div>
+
+                            {isProfileMenuOpen && (
+                                <div className={styles.profileDropdown}>
+                                    <div className={styles.profileDropdownHeader}>
+                                        <div className={styles.profileDropdownAvatar}>
+                                            {user.user_metadata?.avatar_url ? (
+                                                <img src={user.user_metadata.avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                                            ) : (
+                                                (user.email?.charAt(0) || 'U').toUpperCase()
+                                            )}
+                                        </div>
+                                        <div className={styles.profileDropdownInfo}>
+                                            <div className={styles.profileDropdownName}>{user.user_metadata?.full_name || user.email?.split('@')[0]}</div>
+                                            <div className={styles.profileDropdownEmail}>{user.email || ''}</div>
+                                        </div>
+                                    </div>
+
+                                    <div className={styles.profileDropdownDivider} />
+
+                                    <Link href="/dashboard" className={styles.profileDropdownItem} onClick={() => setIsProfileMenuOpen(false)}>
+                                        <PenTool size={16} /> แดชบอร์ดนักเขียน
+                                    </Link>
+                                    <Link href="/bookshelf" className={styles.profileDropdownItem} onClick={() => setIsProfileMenuOpen(false)}>
+                                        <Bookmark size={16} /> ชั้นหนังสือ
+                                    </Link>
+                                    <Link href="/loves" className={styles.profileDropdownItem} onClick={() => setIsProfileMenuOpen(false)}>
+                                        <Heart size={16} /> รักเลย
+                                    </Link>
+                                    <button className={styles.profileDropdownItem} onClick={() => { setIsProfileMenuOpen(false); handleOpenProfileModal(); }}>
+                                        <Settings size={16} /> ตั้งค่าโปรไฟล์
+                                    </button>
+
+                                    <div className={styles.profileDropdownDivider} />
+
+                                    <button className={`${styles.profileDropdownItem} ${styles.profileDropdownLogout}`} onClick={handleSignOut}>
+                                        <LogOut size={16} /> ออกจากระบบ
+                                    </button>
+                                </div>
                             )}
-                            <span className={styles.userName}>{user.user_metadata?.full_name || user.email?.split('@')[0]}</span>
-                            <button onClick={signOut} className={styles.logoutBtn}>ออกจากระบบ</button>
                         </div>
                     ) : (
                         <div className={styles.authButtons}>
-                            <button onClick={handleGoogleSignIn} className={styles.googleBtn}>
+                            <button onClick={handleGoogleSignIn} className={`${styles.authBtn} ${styles.googleBtn}`}>
                                 <img src="/google-logo.svg" alt="G" className={styles.providerIcon} onError={(e) => e.currentTarget.style.display = 'none'} />
-                                เข้าระบบด้วย Google
+                                เข้าสู่ระบบด้วย Google
                             </button>
-                            <button onClick={handleFacebookSignIn} className={styles.loginBtn}>
+                            <button onClick={handleFacebookSignIn} className={`${styles.authBtn} ${styles.facebookBtn}`}>
                                 <img src="/facebook-logo.svg" alt="f" className={styles.providerIcon} onError={(e) => e.currentTarget.style.display = 'none'} />
                                 Facebook
                             </button>
@@ -187,6 +335,79 @@ export default function HomePage() {
                     )}
                 </section>
             </div>
+
+            {/* Profile Modal */}
+            {isProfileModalOpen && (
+                <div className={styles.modalOverlay}>
+                    <div className={styles.modalContent}>
+                        <div className={styles.modalHeader}>
+                            <h2>ตั้งค่าโปรไฟล์นักเขียน</h2>
+                            <button className={styles.closeBtn} onClick={() => setIsProfileModalOpen(false)}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className={styles.modalBody}>
+                            <div className={styles.avatarSection}>
+                                {avatarPreviewUrl ? (
+                                    <img src={avatarPreviewUrl} alt="Preview" className={styles.avatarPreview} />
+                                ) : (
+                                    <div className={styles.avatarPlaceholder}>
+                                        {editProfile.pen_name.charAt(0).toUpperCase() || 'W'}
+                                    </div>
+                                )}
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    ref={fileInputRef}
+                                    style={{ display: 'none' }}
+                                    onChange={handleAvatarChange}
+                                />
+                                <button className={styles.uploadLabel} onClick={() => fileInputRef.current?.click()}>
+                                    <Upload size={16} /> เปลี่ยนรูปโปรไฟล์
+                                </button>
+                            </div>
+
+                            <div className={styles.formGroup}>
+                                <label>นามปากกาหลัก</label>
+                                <input
+                                    type="text"
+                                    className={styles.inputField}
+                                    value={editProfile.pen_name}
+                                    onChange={(e) => setEditProfile({ ...editProfile, pen_name: e.target.value })}
+                                    placeholder="เช่น Flow Writer"
+                                />
+                            </div>
+
+                            <div className={styles.formGroup}>
+                                <label>ประวัติย่อ / Bio</label>
+                                <textarea
+                                    className={styles.textareaField}
+                                    value={editProfile.bio}
+                                    onChange={(e) => setEditProfile({ ...editProfile, bio: e.target.value })}
+                                    placeholder="เล่าเกี่ยวกับตัวคุณสั้นๆ..."
+                                    rows={3}
+                                />
+                            </div>
+                        </div>
+                        <div className={styles.modalFooter}>
+                            <button
+                                className={styles.cancelBtn}
+                                onClick={() => setIsProfileModalOpen(false)}
+                                disabled={isSavingProfile}
+                            >
+                                ยกเลิก
+                            </button>
+                            <button
+                                className={styles.saveBtn}
+                                onClick={handleSaveProfile}
+                                disabled={isSavingProfile || !editProfile.pen_name.trim()}
+                            >
+                                {isSavingProfile ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </main>
     );
 }

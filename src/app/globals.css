@@ -1,11 +1,16 @@
 :root {
   --background: #ffffff;
-  --foreground: #111827;
-  --primary: #1cc6ac;
-  /* readAwrite teal */
-  --primary-hover: #159c87;
-  --surface: #f9fafb;
-  --border: #e5e7eb;
+  /* Global white background */
+  --foreground: #0f172a;
+  /* Default text color */
+  --primary: #f97316;
+  /* Bright Orange */
+  --primary-hover: #ea580c;
+  /* Darker Orange for hover */
+  --surface: #f8fafc;
+  /* Light neutral surface for cards/sections */
+  --border: #e2e8f0;
+  /* Light border color */
   --font-sans: 'Inter', system-ui, sans-serif;
 }
 

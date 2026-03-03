@@ -262,6 +262,223 @@
     color: var(--primary);
 }
 
+.coverActions {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.unsplashPickerBtn {
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    color: #334155;
+    border-radius: 999px;
+    padding: 0.45rem 0.8rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    transition: all 0.2s;
+}
+
+.unsplashPickerBtn:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+.clearCoverBtn {
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    color: #64748b;
+    border-radius: 999px;
+    padding: 0.45rem 0.8rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.clearCoverBtn:hover {
+    border-color: #cbd5e1;
+    color: #334155;
+    background: #f8fafc;
+}
+
+.modalOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 120;
+    padding: 1rem;
+}
+
+.modal {
+    background: #ffffff;
+    width: 100%;
+    max-width: 860px;
+    max-height: 90vh;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 24px 48px -20px rgba(15, 23, 42, 0.35);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.modalHeader {
+    padding: 1rem 1.2rem;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.modalTitle {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.modalBody {
+    padding: 1rem 1.2rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    overflow: auto;
+}
+
+.iconBtn {
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #64748b;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.iconBtn:hover {
+    background: #e2e8f0;
+    color: #334155;
+}
+
+.unsplashModal {
+    max-width: 860px;
+}
+
+.unsplashSearchRow {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.unsplashSearchInput {
+    flex: 1;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 0.92rem;
+    font-family: inherit;
+}
+
+.unsplashSearchInput:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(28, 198, 172, 0.1);
+}
+
+.unsplashSearchBtn {
+    min-width: 84px;
+    height: 38px;
+    border: none;
+    border-radius: 8px;
+    background: var(--primary);
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.unsplashSearchBtn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.unsplashError {
+    color: #dc2626;
+    font-size: 0.9rem;
+}
+
+.unsplashEmpty {
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
+.unsplashGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.6rem;
+    max-height: 58vh;
+    overflow-y: auto;
+    padding-right: 0.15rem;
+}
+
+.unsplashCard {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #ffffff;
+    padding: 0;
+    cursor: pointer;
+    overflow: hidden;
+    text-align: left;
+    transition: transform 0.15s, box-shadow 0.2s;
+}
+
+.unsplashCard:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
+.unsplashThumb {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    display: block;
+}
+
+.unsplashCredit {
+    display: block;
+    font-size: 0.7rem;
+    color: #64748b;
+    padding: 0.35rem 0.45rem 0.45rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media (max-width: 768px) {
+    .unsplashGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .unsplashSearchBtn {
+        min-width: 72px;
+    }
+}
+
 .settingsList {
     display: flex;
     flex-direction: column;
