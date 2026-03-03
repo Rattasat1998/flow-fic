@@ -62,6 +62,9 @@ function PricingContent() {
     }, [vipEntitlement]);
 
     const checkoutStatus = searchParams.get('checkout');
+    const functionsBaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+        ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1`
+        : null;
 
     const startCheckout = async (payload: { kind: 'coins' | 'vip'; packageId?: string }, loadingKey: string) => {
         if (!session?.access_token || !user) {
@@ -72,14 +75,49 @@ function PricingContent() {
         setCheckoutError(null);
         setIsCheckoutLoading(loadingKey);
         try {
-            const response = await fetch('/api/payments/checkout', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${session.access_token}`,
-                },
-                body: JSON.stringify(payload),
-            });
+            const edgeCheckoutUrl = functionsBaseUrl ? `${functionsBaseUrl}/stripe-checkout` : null;
+            const baseHeaders: Record<string, string> = {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${session.access_token}`,
+            };
+
+            const requestBody = JSON.stringify(payload);
+            let response: Response;
+
+            if (edgeCheckoutUrl) {
+                const edgeHeaders = { ...baseHeaders };
+                if (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+                    edgeHeaders.apikey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+                }
+
+                try {
+                    response = await fetch(edgeCheckoutUrl, {
+                        method: 'POST',
+                        headers: edgeHeaders,
+                        body: requestBody,
+                    });
+
+                    if (response.status === 404) {
+                        response = await fetch('/api/payments/checkout', {
+                            method: 'POST',
+                            headers: baseHeaders,
+                            body: requestBody,
+                        });
+                    }
+                } catch {
+                    response = await fetch('/api/payments/checkout', {
+                        method: 'POST',
+                        headers: baseHeaders,
+                        body: requestBody,
+                    });
+                }
+            } else {
+                response = await fetch('/api/payments/checkout', {
+                    method: 'POST',
+                    headers: baseHeaders,
+                    body: requestBody,
+                });
+            }
 
             const result = (await response.json()) as { checkoutUrl?: string; error?: string };
             if (!response.ok || !result.checkoutUrl) {
