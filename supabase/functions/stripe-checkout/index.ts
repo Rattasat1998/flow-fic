@@ -1,4 +1,4 @@
-import { createClient } from 'npm:@supabase/supabase-js@2';
+import { createClient } from 'jsr:@supabase/supabase-js@2';
 import {
   COIN_PACKAGES,
   VIP_MONTHLY_PRICE_THB,
