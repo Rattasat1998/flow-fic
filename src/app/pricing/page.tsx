@@ -97,7 +97,7 @@ function PricingContent() {
                         body: requestBody,
                     });
 
-                    if (response.status === 404) {
+                    if ([401, 403, 404].includes(response.status)) {
                         response = await fetch('/api/payments/checkout', {
                             method: 'POST',
                             headers: baseHeaders,
