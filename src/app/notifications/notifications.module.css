@@ -1,0 +1,244 @@
+.main {
+    min-height: 100vh;
+    background: #f8fafc;
+    color: #0f172a;
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+.header {
+    background: white;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.headerLeft {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.backBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: #64748b;
+    text-decoration: none;
+    font-size: 0.9rem;
+    padding: 0.4rem 0.65rem;
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.backBtn:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+}
+
+.markAllBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 1rem;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    background: white;
+    color: #475569;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.markAllBtn:hover {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+}
+
+.markAllBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ─── Notification List ─── */
+.list {
+    max-width: 700px;
+    margin: 1.5rem auto;
+    padding: 0 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.item {
+    display: flex;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    color: inherit;
+    position: relative;
+}
+
+.item:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.itemUnread {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+}
+
+.itemUnread::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 8px;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #3b82f6;
+}
+
+.itemIcon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 1.2rem;
+}
+
+.itemUnread .itemIcon {
+    background: #dbeafe;
+}
+
+.itemBody {
+    flex: 1;
+    min-width: 0;
+}
+
+.itemTitle {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 0.2rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.itemDesc {
+    font-size: 0.82rem;
+    color: #64748b;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.itemTime {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    white-space: nowrap;
+    margin-top: 0.35rem;
+}
+
+/* ─── Empty State ─── */
+.emptyState {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 5rem 2rem;
+    color: #94a3b8;
+    text-align: center;
+    gap: 0.75rem;
+}
+
+.emptyIcon {
+    font-size: 3rem;
+    opacity: 0.5;
+}
+
+.emptyTitle {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.emptyDesc {
+    font-size: 0.9rem;
+}
+
+/* ─── Loading ─── */
+.loadingState {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5rem 2rem;
+    color: #94a3b8;
+    gap: 0.5rem;
+}
+
+.spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ─── Login Prompt ─── */
+.loginPrompt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 5rem 2rem;
+    gap: 1rem;
+    text-align: center;
+    color: #64748b;
+}
+
+.loginBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.6rem 1.5rem;
+    border-radius: 8px;
+    border: none;
+    background: var(--primary);
+    color: white;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.loginBtn:hover {
+    opacity: 0.9;
+}

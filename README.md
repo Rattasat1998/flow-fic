@@ -25,11 +25,52 @@ Create `.env.local` and set:
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_or_sb_secret_key
+STRIPE_SECRET_KEY=sk_test_or_sk_live_key
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+NEXT_PUBLIC_APP_URL=https://your-domain.com
+FINANCE_ADMIN_USER_IDS=uuid1,uuid2
 UNSPLASH_ACCESS_KEY=your_unsplash_access_key
 UNSPLASH_SECRET_KEY=your_unsplash_secret_key
 ```
 
 `UNSPLASH_ACCESS_KEY` is required for image search in the editor.
+`SUPABASE_SERVICE_ROLE_KEY` must NOT be a publishable key (`sb_publishable_*`).
+`STRIPE_SECRET_KEY` must be a Stripe secret key (`sk_*`), not publishable (`pk_*`).
+`FINANCE_ADMIN_USER_IDS` controls access to admin payment operations APIs.
+
+## Monetization Rollout (v1)
+
+Use this sequence when deploying payment policy updates:
+
+```bash
+# 1) Link project (first time)
+supabase link --project-ref vthbilvvchwgiiplvfxw
+
+# 2) Ensure migration file exists in supabase/migrations
+# (example: 20260305125555_monetization_policy_v1.sql)
+
+# 3) Apply DB migration to remote
+supabase db push --yes
+
+# 4) Deploy edge functions
+supabase functions deploy stripe-checkout --project-ref vthbilvvchwgiiplvfxw
+supabase functions deploy stripe-webhook --project-ref vthbilvvchwgiiplvfxw --no-verify-jwt
+
+# 5) Optional: run reconciliation once
+node -e "const {createClient}=require('@supabase/supabase-js'); const fs=require('fs'); const env=Object.fromEntries(fs.readFileSync('.env.local','utf8').split(/\r?\n/).filter(Boolean).map(l=>{const i=l.indexOf('='); return [l.slice(0,i),l.slice(i+1)]})); const sb=createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY,{auth:{autoRefreshToken:false,persistSession:false}}); sb.rpc('run_payment_reconciliation',{p_mismatch_threshold:0}).then(({data,error})=>{if(error) throw error; console.log(data?.[0]||data);}).catch(e=>{console.error(e); process.exit(1);});"
+```
+
+Stripe webhook endpoint should stay enabled at:
+
+`https://vthbilvvchwgiiplvfxw.supabase.co/functions/v1/stripe-webhook`
+
+with events:
+
+- `checkout.session.completed`
+- `customer.subscription.created`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 

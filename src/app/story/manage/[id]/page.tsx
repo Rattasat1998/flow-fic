@@ -30,6 +30,14 @@ export type Character = {
     created_at: string;
 };
 
+const toComparableJson = (value: unknown): string => {
+    try {
+        return JSON.stringify(value ?? null);
+    } catch {
+        return String(value ?? '');
+    }
+};
+
 export default function StoryManagerPage() {
     const params = useParams();
     const router = useRouter();
@@ -127,19 +135,35 @@ export default function StoryManagerPage() {
                 // Fetch chapters for this story
                 const { data: chaptersData, error: chaptersError } = await supabase
                     .from('chapters')
-                    .select('id, title, status, order_index, created_at, read_count, is_premium, coin_price')
+                    .select('id, title, draft_title, published_title, content, draft_content, published_content, status, order_index, created_at, read_count, is_premium, coin_price, draft_updated_at, published_updated_at')
                     .eq('story_id', storyId)
                     .order('order_index', { ascending: true });
 
                 const formattedChapters = (chaptersData || []).map(ch => ({
                     id: ch.id,
-                    title: ch.title,
+                    title: ch.draft_title || ch.title,
                     status: ch.status as 'draft' | 'published',
                     views: ch.read_count || 0,
                     comments: 0,
                     date: new Date(ch.created_at).toLocaleDateString(),
                     isPremium: ch.is_premium || false,
                     coinPrice: ch.coin_price || 0,
+                    hasUnpublishedChanges: (() => {
+                        if (ch.status !== 'published') return false;
+
+                        const draftTitle = (ch.draft_title || ch.title || '').trim();
+                        const publishedTitle = (ch.published_title || ch.title || '').trim();
+                        const draftContent = toComparableJson(ch.draft_content ?? ch.content);
+                        const publishedContent = toComparableJson(ch.published_content ?? ch.content);
+                        const hasContentDiff = draftTitle !== publishedTitle || draftContent !== publishedContent;
+
+                        const draftTs = ch.draft_updated_at ? Date.parse(ch.draft_updated_at) : NaN;
+                        const publishedTs = ch.published_updated_at ? Date.parse(ch.published_updated_at) : NaN;
+                        const hasTimestampDiff =
+                            Number.isFinite(draftTs) && Number.isFinite(publishedTs) && draftTs > publishedTs;
+
+                        return hasContentDiff || hasTimestampDiff;
+                    })(),
                 }));
 
                 const dbStory = {
@@ -269,6 +293,9 @@ export default function StoryManagerPage() {
                         story_id: storyId,
                         user_id: user.id,
                         title: 'ตอนใหม่',
+                        draft_title: 'ตอนใหม่',
+                        draft_content: null,
+                        draft_updated_at: new Date().toISOString(),
                         order_index: chapters.length,
                         status: 'draft'
                     }
@@ -881,6 +908,9 @@ export default function StoryManagerPage() {
                                                                     <span className={styles.publishedBadge}>เผยแพร่แล้ว</span>
                                                                 ) : (
                                                                     <span className={styles.draftBadge}>ยังไม่เผยแพร่</span>
+                                                                )}
+                                                                {chapter.hasUnpublishedChanges && (
+                                                                    <span className={styles.pendingDraftBadge}>มีฉบับร่างใหม่</span>
                                                                 )}
                                                                 {chapter.status === 'published' && (
                                                                     <span style={{ marginLeft: '1rem' }}>👁️ {chapter.views} | 💬 {chapter.comments}</span>

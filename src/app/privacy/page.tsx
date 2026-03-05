@@ -65,7 +65,7 @@ export default function PrivacyPage() {
       <section style={{ marginBottom: "1.5rem" }}>
         <h2>6. คุกกี้และเซสชัน</h2>
         <p>
-          ระบบอาจใช้คุกกี้หรือข้อมูลเซสชันที่จำเป็นเพื่อคงสถานะการล็อกอินและการทำงานพื้นฐานของแอป
+          ระบบอาจใช้คุกกี้หรือข้อมูลเซสชันที่จำเป็นเพื่อคงสถานะการล็อกอินและการทำงานพื้นฐานของเว็บไซต์
           การปิดใช้งานคุกกี้บางประเภทอาจทำให้บริการบางส่วนใช้งานไม่ได้
         </p>
       </section>
@@ -80,9 +80,12 @@ export default function PrivacyPage() {
 
       <section style={{ marginBottom: "2rem" }}>
         <h2>8. ติดต่อเรา</h2>
-        <p>หากมีคำถามเกี่ยวกับความเป็นส่วนตัว กรุณาติดต่อผ่านช่องทางซัพพอร์ตภายในแอป FlowFic</p>
+        <p>หากมีคำถามเกี่ยวกับความเป็นส่วนตัว กรุณาติดต่อผ่านช่องทางซัพพอร์ตบนเว็บไซต์ FlowFic</p>
       </section>
 
+      <p style={{ marginBottom: "0.75rem" }}>
+        <Link href="/terms">ข้อกำหนดและเงื่อนไขการใช้บริการ (Terms of Service)</Link>
+      </p>
       <p style={{ marginBottom: "0.75rem" }}>
         <Link href="/data-deletion">คำแนะนำการลบข้อมูล (Data Deletion)</Link>
       </p>

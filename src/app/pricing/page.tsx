@@ -1,12 +1,13 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Check, Sparkles, Coins, Zap } from 'lucide-react';
+import { Check, Sparkles, Coins } from 'lucide-react';
 import styles from './pricing.module.css';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { COIN_PACKAGES, VIP_MONTHLY_PRICE_THB, getCoinPackageTotalCoins } from '@/lib/monetization';
+import { useTracking } from '@/hooks/useTracking';
 
 type VipEntitlementRow = {
     status: string;
@@ -16,6 +17,7 @@ type VipEntitlementRow = {
 function PricingContent() {
     const { user, session } = useAuth();
     const searchParams = useSearchParams();
+    useTracking({ autoPageView: true, pagePath: '/pricing' });
 
     const [coinBalance, setCoinBalance] = useState(0);
     const [vipEntitlement, setVipEntitlement] = useState<VipEntitlementRow | null>(null);
@@ -23,17 +25,23 @@ function PricingContent() {
     const [checkoutError, setCheckoutError] = useState<string | null>(null);
     const [isCheckoutLoading, setIsCheckoutLoading] = useState<string | null>(null);
 
-    useEffect(() => {
-        const fetchEntitlement = async () => {
-            setIsLoadingEntitlement(true);
-            if (!user) {
-                setCoinBalance(0);
-                setVipEntitlement(null);
-                setIsLoadingEntitlement(false);
-                return;
-            }
+    const checkoutStatus = searchParams.get('checkout');
 
-            const [{ data: walletData }, { data: vipData }] = await Promise.all([
+    const fetchWalletData = useCallback(async () => {
+        setIsLoadingEntitlement(true);
+
+        if (!user) {
+            setCoinBalance(0);
+            setVipEntitlement(null);
+            setIsLoadingEntitlement(false);
+            return;
+        }
+
+        try {
+            const [
+                { data: walletData, error: walletFetchError },
+                { data: vipData, error: vipFetchError },
+            ] = await Promise.all([
                 supabase
                     .from('wallets')
                     .select('coin_balance')
@@ -46,13 +54,22 @@ function PricingContent() {
                     .maybeSingle(),
             ]);
 
+            if (walletFetchError) throw walletFetchError;
+            if (vipFetchError) throw vipFetchError;
+
             setCoinBalance(walletData?.coin_balance || 0);
             setVipEntitlement((vipData as VipEntitlementRow | null) || null);
+        } catch (error) {
+            console.error('Failed to fetch pricing wallet data:', error);
+        } finally {
             setIsLoadingEntitlement(false);
-        };
-
-        fetchEntitlement();
+        }
     }, [user]);
+
+    useEffect(() => {
+        fetchWalletData();
+        // Refresh after returning from Stripe checkout.
+    }, [fetchWalletData, checkoutStatus]);
 
     const isVipActive = useMemo(() => {
         if (!vipEntitlement) return false;
@@ -61,7 +78,6 @@ function PricingContent() {
         return new Date(vipEntitlement.current_period_end).getTime() > Date.now();
     }, [vipEntitlement]);
 
-    const checkoutStatus = searchParams.get('checkout');
     const functionsBaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
         ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1`
         : null;
@@ -80,51 +96,57 @@ function PricingContent() {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${session.access_token}`,
             };
+            const idempotencyKey = typeof window !== 'undefined' && window.crypto?.randomUUID
+                ? window.crypto.randomUUID()
+                : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+            const requestBody = JSON.stringify({ ...payload, idempotencyKey });
 
-            const requestBody = JSON.stringify(payload);
-            let response: Response;
+            const callCheckout = async (url: string, headers: Record<string, string>) => {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers,
+                    body: requestBody,
+                });
+                let result: { checkoutUrl?: string; error?: string } = {};
+                try {
+                    result = (await response.json()) as { checkoutUrl?: string; error?: string };
+                } catch {
+                    result = {};
+                }
+                return { response, result };
+            };
+
+            let lastError = 'สร้างลิงก์ชำระเงินไม่สำเร็จ';
+
+            try {
+                const nextApiResult = await callCheckout('/api/payments/checkout', baseHeaders);
+                if (nextApiResult.response.ok && nextApiResult.result.checkoutUrl) {
+                    window.location.href = nextApiResult.result.checkoutUrl;
+                    return;
+                }
+                lastError = nextApiResult.result.error || lastError;
+            } catch {
+                // Try edge function fallback below.
+            }
 
             if (edgeCheckoutUrl) {
                 const edgeHeaders = { ...baseHeaders };
                 if (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
                     edgeHeaders.apikey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
                 }
-
                 try {
-                    response = await fetch(edgeCheckoutUrl, {
-                        method: 'POST',
-                        headers: edgeHeaders,
-                        body: requestBody,
-                    });
-
-                    if ([401, 403, 404].includes(response.status) || response.status >= 500) {
-                        response = await fetch('/api/payments/checkout', {
-                            method: 'POST',
-                            headers: baseHeaders,
-                            body: requestBody,
-                        });
+                    const edgeResult = await callCheckout(edgeCheckoutUrl, edgeHeaders);
+                    if (edgeResult.response.ok && edgeResult.result.checkoutUrl) {
+                        window.location.href = edgeResult.result.checkoutUrl;
+                        return;
                     }
+                    lastError = edgeResult.result.error || lastError;
                 } catch {
-                    response = await fetch('/api/payments/checkout', {
-                        method: 'POST',
-                        headers: baseHeaders,
-                        body: requestBody,
-                    });
+                    // Fall through to final error.
                 }
-            } else {
-                response = await fetch('/api/payments/checkout', {
-                    method: 'POST',
-                    headers: baseHeaders,
-                    body: requestBody,
-                });
             }
 
-            const result = (await response.json()) as { checkoutUrl?: string; error?: string };
-            if (!response.ok || !result.checkoutUrl) {
-                throw new Error(result.error || 'สร้างลิงก์ชำระเงินไม่สำเร็จ');
-            }
-
-            window.location.href = result.checkoutUrl;
+            throw new Error(lastError);
         } catch (error) {
             setCheckoutError(error instanceof Error ? error.message : 'เกิดข้อผิดพลาดในการสร้างรายการชำระเงิน');
             setIsCheckoutLoading(null);
@@ -147,7 +169,7 @@ function PricingContent() {
             <div className={styles.container}>
                 <div className={styles.pageTitle}>
                     <h1>เติมเหรียญ & สมัครวีไอพี</h1>
-                    <p>สนับสนุนนักเขียนและปลดล็อกประสบการณ์แชทกับ AI แบบไร้ขีดจำกัด</p>
+                    <p>เติมเหรียญเพื่อปลดล็อกตอนพิเศษ หรือสมัคร VIP เพื่ออ่านตอนพรีเมียมได้ทันที</p>
                 </div>
 
                 {/* Subscription Section (The Killer Feature) */}
@@ -165,26 +187,30 @@ function PricingContent() {
                             </div>
                         </div>
 
-                        <p className={styles.vipDesc}>คุยกับทุกตัวละคร AI ได้เต็มอิ่มทะลุขีดจำกัด!</p>
+                        <p className={styles.vipDesc}>สิทธิ์หลักของแพ็กเกจนี้คืออ่านตอนพรีเมียมแบบไม่ต้องใช้เหรียญ</p>
 
                         <ul className={styles.featureList}>
                             <li>
                                 <div className={styles.featureIcon}><Check size={16} /></div>
-                                <span>แชทโต้ตอบกับ AI ได้ <strong>ไม่จำกัดจำนวนข้อความ</strong> (ปกติฟรี 10 ข้อความ/วัน)</span>
+                                <span>อ่านตอนที่ติดเหรียญได้ทันที เมื่อสถานะสมาชิกเป็น <strong>active</strong></span>
                             </li>
                             <li>
                                 <div className={styles.featureIcon}><Check size={16} /></div>
-                                <span>ฟีเจอร์ <Zap size={14} className={styles.inlineIcon} /> <strong>AI Voice Call</strong> โทรคุยกับตัวละครด้วยเสียงจริง</span>
+                                <span>ปลดล็อกตอนพรีเมียมผ่าน VIP โดยไม่หักเหรียญจาก Wallet</span>
                             </li>
                             <li>
                                 <div className={styles.featureIcon}><Check size={16} /></div>
-                                <span>ไม่มีโฆษณาคั่นระหว่างต่อบทแชท</span>
+                                <span>ต่ออายุรายเดือนผ่าน Stripe และระบบซิงก์สิทธิ์อัตโนมัติ</span>
                             </li>
                             <li>
                                 <div className={styles.featureIcon}><Check size={16} /></div>
-                                <span>นักเขียนที่สร้าง AI ตัวนั้น จะได้รับส่วนแบ่งรายได้จาก VIP ของคุณ!</span>
+                                <span>มีสถานะสิทธิ์บนหน้า Pricing ให้ตรวจสอบได้แบบเรียลไทม์</span>
                             </li>
                         </ul>
+
+                        <p className={styles.vipFootnote}>
+                            หมายเหตุ: ฟีเจอร์แชทไม่จำกัด, AI Voice Call และสิทธิ์ไม่มีโฆษณา ยังไม่เปิดใช้งานในระบบปัจจุบัน
+                        </p>
 
                         <button
                             className={styles.subscribeBtn}

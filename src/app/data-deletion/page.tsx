@@ -25,7 +25,7 @@ export default function DataDeletionPage() {
         <h2>How to request deletion</h2>
         <p>
           If you want to delete your FlowFic account and related personal data, please contact us
-          via the in-app support channel and include your account email and the phrase
+          via the website support channel and include your account email and the phrase
           &quot;Delete my data&quot;.
         </p>
       </section>
@@ -53,6 +53,9 @@ export default function DataDeletionPage() {
         </p>
       </section>
 
+      <p>
+        <Link href="/terms">Terms of Service</Link>
+      </p>
       <p>
         <Link href="/privacy">Privacy Policy</Link>
       </p>

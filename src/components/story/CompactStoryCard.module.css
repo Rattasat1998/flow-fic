@@ -1,0 +1,166 @@
+.card {
+    position: relative;
+    flex: 0 0 156px;
+    width: 156px;
+    scroll-snap-align: start;
+}
+
+.cardLink {
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.coverWrap {
+    position: relative;
+    overflow: hidden;
+    border-radius: 16px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    aspect-ratio: 3 / 4;
+}
+
+.cover {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.coverPlaceholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.completedBadge {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 2;
+    border-radius: 999px;
+    background: #ec4899;
+    color: #ffffff;
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0.3rem 0.52rem;
+}
+
+.removeBtn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    z-index: 3;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    background: rgba(15, 23, 42, 0.62);
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.2s;
+}
+
+.removeBtn:hover:not(:disabled) {
+    background: rgba(15, 23, 42, 0.82);
+    transform: translateY(-1px);
+}
+
+.removeBtn:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+.info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0 0.1rem;
+}
+
+.title {
+    margin: 0;
+    color: #0f172a;
+    font-size: 0.92rem;
+    font-weight: 700;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.author {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.8rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.05rem;
+}
+
+.tag {
+    border-radius: 999px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #475569;
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0.24rem 0.5rem;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cardLink:focus-visible .coverWrap {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+.removeBtn:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+@media (max-width: 1024px) {
+    .card {
+        flex-basis: 148px;
+        width: 148px;
+    }
+}
+
+@media (max-width: 640px) {
+    .card {
+        flex-basis: 132px;
+        width: 132px;
+    }
+
+    .title {
+        font-size: 0.86rem;
+    }
+
+    .author {
+        font-size: 0.75rem;
+    }
+}

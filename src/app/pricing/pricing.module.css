@@ -172,6 +172,15 @@
     z-index: 10;
 }
 
+.vipFootnote {
+    margin: -0.5rem 0 1.25rem 0;
+    color: #cbd5e1;
+    font-size: 0.82rem;
+    line-height: 1.45;
+    position: relative;
+    z-index: 10;
+}
+
 .featureList {
     list-style: none;
     padding: 0;
@@ -202,12 +211,6 @@
     justify-content: center;
     flex-shrink: 0;
     margin-top: 2px;
-}
-
-.inlineIcon {
-    display: inline-block;
-    vertical-align: text-bottom;
-    color: #fde047;
 }
 
 .subscribeBtn {

@@ -1,0 +1,258 @@
+.walletLedgerSection {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.walletHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.walletTitleWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.walletTitleWrap h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1.02rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.walletTitleWrap p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
+.refreshWalletBtn {
+  border: 1px solid var(--border);
+  background: #f8fafc;
+  color: #334155;
+  border-radius: 10px;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+.refreshWalletBtn:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.refreshWalletBtn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.spinIcon {
+  animation: spinLinear 1s linear infinite;
+}
+
+@keyframes spinLinear {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.walletSummaryGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.7rem;
+}
+
+@media (min-width: 720px) {
+  .walletSummaryGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.walletSummaryCard {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem;
+  background: #f8fafc;
+}
+
+.walletSummaryLabel {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.walletSummaryValue {
+  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.statusOk {
+  color: #047857;
+}
+
+.statusWarn {
+  color: #b45309;
+}
+
+.walletWarning {
+  border: 1px solid #fcd34d;
+  background: #fffbeb;
+  color: #92400e;
+  border-radius: 12px;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+
+.historyListWrap {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.historyListHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0.65rem 0.85rem;
+}
+
+.historyListHeader h4 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 0.93rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.historyListHeader span {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.historyRows {
+  display: flex;
+  flex-direction: column;
+}
+
+.historyRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.72rem 0.85rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.historyRow:last-child {
+  border-bottom: none;
+}
+
+.historyIcon {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #ecfeff;
+  color: #0e7490;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+}
+
+.historyMain {
+  min-width: 0;
+  flex: 1;
+}
+
+.historyType {
+  color: #0f172a;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.historyMeta {
+  margin-top: 0.14rem;
+  color: #64748b;
+  font-size: 0.76rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.6rem;
+}
+
+.historyAmountWrap {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.historyAmount {
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.credit {
+  color: #047857;
+}
+
+.debit {
+  color: #b91c1c;
+}
+
+.historyBalanceAfter {
+  margin-top: 0.14rem;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.historyLoading,
+.historyError,
+.historyEmpty {
+  padding: 1rem 0.85rem;
+  font-size: 0.85rem;
+}
+
+.historyLoading {
+  color: #64748b;
+}
+
+.historyError {
+  color: #b91c1c;
+}
+
+.historyEmpty {
+  color: #64748b;
+}

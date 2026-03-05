@@ -25,6 +25,7 @@ import {
 import styles from './dashboard.module.css';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { WalletLedgerPanel } from '@/components/profile/WalletLedgerPanel';
 
 type DBStoryRow = {
     id: string;
@@ -742,7 +743,7 @@ export default function DashboardPage() {
             {/* Profile Modal */}
             {isProfileModalOpen && (
                 <div className={styles.modalOverlay}>
-                    <div className={styles.modalContent}>
+                    <div className={`${styles.modalContent} ${styles.profileModalWide}`}>
                         <div className={styles.modalHeader}>
                             <h2>ตั้งค่าโปรไฟล์นักเขียน</h2>
                             <button className={styles.closeBtn} onClick={() => setIsProfileModalOpen(false)}>
@@ -791,6 +792,8 @@ export default function DashboardPage() {
                                     rows={3}
                                 />
                             </div>
+
+                            <WalletLedgerPanel userId={user?.id ?? null} />
                         </div>
                         <div className={styles.modalFooter}>
                             <button

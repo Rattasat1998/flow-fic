@@ -11,6 +11,7 @@ import { List, Heart, Bookmark, BookmarkCheck, MoreVertical, X, Send, Lock, Coin
 import styles from './story.module.css';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTracking } from '@/hooks/useTracking';
 
 interface StoryPageProps {
   params: Promise<{ id: string }>;
@@ -30,7 +31,11 @@ type DBStory = {
 type DBChapter = {
   id: string;
   title: string;
+  draft_title: string | null;
+  published_title: string | null;
   content: unknown;
+  draft_content: unknown;
+  published_content: unknown;
   order_index: number;
   is_premium: boolean;
   coin_price: number;
@@ -114,7 +119,7 @@ const parseChapterBlocks = (content: unknown): { povCharacterId: string | null; 
     return {
       povCharacterId: typeof parsedContent.povCharacterId === 'string' ? parsedContent.povCharacterId : null,
       blocks: parsedBlocks,
-      chatTheme: typeof parsedContent.chatTheme === 'string' ? parsedContent.chatTheme : 'white'
+      chatTheme: typeof parsedContent.chatTheme === 'string' ? parsedContent.chatTheme : 'white',
     };
   }
 
@@ -145,6 +150,7 @@ export default function StoryPage({ params }: StoryPageProps) {
   const unwrappedParams = use(params);
   const storyId = unwrappedParams.id;
   const { user } = useAuth();
+  const { trackEvent } = useTracking({ autoPageView: true, pagePath: `/story/${storyId}/read`, storyId });
 
   const [messages, setMessages] = useState<ReaderChatMessage[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -238,7 +244,7 @@ export default function StoryPage({ params }: StoryPageProps) {
       // Fetch Chapters
       let chapterQuery = supabase
         .from('chapters')
-        .select('id, title, content, order_index, is_premium, coin_price')
+        .select('id, title, draft_title, published_title, content, draft_content, published_content, order_index, is_premium, coin_price')
         .eq('story_id', storyId);
 
       if (isPreviewMode) {
@@ -259,10 +265,17 @@ export default function StoryPage({ params }: StoryPageProps) {
       }
 
       const parsedChapters = ((chapterData as DBChapter[]) || []).map(chapter => {
-        const parsedContent = parseChapterBlocks(chapter.content);
+        const sourceTitle = isPreviewMode
+          ? (chapter.draft_title || chapter.title || chapter.published_title || 'ไม่มีชื่อ')
+          : (chapter.published_title || chapter.title);
+        const sourceContent = isPreviewMode
+          ? (chapter.draft_content ?? chapter.content ?? chapter.published_content)
+          : (chapter.published_content ?? chapter.content);
+        const parsedContent = parseChapterBlocks(sourceContent);
+
         return {
           id: chapter.id,
-          title: chapter.title,
+          title: sourceTitle,
           povCharacterId: parsedContent.povCharacterId,
           blocks: parsedContent.blocks,
           chatTheme: parsedContent.chatTheme,
@@ -397,64 +410,66 @@ export default function StoryPage({ params }: StoryPageProps) {
 
   const activeWritingStyle = dbStory?.writing_style || 'narrative';
   const isChatStyle = activeWritingStyle === 'chat';
+  const activeChatThemeClass = useMemo(() => {
+    const rawTheme = (dbChapters[selectedChapterIndex]?.chatTheme || 'white').toLowerCase();
+    if (rawTheme === 'pink' || rawTheme === 'mint' || rawTheme === 'midnight') return rawTheme;
+    if (rawTheme === 'dark') return 'midnight';
+    return 'light';
+  }, [dbChapters, selectedChapterIndex]);
 
   const activeStory = dbStory
     ? { title: dbStory.title, characterName: dbStory.pen_name, avatarUrl: dbStory.cover_url || fallbackAvatar }
     : null;
 
   const chatScript = useMemo<ReaderChatMessage[]>(() => {
-    return dbChapters.flatMap((chapter: ReaderChapter, idx: number) => {
-      const chapterTitleMessage: ReaderChatMessage = {
-        id: `${chapter.id}_title`,
-        sender: 'system',
-        text: `${idx + 1}: ${chapter.title}`,
-        timestamp: idx * 2 + 1,
+    if (!isChatStyle) return [];
+
+    const chapter = dbChapters[selectedChapterIndex];
+    if (!chapter) return [];
+
+    const chapterTitleMessage: ReaderChatMessage = {
+      id: `${chapter.id}_title`,
+      sender: 'system',
+      text: `${selectedChapterIndex + 1}: ${chapter.title}`,
+      timestamp: selectedChapterIndex * 2 + 1,
+      chapterId: chapter.id,
+      chapterIndex: selectedChapterIndex,
+    };
+
+    const contentMessages: ReaderChatMessage[] = chapter.blocks.map((block, blockIdx) => {
+      let sender: 'character' | 'player' | 'system' = 'character';
+      if (!block.characterId) {
+        sender = 'system';
+      } else if (block.characterId === chapter.povCharacterId) {
+        sender = 'player';
+      }
+
+      return {
+        id: `${chapter.id}_block_${block.id || blockIdx}`,
+        sender,
+        text: block.text,
+        timestamp: selectedChapterIndex * 1000 + blockIdx,
+        type: block.type,
+        imageUrl: block.imageUrl,
+        characterId: block.characterId,
         chapterId: chapter.id,
-        chapterIndex: idx,
+        chapterIndex: selectedChapterIndex,
       };
-
-      const contentMessages: ReaderChatMessage[] = chapter.blocks.map((block, blockIdx) => {
-        let sender: 'character' | 'player' | 'system' = 'character';
-        if (!block.characterId) {
-          sender = 'system';
-        } else if (block.characterId === chapter.povCharacterId) {
-          sender = 'player';
-        }
-
-        return {
-          id: `${chapter.id}_block_${block.id || blockIdx}`,
-          sender: sender,
-          text: block.text,
-          timestamp: idx * 1000 + blockIdx,
-          type: block.type,
-          imageUrl: block.imageUrl,
-          characterId: block.characterId,
-          chapterId: chapter.id,
-          chapterIndex: idx,
-        };
-      });
-
-      return [chapterTitleMessage, ...contentMessages];
     });
-  }, [dbChapters]);
+
+    return [chapterTitleMessage, ...contentMessages];
+  }, [isChatStyle, dbChapters, selectedChapterIndex]);
 
   const handleNextLine = () => {
     if (!activeStory || !isChatStyle) return;
+    const currentChapter = dbChapters[selectedChapterIndex];
+    if (!currentChapter || !canReadChapter(currentChapter)) return;
     if (currentIndex >= chatScript.length) return;
 
     const nextMessage = chatScript[currentIndex];
-    const nextChapter = dbChapters[nextMessage.chapterIndex];
-
-    if (nextChapter && !canReadChapter(nextChapter)) {
-      setSelectedChapterIndex(nextMessage.chapterIndex);
-      return;
-    }
 
     setMessages((prev: ReaderChatMessage[]) => [...prev, nextMessage]);
     setCurrentIndex((prev: number) => prev + 1);
-    if (typeof nextMessage.chapterIndex === 'number') {
-      setSelectedChapterIndex(nextMessage.chapterIndex);
-    }
   };
 
   // Interaction handlers
@@ -497,6 +512,7 @@ export default function StoryPage({ params }: StoryPageProps) {
       if (!hadLikeBefore) {
         setLikeCount(prev => prev + 1);
       }
+      trackEvent('like', `/story/${storyId}/read`, { storyId, chapterId: currentChapterId });
     }
   };
 
@@ -533,6 +549,7 @@ export default function StoryPage({ params }: StoryPageProps) {
       if (error) return;
 
       setFavoritedChapterId(currentChapterId);
+      trackEvent('favorite', `/story/${storyId}/read`, { storyId, chapterId: currentChapterId });
     }
   };
 
@@ -566,6 +583,7 @@ export default function StoryPage({ params }: StoryPageProps) {
         profiles: profileData || { pen_name: user.email?.split('@')[0] || 'ผู้อ่าน', avatar_url: null }
       }]);
       setNewComment('');
+      trackEvent('comment', `/story/${storyId}/read`, { storyId, chapterId: dbChapters[selectedChapterIndex]?.id });
     }
     setIsSubmittingComment(false);
   };
@@ -601,8 +619,14 @@ export default function StoryPage({ params }: StoryPageProps) {
     if (!result || !result.success) {
       if (result?.message === 'INSUFFICIENT_COINS') {
         setUnlockError('เหรียญไม่พอสำหรับปลดล็อกตอนนี้');
+      } else if (result?.message === 'FINANCE_RESTRICTED') {
+        setUnlockError('บัญชีของคุณถูกจำกัดการทำธุรกรรมชั่วคราว กรุณาลองใหม่ภายหลัง');
+      } else if (result?.message === 'FINANCE_BANNED') {
+        setUnlockError('บัญชีของคุณถูกระงับสิทธิ์ด้านการเงิน กรุณาติดต่อทีมงาน');
       } else if (result?.message === 'AUTH_REQUIRED') {
         setUnlockError('กรุณาเข้าสู่ระบบก่อนปลดล็อก');
+      } else if (result?.message === 'CHAPTER_NOT_FOUND') {
+        setUnlockError('ไม่พบตอนที่ต้องการปลดล็อกหรือยังไม่เผยแพร่');
       } else {
         setUnlockError('ปลดล็อกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
       }
@@ -616,6 +640,11 @@ export default function StoryPage({ params }: StoryPageProps) {
     if (typeof result.new_balance === 'number') {
       setCoinBalance(result.new_balance);
     }
+    trackEvent('chapter_unlock', `/story/${storyId}/read`, {
+      storyId,
+      chapterId: chapter.id,
+      metadata: { coin_price: chapter.coinPrice, method: result.message === 'UNLOCKED_BY_VIP' ? 'vip' : 'coins' },
+    });
   };
 
   if (isLoading) {
@@ -639,17 +668,9 @@ export default function StoryPage({ params }: StoryPageProps) {
   const isCurrentChapterLiked = !!currentChapterId && likedChapterId === currentChapterId;
   const isCurrentChapterFavorited = !!currentChapterId && favoritedChapterId === currentChapterId;
   const isCurrentChapterLocked = currentChapter ? !canReadChapter(currentChapter) : false;
+  const showPremiumGate = !!currentChapter && !canReadChapter(currentChapter);
 
-  const nextChatMessage = isChatStyle && currentIndex < chatScript.length
-    ? chatScript[currentIndex]
-    : null;
-  const nextChatChapter = nextChatMessage ? dbChapters[nextChatMessage.chapterIndex] : null;
-  const isChatBlockedByPremium = !!nextChatChapter && !canReadChapter(nextChatChapter);
-
-  const lockedChapterForGate = isChatStyle ? nextChatChapter : currentChapter;
-  const showPremiumGate = !!lockedChapterForGate && !canReadChapter(lockedChapterForGate);
-
-  const premiumGateJSX = showPremiumGate && lockedChapterForGate ? (
+  const premiumGateJSX = showPremiumGate && currentChapter ? (
     <div className={`${styles.premiumGate} ${isChatStyle ? styles.premiumGateChat : ''}`}>
       <div className={styles.premiumGateBadge}>
         <Lock size={14} />
@@ -657,9 +678,9 @@ export default function StoryPage({ params }: StoryPageProps) {
       </div>
       <h3>ตอนนี้ต้องปลดล็อกก่อนอ่าน</h3>
       <p>
-        ใช้ {lockedChapterForGate.coinPrice.toLocaleString('th-TH')} เหรียญเพื่ออ่านตอน
+        ใช้ {currentChapter.coinPrice.toLocaleString('th-TH')} เหรียญเพื่ออ่านตอน
         {' '}
-        <strong>{lockedChapterForGate.title}</strong>
+        <strong>{currentChapter.title}</strong>
       </p>
       {user && !isPreviewMode && (
         <div className={styles.premiumGateBalance}>
@@ -672,12 +693,12 @@ export default function StoryPage({ params }: StoryPageProps) {
           <button
             type="button"
             className={styles.premiumGateBtn}
-            onClick={() => handleUnlockChapter(lockedChapterForGate)}
-            disabled={isUnlockingChapterId === lockedChapterForGate.id}
+            onClick={() => handleUnlockChapter(currentChapter)}
+            disabled={isUnlockingChapterId === currentChapter.id}
           >
-            {isUnlockingChapterId === lockedChapterForGate.id
+            {isUnlockingChapterId === currentChapter.id
               ? 'กำลังปลดล็อก...'
-              : `ปลดล็อก ${lockedChapterForGate.coinPrice.toLocaleString('th-TH')} เหรียญ`}
+              : `ปลดล็อก ${currentChapter.coinPrice.toLocaleString('th-TH')} เหรียญ`}
           </button>
         ) : (
           <Link href="/" className={styles.premiumGateBtn}>
@@ -755,8 +776,11 @@ export default function StoryPage({ params }: StoryPageProps) {
     </div>
   );
 
+  const themeWrapperClass = isChatStyle ? `theme-${activeChatThemeClass}` : '';
+
   return (
-    <div className={isChatStyle ? styles.main : styles.readerLayout}>
+    <div className={themeWrapperClass}>
+      <div className={isChatStyle ? styles.main : styles.readerLayout}>
       {isChatStyle ? (
         <>
           <header className={styles.header}>
@@ -770,6 +794,13 @@ export default function StoryPage({ params }: StoryPageProps) {
               </div>
             </div>
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+              <button
+                onClick={() => setIsTocOpen(true)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(148,163,184,0.8)' }}
+                title="เลือกตอน"
+              >
+                <List size={18} />
+              </button>
               <button onClick={handleToggleLike} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', color: isCurrentChapterLiked ? '#ef4444' : 'rgba(148,163,184,0.7)', fontSize: '0.85rem', fontWeight: 600 }}>
                 <Heart size={18} fill={isCurrentChapterLiked ? 'currentColor' : 'none'} />
                 {!storySettings.hideHeartCount && <span>{likeCount}</span>}
@@ -805,7 +836,8 @@ export default function StoryPage({ params }: StoryPageProps) {
 
           <ChatActionBar
             onNextLine={handleNextLine}
-            hasMore={!isChatBlockedByPremium && currentIndex < chatScript.length}
+            hasMore={!isCurrentChapterLocked && currentIndex < chatScript.length}
+            onCloseChapter={() => setIsTocOpen(true)}
           />
         </>
       ) : (
@@ -960,51 +992,53 @@ export default function StoryPage({ params }: StoryPageProps) {
             )}
           </main>
 
-          {/* Table of Contents Modal */}
-          {isTocOpen && (
-            <div className={styles.tocOverlay} onClick={() => setIsTocOpen(false)}>
-              <div className={styles.tocModal} onClick={(e) => e.stopPropagation()}>
-                <div className={styles.tocHeader}>
-                  <h3 className={styles.tocTitle}>สารบัญ</h3>
-                  <button className={styles.tocCloseBtn} onClick={() => setIsTocOpen(false)}>
-                    <X size={20} />
-                  </button>
-                </div>
-                <div className={styles.tocContent}>
-                  <div className={styles.tocStoryTitle}>{dbChapters[selectedChapterIndex]?.title || activeStory.title}</div>
-                  <div className={styles.tocTotalInfo}>ตอนทั้งหมด ({dbChapters.length})</div>
-                  <div className={styles.tocList}>
-                    {dbChapters.map((ch, idx) => (
-                      <button
-                        key={ch.id}
-                        className={`${styles.tocItem} ${idx === selectedChapterIndex ? styles.tocItemActive : ''}`}
-                        onClick={() => {
-                          setUnlockError(null);
-                          setSelectedChapterIndex(idx);
-                          setIsTocOpen(false);
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }}
-                      >
-                        <span className={styles.tocItemIndex}>#{idx + 1}</span>
-                        <div className={styles.tocItemBody}>
-                          <span className={styles.tocItemTitle}>{ch.title}</span>
-                          {ch.isPremium && (
-                            <span className={`${styles.tocLockTag} ${canReadChapter(ch) ? styles.tocLockTagUnlocked : ''}`}>
-                              {canReadChapter(ch)
-                                ? 'ปลดล็อกแล้ว'
-                                : `ล็อก ${ch.coinPrice.toLocaleString('th-TH')} เหรียญ`}
-                            </span>
-                          )}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </>
       )}
+      {isTocOpen && (
+        <div className={styles.tocOverlay} onClick={() => setIsTocOpen(false)}>
+          <div className={styles.tocModal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.tocHeader}>
+              <h3 className={styles.tocTitle}>สารบัญ</h3>
+              <button className={styles.tocCloseBtn} onClick={() => setIsTocOpen(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className={styles.tocContent}>
+              <div className={styles.tocStoryTitle}>{dbChapters[selectedChapterIndex]?.title || activeStory.title}</div>
+              <div className={styles.tocTotalInfo}>ตอนทั้งหมด ({dbChapters.length})</div>
+              <div className={styles.tocList}>
+                {dbChapters.map((ch, idx) => (
+                  <button
+                    key={ch.id}
+                    className={`${styles.tocItem} ${idx === selectedChapterIndex ? styles.tocItemActive : ''}`}
+                    onClick={() => {
+                      setUnlockError(null);
+                      setSelectedChapterIndex(idx);
+                      setMessages([]);
+                      setCurrentIndex(0);
+                      setIsTocOpen(false);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                  >
+                    <span className={styles.tocItemIndex}>#{idx + 1}</span>
+                    <div className={styles.tocItemBody}>
+                      <span className={styles.tocItemTitle}>{ch.title}</span>
+                      {ch.isPremium && (
+                        <span className={`${styles.tocLockTag} ${canReadChapter(ch) ? styles.tocLockTagUnlocked : ''}`}>
+                          {canReadChapter(ch)
+                            ? 'ปลดล็อกแล้ว'
+                            : `ล็อก ${ch.coinPrice.toLocaleString('th-TH')} เหรียญ`}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
     </div>
   );
 }

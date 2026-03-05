@@ -1,0 +1,9 @@
+Title,Description,Priority,Estimate,Labels,Project
+"EPIC: Data & Observability Foundation (Week 1)","Build event tracking, ingestion, and internal KPI dashboards to make decisions from real usage data.",1,,"area:data, type:feature","8-Week Growth Roadmap"
+"EPIC: Creator Onboarding & Publishing Core (Week 2)","Reduce writer onboarding friction and harden draft/publish so new writers can ship first content quickly.",1,,"area:creator, type:feature","8-Week Growth Roadmap"
+"EPIC: Reader Discovery Core (Week 3)","Improve reader discovery using curated rails, ranking, and practical search/filter capabilities.",1,,"area:reader, type:feature","8-Week Growth Roadmap"
+"EPIC: Follow & Notification Loop (Week 4)","Create return loops with follow and new chapter notifications.",1,,"area:reader, type:feature","8-Week Growth Roadmap"
+"EPIC: Writer Analytics & Retention Tools (Week 5)","Deliver analytics that help writers improve publishing cadence and content performance.",2,,"area:creator, type:feature","8-Week Growth Roadmap"
+"EPIC: Trust, Safety, Moderation (Week 6)","Establish report and moderation workflows with SLA and auditability.",1,,"area:trust, type:feature","8-Week Growth Roadmap"
+"EPIC: Monetization MVP (Week 7)","Launch premium chapter unlock, wallet ledger, and payment reconciliation.",1,,"area:monetization, type:feature","8-Week Growth Roadmap"
+"EPIC: Optimization & Launch Readiness (Week 8)","Improve performance, run experiments, and prepare launch runbooks.",1,,"type:ops, type:tech","8-Week Growth Roadmap"

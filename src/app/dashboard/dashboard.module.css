@@ -796,6 +796,10 @@
     flex-direction: column;
 }
 
+.profileModalWide {
+    max-width: 760px;
+}
+
 .storyModal {
     max-width: 700px;
 }

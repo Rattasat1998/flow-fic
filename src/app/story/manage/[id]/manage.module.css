@@ -384,6 +384,16 @@
     font-weight: 600;
 }
 
+.pendingDraftBadge {
+    background-color: #fffbeb;
+    color: #b45309;
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    border: 1px solid #fde68a;
+}
+
 .iconBtn {
     background: none;
     border: none;

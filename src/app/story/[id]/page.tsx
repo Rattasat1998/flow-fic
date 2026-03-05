@@ -3,8 +3,11 @@
 import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { PlaySquare } from 'lucide-react';
+import { PlaySquare, UserPlus, UserCheck } from 'lucide-react';
 import styles from './details.module.css';
+import { useTracking } from '@/hooks/useTracking';
+import { useFollow } from '@/hooks/useFollow';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface StoryDetailsProps {
     params: Promise<{ id: string }>;
@@ -20,6 +23,7 @@ type DBStory = {
     status: string;
     completion_status: string;
     created_at: string;
+    user_id: string;
 };
 
 type DBChapter = {
@@ -38,10 +42,18 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
     const unwrappedParams = use(params);
     const storyId = unwrappedParams.id;
 
+    useTracking({ autoPageView: true, pagePath: `/story/${storyId}`, storyId });
+    const { user } = useAuth();
+
     const [isLoading, setIsLoading] = useState(true);
     const [dbStory, setDbStory] = useState<DBStory | null>(null);
     const [dbChapters, setDbChapters] = useState<DBChapter[]>([]);
     const [likeCount, setLikeCount] = useState(0);
+
+    const { isFollowing, followerCount, toggleFollow, isLoading: isFollowLoading } = useFollow({
+        storyId,
+        userId: user?.id,
+    });
 
     useEffect(() => {
         const fetchStoryDetails = async () => {
@@ -137,6 +149,9 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
                                 <span className={styles.badge + ' ' + styles.badgeDark}>
                                     ❤️ {likeCount.toLocaleString()} Loves
                                 </span>
+                                <span className={styles.badge + ' ' + styles.badgeDark}>
+                                    👥 {followerCount.toLocaleString()} ติดตาม
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -150,6 +165,16 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
                             <PlaySquare size={20} fill="currentColor" />
                             {dbChapters.length > 0 ? 'เริ่มอ่านตอนแรก' : 'อ่านเลย'}
                         </Link>
+                        {(!dbStory.user_id || dbStory.user_id !== user?.id) && (
+                            <button
+                                className={`${styles.followBtn} ${isFollowing ? styles.followBtnActive : ''}`}
+                                onClick={toggleFollow}
+                                disabled={isFollowLoading}
+                            >
+                                {isFollowing ? <UserCheck size={18} /> : <UserPlus size={18} />}
+                                {isFollowing ? 'กำลังติดตาม' : 'ติดตามเรื่องนี้'}
+                            </button>
+                        )}
                     </div>
 
                     <div className={styles.infoBlock}>

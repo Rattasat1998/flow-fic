@@ -106,9 +106,50 @@
 
 .headerActions {
     display: flex;
+    align-items: center;
+    flex-wrap: wrap;
     gap: 1rem;
     flex: 1;
     justify-content: flex-end;
+}
+
+.headerPremiumControls {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.35rem 0.55rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 999px;
+    background: #f8fafc;
+}
+
+.headerPremiumToggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #334155;
+    white-space: nowrap;
+}
+
+.headerPremiumPrice {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    color: #475569;
+    white-space: nowrap;
+}
+
+.headerPremiumInput {
+    width: 72px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 0.18rem 0.38rem;
+    font-size: 0.82rem;
+    color: #0f172a;
+    background: #fff;
 }
 
 .saveDraftBtn {
@@ -130,6 +171,25 @@
     border-color: #94a3b8;
 }
 
+.discardDraftBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    background-color: #fff7ed;
+    border: 1px solid #fed7aa;
+    color: #9a3412;
+    padding: 0.5rem 0.9rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.discardDraftBtn:hover:not(:disabled) {
+    background-color: #ffedd5;
+    border-color: #fdba74;
+}
+
 .publishBtn {
     background-color: var(--primary);
     color: white;
@@ -147,6 +207,7 @@
 }
 
 .saveDraftBtn:disabled,
+.discardDraftBtn:disabled,
 .publishBtn:disabled {
     opacity: 0.7;
     cursor: not-allowed;
@@ -166,6 +227,32 @@
     }
 }
 
+.editorWorkspace {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-rows: minmax(0, 1fr);
+    gap: 1rem;
+    padding: 0 1rem 1rem;
+    overflow: hidden;
+}
+
+.editorMainColumn {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    overflow: hidden;
+}
+
+.revisionSidebar {
+    min-width: 0;
+    display: flex;
+    padding-top: 1rem;
+    padding-right: 0.2rem;
+}
+
 .content {
     flex: 1;
     max-width: 800px;
@@ -174,12 +261,17 @@
     padding: 1rem 1.5rem;
     display: flex;
     flex-direction: column;
+    min-height: 0;
     overflow-y: auto;
     scroll-behavior: smooth;
 }
 
 .contentNarrative {
     max-width: 1420px;
+}
+
+.contentChat {
+    overflow: hidden;
 }
 
 .titleArea {
@@ -235,6 +327,59 @@
     font-size: 0.8rem;
     color: #64748b;
     margin-left: 0.5rem;
+}
+
+.chatSetupStack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    margin-bottom: 1rem;
+}
+
+.chatSetupStack .povSelector {
+    margin-bottom: 0;
+}
+
+.soundSelector {
+    background-color: #f1f5f9;
+    border-radius: 8px;
+    padding: 0.6rem 0.8rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.soundSelector label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: #334155;
+}
+
+.soundSelect {
+    padding: 0.46rem 0.62rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #0f172a;
+    font-size: 0.86rem;
+}
+
+.soundSelect:disabled {
+    background: #f8fafc;
+    color: #94a3b8;
+}
+
+.soundHelp {
+    font-size: 0.76rem;
+    color: #64748b;
+}
+
+.soundPreview {
+    width: 100%;
+    height: 34px;
 }
 
 /* ─── Narrative Editor 2-column layout ─── */
@@ -389,9 +534,12 @@
 /* Chat Editor Specific Layout */
 .chatHistory {
     flex: 1;
+    min-height: 0;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
     padding-bottom: 1rem;
+    padding-right: 0.3rem;
 }
 
 .chatInputBar {
@@ -713,6 +861,31 @@
     border: 2px solid #3b82f6;
 }
 
+@media (max-width: 1180px) {
+    .editorWorkspace {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+        padding: 0 0 1rem;
+    }
+
+    .editorMainColumn {
+        min-height: 0;
+    }
+
+    .content {
+        max-width: 980px;
+    }
+
+    .revisionSidebar {
+        padding: 0 1rem;
+    }
+
+    .revisionPanel {
+        position: static;
+        max-height: 360px;
+    }
+}
+
 @media (max-width: 768px) {
     .header {
         padding: 0.75rem 1rem;
@@ -730,8 +903,22 @@
 
     .headerActions {
         width: 100%;
+        gap: 0.6rem;
     }
 
+    .headerPremiumControls {
+        width: 100%;
+        justify-content: space-between;
+        border-radius: 12px;
+        padding: 0.45rem 0.6rem;
+    }
+
+    .headerPremiumToggle,
+    .headerPremiumPrice {
+        font-size: 0.78rem;
+    }
+
+    .discardDraftBtn,
     .saveDraftBtn,
     .publishBtn {
         flex: 1;
@@ -769,6 +956,10 @@
         min-height: 34px;
         font-size: 0.9rem;
         padding: 0.42rem 0.58rem;
+    }
+
+    .revisionSidebar {
+        padding: 0 0.75rem;
     }
 
 }
@@ -1191,5 +1382,344 @@
     to {
         opacity: 1;
         transform: translateY(0);
+    }
+}
+
+/* ─── Auto-Save Indicator ─── */
+.autoSaveIndicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: #f59e0b;
+    font-weight: 500;
+    animation: autoSavePulse 1.5s ease-in-out infinite;
+}
+
+.autoSaveIndicatorSaved {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: #10b981;
+    font-weight: 500;
+    animation: autoSaveFadeIn 0.3s ease;
+}
+
+@keyframes autoSavePulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+@keyframes autoSaveFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-2px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ─── Recovery Banner ─── */
+.recoveryBanner {
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    border-bottom: 1px solid #fcd34d;
+    padding: 0.75rem 2rem;
+    animation: recoverySlideDown 0.3s ease;
+}
+
+.recoveryContent {
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.recoveryIcon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: #f59e0b;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.recoveryText {
+    flex: 1;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.recoveryText strong {
+    font-size: 0.9rem;
+    color: #92400e;
+}
+
+.recoveryText span {
+    font-size: 0.8rem;
+    color: #a16207;
+}
+
+.recoveryActions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.recoveryRestoreBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 1rem;
+    border-radius: 8px;
+    border: none;
+    background: #f59e0b;
+    color: white;
+    font-weight: 600;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.recoveryRestoreBtn:hover {
+    background: #d97706;
+}
+
+.recoveryDismissBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid #d97706;
+    background: transparent;
+    color: #92400e;
+    font-weight: 500;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.recoveryDismissBtn:hover {
+    background: rgba(217, 119, 6, 0.1);
+}
+
+@keyframes recoverySlideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-100%);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.revisionPanel {
+    position: sticky;
+    top: 0.9rem;
+    align-self: flex-start;
+    width: 100%;
+    max-height: calc(100vh - 7.3rem);
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+    padding: 0.72rem 0.78rem;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.revisionPanelHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.7rem;
+}
+
+.revisionPanelHeader h3 {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #1e293b;
+}
+
+.revisionPanelHeader span {
+    font-size: 0.78rem;
+    color: #64748b;
+}
+
+.revisionEmpty {
+    margin: 0.55rem 0 0;
+    font-size: 0.82rem;
+    color: #64748b;
+}
+
+.revisionList {
+    margin: 0.5rem 0 0;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: grid;
+    gap: 0.45rem;
+    padding-right: 0.25rem;
+}
+
+.revisionItem {
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    border-radius: 10px;
+    padding: 0.55rem 0.7rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.revisionMeta {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.55rem;
+}
+
+.revisionMeta strong {
+    font-size: 0.8rem;
+    color: #0f172a;
+}
+
+.revisionMeta span {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.revisionActions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.revisionTitle {
+    font-size: 0.76rem;
+    color: #475569;
+    max-width: 240px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.revisionChangeSummary {
+    width: 100%;
+    font-size: 0.74rem;
+    color: #475569;
+    line-height: 1.35;
+}
+
+.revisionDiffPreview {
+    width: 100%;
+    display: grid;
+    gap: 0.4rem;
+}
+
+.revisionDiffPreview > div {
+    background: #ffffff;
+    border: 1px dashed #dbe3ee;
+    border-radius: 8px;
+    padding: 0.35rem 0.45rem;
+}
+
+.revisionDiffPreview span {
+    display: block;
+    font-size: 0.68rem;
+    color: #64748b;
+    margin-bottom: 0.2rem;
+}
+
+.revisionDiffPreview p {
+    margin: 0;
+    font-size: 0.72rem;
+    color: #334155;
+    line-height: 1.35;
+    max-height: 3.8rem;
+    overflow: hidden;
+}
+
+.revisionRestoreBtn {
+    border: 1px solid #cbd5e1;
+    background: white;
+    color: #334155;
+    border-radius: 8px;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.revisionRestoreBtn:hover:not(:disabled) {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+}
+
+.revisionRestoreBtn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+    .recoveryBanner {
+        padding: 0.65rem 1rem;
+    }
+
+    .recoveryContent {
+        gap: 0.75rem;
+    }
+
+    .recoveryIcon {
+        width: 34px;
+        height: 34px;
+    }
+
+    .recoveryActions {
+        width: 100%;
+    }
+
+    .recoveryRestoreBtn,
+    .recoveryDismissBtn {
+        flex: 1;
+        justify-content: center;
+    }
+
+    .revisionPanel {
+        padding: 0.6rem 1rem;
+    }
+
+    .revisionItem {
+        align-items: flex-start;
+    }
+
+    .revisionActions {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .revisionTitle {
+        max-width: 50vw;
     }
 }

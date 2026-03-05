@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Save, Loader2, Plus, X, Trash2, GripVertical, Image as ImageIcon, Search, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, Plus, X, Trash2, GripVertical, Image as ImageIcon, Search, CheckCircle2, AlertCircle, RotateCcw, Clock } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAutoSave } from '@/hooks/useAutoSave';
 import styles from './edit.module.css';
 import blockStyles from './block-editor.module.css';
 
@@ -41,12 +42,38 @@ type NoticeState = {
     message: string;
 };
 
+type ChapterRevisionType = 'manual_save' | 'publish' | 'discard' | 'restore';
+
+type ChapterContentPayload = {
+    povCharacterId: string | null;
+    chatTheme?: string;
+    backgroundSound: null;
+    blocks: Block[];
+};
+
+type ChapterRevision = {
+    id: string;
+    revision_type: ChapterRevisionType;
+    title: string;
+    content: unknown;
+    is_premium: boolean;
+    coin_price: number;
+    created_at: string;
+};
+
+type RevisionDiffSummary = {
+    highlights: string[];
+    beforeText: string;
+    afterText: string;
+};
+
 export default function EditChapterPage() {
     const params = useParams();
     const router = useRouter();
     const searchParams = useSearchParams();
     const storyId = params.id as string;
     const chapterId = params.chapterId as string;
+    const cacheKey = `flowfic_chapter_${chapterId}`;
     const { user, isLoading: isLoadingAuth } = useAuth();
 
     const [isMounted, setIsMounted] = useState(false);
@@ -69,6 +96,10 @@ export default function EditChapterPage() {
     const [isCharPopupOpen, setIsCharPopupOpen] = useState(false);
     const charPopupRef = useRef<HTMLDivElement>(null);
     const chatEndRef = useRef<HTMLDivElement>(null);
+    const sendSoundContextRef = useRef<AudioContext | null>(null);
+    const serverAutoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const serverDraftSignatureRef = useRef<string>('');
+    const isServerAutoSavingRef = useRef(false);
     const imageInputRef = useRef<HTMLInputElement>(null);
     const [isUploadingImage, setIsUploadingImage] = useState(false);
     const [chatTheme, setChatTheme] = useState<string>('white');
@@ -89,15 +120,661 @@ export default function EditChapterPage() {
     const [isUnsplashLoading, setIsUnsplashLoading] = useState(false);
     const [unsplashError, setUnsplashError] = useState<string | null>(null);
     const [notice, setNotice] = useState<NoticeState | null>(null);
+    const [revisions, setRevisions] = useState<ChapterRevision[]>([]);
+    const [isLoadingRevisions, setIsLoadingRevisions] = useState(false);
+    const [isRestoringRevision, setIsRestoringRevision] = useState(false);
+    const [savedDraftSignature, setSavedDraftSignature] = useState('');
 
     const styleParam = searchParams.get('style');
     const editorStyle = styleParam === 'chat' || styleParam === 'thread' ? styleParam : 'narrative';
     const isChatStyle = editorStyle === 'chat';
     const styleLabel = isChatStyle ? 'แชท' : editorStyle === 'thread' ? 'กระทู้' : 'บรรยาย';
 
+    // ── Auto-Save Hook ──
+    const {
+        hasRecovery,
+        recoveryDraft,
+        recoveryTimestamp,
+        acceptRecovery,
+        dismissRecovery,
+        onEditorChange,
+        clearDraft,
+        autoSaveStatus,
+    } = useAutoSave({
+        chapterId,
+        serverSavedAt: lastSavedAt,
+        isReady: !isLoading && isMounted,
+    });
+
+    // ── Notify auto-save of state changes ──
+    const notifyAutoSave = useCallback(() => {
+        if (!isMounted || isLoading) return;
+        onEditorChange({
+            title,
+            blocks,
+            povCharacterId,
+            chatTheme,
+            backgroundSound: null,
+            isPremium,
+            coinPrice,
+        });
+    }, [title, blocks, povCharacterId, chatTheme, isPremium, coinPrice, isMounted, isLoading, onEditorChange]);
+
+    useEffect(() => {
+        notifyAutoSave();
+    }, [notifyAutoSave]);
+
+    useEffect(() => {
+        if (!isMounted) return;
+
+        sessionStorage.setItem(cacheKey, JSON.stringify({
+            characters,
+            title,
+            status,
+            lastSavedAt,
+            blocks,
+            povCharacterId,
+            chatTheme,
+            isPremium,
+            coinPrice,
+        }));
+    }, [
+        cacheKey,
+        isMounted,
+        characters,
+        title,
+        status,
+        lastSavedAt,
+        blocks,
+        povCharacterId,
+        chatTheme,
+        isPremium,
+        coinPrice,
+    ]);
+
+    // ── Handle recovery accept ──
+    const handleAcceptRecovery = () => {
+        const draft = acceptRecovery();
+        if (!draft) return;
+        setTitle(draft.title);
+        setBlocks(draft.blocks);
+        setPovCharacterId(draft.povCharacterId);
+        setChatTheme(draft.chatTheme);
+        setIsPremium(draft.isPremium);
+        setCoinPrice(draft.coinPrice);
+        showNotice('success', 'กู้คืนสำเร็จ', 'ฉบับร่างล่าสุดถูกกู้คืนแล้ว');
+    };
+
+    const handleDismissRecovery = () => {
+        dismissRecovery();
+        showNotice('success', 'ละทิ้งฉบับร่าง', 'ใช้ข้อมูลจากเซิร์ฟเวอร์แทน');
+    };
+
     const showNotice = (tone: NoticeState['tone'], title: string, message: string) => {
         setNotice({ tone, title, message });
     };
+
+    const updateSavedDraftSignature = useCallback((signature: string) => {
+        serverDraftSignatureRef.current = signature;
+        setSavedDraftSignature(signature);
+    }, []);
+
+    const parseStoredChapterContent = useCallback((rawContent: unknown): ChapterContentPayload => {
+        let parsedBlocks: Block[] = [];
+        let parsedPov: string | null = null;
+        let parsedChatTheme = 'white';
+
+        if (rawContent && typeof rawContent === 'object') {
+            const contentObject = rawContent as Record<string, unknown>;
+            if (Array.isArray(contentObject.blocks)) {
+                parsedBlocks = contentObject.blocks
+                    .map((item, index) => {
+                        if (!item || typeof item !== 'object') return null;
+                        const blockObject = item as Record<string, unknown>;
+                        const type = blockObject.type === 'image' ? 'image' : 'paragraph';
+                        const text = typeof blockObject.text === 'string' ? blockObject.text : '';
+                        const characterId = typeof blockObject.characterId === 'string' ? blockObject.characterId : null;
+                        const imageUrl = typeof blockObject.imageUrl === 'string' ? blockObject.imageUrl : undefined;
+                        const id = typeof blockObject.id === 'string' && blockObject.id
+                            ? blockObject.id
+                            : `block-${Date.now()}-${index}`;
+
+                        return {
+                            id,
+                            type,
+                            text,
+                            characterId,
+                            imageUrl,
+                        } as Block;
+                    })
+                    .filter((item): item is Block => item !== null);
+            } else if (typeof contentObject.text === 'string') {
+                parsedBlocks = contentObject.text
+                    .split('\n')
+                    .filter((line) => line.trim() !== '')
+                    .map((line, index) => ({
+                        id: `block-${Date.now()}-${index}`,
+                        type: 'paragraph' as const,
+                        text: line,
+                        characterId: null,
+                    }));
+            }
+
+            parsedPov = typeof contentObject.povCharacterId === 'string' ? contentObject.povCharacterId : null;
+            parsedChatTheme = typeof contentObject.chatTheme === 'string' ? contentObject.chatTheme : 'white';
+        } else if (typeof rawContent === 'string') {
+            parsedBlocks = rawContent
+                .split('\n')
+                .filter((line) => line.trim() !== '')
+                .map((line, index) => ({
+                    id: `block-${Date.now()}-${index}`,
+                    type: 'paragraph' as const,
+                    text: line,
+                    characterId: null,
+                }));
+        }
+
+        if (parsedBlocks.length === 0) {
+            parsedBlocks = [{ id: `block-${Date.now()}`, type: 'paragraph', text: '', characterId: null }];
+        }
+
+        return {
+            povCharacterId: parsedPov,
+            chatTheme: parsedChatTheme,
+            backgroundSound: null,
+            blocks: parsedBlocks,
+        };
+    }, []);
+
+    const applySnapshotToEditor = useCallback((snapshot: {
+        title: string;
+        content: ChapterContentPayload;
+        isPremium: boolean;
+        coinPrice: number;
+    }) => {
+        setTitle(snapshot.title);
+        setBlocks(snapshot.content.blocks);
+        setPovCharacterId(snapshot.content.povCharacterId);
+        setChatTheme(snapshot.content.chatTheme || 'white');
+        setIsPremium(snapshot.isPremium);
+        setCoinPrice(snapshot.coinPrice > 0 ? snapshot.coinPrice : 10);
+    }, []);
+
+    const getRevisionTypeLabel = (revisionType: ChapterRevisionType) => {
+        if (revisionType === 'publish') return 'เผยแพร่';
+        if (revisionType === 'discard') return 'ยกเลิกฉบับร่าง';
+        if (revisionType === 'restore') return 'กู้คืนเวอร์ชัน';
+        return 'บันทึกร่าง';
+    };
+
+    const buildSignatureFromSnapshot = useCallback((snapshot: {
+        title: string;
+        content: ChapterContentPayload;
+        isPremium: boolean;
+        coinPrice: number;
+        statusValue: 'draft' | 'published';
+    }) => {
+        return JSON.stringify({
+            title: snapshot.title,
+            draftContent: snapshot.content,
+            isPremium: snapshot.isPremium,
+            coinPrice: snapshot.coinPrice,
+            status: snapshot.statusValue,
+        });
+    }, []);
+
+    const chapterContentToText = useCallback((content: ChapterContentPayload) => {
+        return content.blocks
+            .map((block) => block.text || '')
+            .join('\n')
+            .trim();
+    }, []);
+
+    const playChatSendSound = useCallback(() => {
+        if (!isChatStyle || typeof window === 'undefined') return;
+
+        try {
+            if (!sendSoundContextRef.current) {
+                sendSoundContextRef.current = new AudioContext();
+            }
+
+            const ctx = sendSoundContextRef.current;
+            const now = ctx.currentTime;
+            const oscillator = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            oscillator.type = 'triangle';
+            oscillator.frequency.setValueAtTime(880, now);
+            oscillator.frequency.exponentialRampToValueAtTime(1320, now + 0.06);
+
+            gain.gain.setValueAtTime(0.0001, now);
+            gain.gain.exponentialRampToValueAtTime(0.04, now + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
+
+            oscillator.connect(gain);
+            gain.connect(ctx.destination);
+
+            oscillator.start(now);
+            oscillator.stop(now + 0.1);
+        } catch (error) {
+            console.error('Failed to play send sound:', error);
+        }
+    }, [isChatStyle]);
+
+    const buildDraftSnapshot = useCallback(() => {
+        const draftBlocks = blocks.length > 0
+            ? blocks
+            : [{ id: 'block-empty', type: 'paragraph' as const, text: '', characterId: null }];
+        const draftContent: ChapterContentPayload = {
+            povCharacterId: isChatStyle ? povCharacterId : null,
+            chatTheme: isChatStyle ? chatTheme : undefined,
+            backgroundSound: null,
+            blocks: draftBlocks,
+        };
+        const signature = buildSignatureFromSnapshot({
+            title,
+            content: draftContent,
+            isPremium,
+            coinPrice,
+            statusValue: status,
+        });
+
+        return { draftContent, signature };
+    }, [
+        blocks,
+        isChatStyle,
+        povCharacterId,
+        chatTheme,
+        title,
+        isPremium,
+        coinPrice,
+        status,
+        buildSignatureFromSnapshot,
+    ]);
+
+    const currentDraftSignature = useMemo(() => buildDraftSnapshot().signature, [buildDraftSnapshot]);
+    const isDraftDirty = currentDraftSignature !== savedDraftSignature;
+
+    const flushServerDraftAutoSave = useCallback(async (force = false) => {
+        if (!user || !chapterId || !storyId) return;
+        if (isLoading || isSaving) return;
+        if (isServerAutoSavingRef.current) return;
+
+        const { draftContent, signature } = buildDraftSnapshot();
+        if (!force && signature === serverDraftSignatureRef.current) return;
+
+        isServerAutoSavingRef.current = true;
+        const nowIso = new Date().toISOString();
+        const payload: Record<string, unknown> = {
+            draft_title: title,
+            draft_content: draftContent,
+            draft_updated_at: nowIso,
+            updated_at: nowIso,
+        };
+
+        // Keep legacy columns aligned only while chapter is still unpublished.
+        if (status !== 'published') {
+            payload.title = title;
+            payload.content = draftContent;
+            payload.is_premium = isPremium;
+            payload.coin_price = isPremium ? Math.max(1, coinPrice) : 0;
+        }
+
+        try {
+            const { error } = await supabase
+                .from('chapters')
+                .update(payload)
+                .eq('id', chapterId)
+                .eq('story_id', storyId);
+
+            if (error) throw error;
+
+            updateSavedDraftSignature(signature);
+            setLastSavedAt(nowIso);
+        } catch (error) {
+            console.error('Auto-save to server failed:', error);
+        } finally {
+            isServerAutoSavingRef.current = false;
+        }
+    }, [
+        user,
+        chapterId,
+        storyId,
+        isLoading,
+        isSaving,
+        buildDraftSnapshot,
+        title,
+        status,
+        isPremium,
+        coinPrice,
+        updateSavedDraftSignature,
+    ]);
+
+    const loadRevisions = useCallback(async () => {
+        if (!user || !chapterId) return;
+        setIsLoadingRevisions(true);
+
+        try {
+            const { data, error } = await supabase
+                .from('chapter_revisions')
+                .select('id, revision_type, title, content, is_premium, coin_price, created_at')
+                .eq('chapter_id', chapterId)
+                .order('created_at', { ascending: false })
+                .limit(20);
+
+            if (error) throw error;
+
+            const mappedRows = (data ?? []).map((row) => {
+                const rowData = row as Record<string, unknown>;
+                const revisionType = rowData.revision_type;
+                const safeRevisionType: ChapterRevisionType = revisionType === 'publish'
+                    || revisionType === 'discard'
+                    || revisionType === 'restore'
+                    || revisionType === 'manual_save'
+                    ? revisionType
+                    : 'manual_save';
+
+                return {
+                    id: String(rowData.id),
+                    revision_type: safeRevisionType,
+                    title: typeof rowData.title === 'string' ? rowData.title : '',
+                    content: rowData.content ?? null,
+                    is_premium: !!rowData.is_premium,
+                    coin_price: Number(rowData.coin_price) || 0,
+                    created_at: typeof rowData.created_at === 'string' ? rowData.created_at : new Date().toISOString(),
+                } as ChapterRevision;
+            });
+
+            setRevisions(mappedRows);
+        } catch (error) {
+            console.error('Failed to load chapter revisions:', error);
+        } finally {
+            setIsLoadingRevisions(false);
+        }
+    }, [user, chapterId]);
+
+    const saveRevisionSnapshot = useCallback(async (
+        revisionType: ChapterRevisionType,
+        snapshot?: {
+            title: string;
+            content: ChapterContentPayload;
+            isPremium: boolean;
+            coinPrice: number;
+        },
+    ) => {
+        if (!user || !chapterId || !storyId) return;
+
+        const currentDraft = buildDraftSnapshot();
+        const sourceSnapshot = snapshot ?? {
+            title,
+            content: currentDraft.draftContent,
+            isPremium,
+            coinPrice,
+        };
+
+        try {
+            const { error } = await supabase
+                .from('chapter_revisions')
+                .insert({
+                    chapter_id: chapterId,
+                    story_id: storyId,
+                    user_id: user.id,
+                    revision_type: revisionType,
+                    title: sourceSnapshot.title,
+                    content: sourceSnapshot.content,
+                    is_premium: sourceSnapshot.isPremium,
+                    coin_price: sourceSnapshot.isPremium ? Math.max(1, sourceSnapshot.coinPrice) : 0,
+                });
+
+            if (error) throw error;
+
+            await loadRevisions();
+        } catch (error) {
+            console.error('Failed to save chapter revision:', error);
+        }
+    }, [
+        user,
+        chapterId,
+        storyId,
+        buildDraftSnapshot,
+        title,
+        isPremium,
+        coinPrice,
+        loadRevisions,
+    ]);
+
+    const persistSnapshotAsDraft = useCallback(async (snapshot: {
+        title: string;
+        content: ChapterContentPayload;
+        isPremium: boolean;
+        coinPrice: number;
+    }) => {
+        if (!user || !chapterId || !storyId) return false;
+
+        const nowIso = new Date().toISOString();
+        const payload: Record<string, unknown> = {
+            draft_title: snapshot.title,
+            draft_content: snapshot.content,
+            draft_updated_at: nowIso,
+            updated_at: nowIso,
+        };
+
+        if (status !== 'published') {
+            payload.title = snapshot.title;
+            payload.content = snapshot.content;
+            payload.is_premium = snapshot.isPremium;
+            payload.coin_price = snapshot.isPremium ? Math.max(1, snapshot.coinPrice) : 0;
+        }
+
+        const { error } = await supabase
+            .from('chapters')
+            .update(payload)
+            .eq('id', chapterId)
+            .eq('story_id', storyId);
+
+        if (error) {
+            console.error('Failed to persist snapshot as draft:', error);
+            return false;
+        }
+
+        setLastSavedAt(nowIso);
+        updateSavedDraftSignature(buildSignatureFromSnapshot({
+            title: snapshot.title,
+            content: snapshot.content,
+            isPremium: snapshot.isPremium,
+            coinPrice: snapshot.coinPrice,
+            statusValue: status,
+        }));
+        return true;
+    }, [user, chapterId, storyId, status, buildSignatureFromSnapshot, updateSavedDraftSignature]);
+
+    const buildSnapshotFromRevision = useCallback((revision: ChapterRevision) => {
+        const parsedContent = parseStoredChapterContent(revision.content);
+        return {
+            title: revision.title || 'ไม่มีชื่อ',
+            content: parsedContent,
+            isPremium: revision.is_premium,
+            coinPrice: revision.coin_price > 0 ? revision.coin_price : 10,
+        };
+    }, [parseStoredChapterContent]);
+
+    const buildRevisionDiffSummary = useCallback((
+        currentRevision: ChapterRevision,
+        previousRevision: ChapterRevision | null,
+    ): RevisionDiffSummary => {
+        const currentSnapshot = buildSnapshotFromRevision(currentRevision);
+        const currentText = chapterContentToText(currentSnapshot.content);
+        const currentCharLength = currentText.length;
+        const currentBlocksLength = currentSnapshot.content.blocks.length;
+
+        if (!previousRevision) {
+            return {
+                highlights: ['เวอร์ชันแรกที่บันทึก'],
+                beforeText: '-',
+                afterText: currentText || '-',
+            };
+        }
+
+        const previousSnapshot = buildSnapshotFromRevision(previousRevision);
+        const previousText = chapterContentToText(previousSnapshot.content);
+        const previousCharLength = previousText.length;
+        const previousBlocksLength = previousSnapshot.content.blocks.length;
+
+        const highlights: string[] = [];
+
+        if (currentSnapshot.title !== previousSnapshot.title) {
+            highlights.push('แก้ชื่อเรื่อง');
+        }
+        if (currentSnapshot.isPremium !== previousSnapshot.isPremium) {
+            highlights.push(currentSnapshot.isPremium ? 'เปิดตอนพิเศษ' : 'ปิดตอนพิเศษ');
+        }
+        if (currentSnapshot.coinPrice !== previousSnapshot.coinPrice) {
+            highlights.push(`ราคา ${previousSnapshot.coinPrice} -> ${currentSnapshot.coinPrice}`);
+        }
+        if (currentBlocksLength !== previousBlocksLength) {
+            const delta = currentBlocksLength - previousBlocksLength;
+            highlights.push(`จำนวนบล็อก ${delta > 0 ? `+${delta}` : `${delta}`}`);
+        }
+        if (currentCharLength !== previousCharLength) {
+            const delta = currentCharLength - previousCharLength;
+            highlights.push(`ตัวอักษร ${delta > 0 ? `+${delta}` : `${delta}`}`);
+        }
+
+        if (highlights.length === 0) {
+            highlights.push('ไม่มีความต่างจากเวอร์ชันก่อนหน้า');
+        }
+
+        return {
+            highlights,
+            beforeText: previousText || '-',
+            afterText: currentText || '-',
+        };
+    }, [buildSnapshotFromRevision, chapterContentToText]);
+
+    const revisionRows = useMemo(() => {
+        return revisions.map((revision, index) => {
+            const previous = revisions[index + 1] ?? null;
+            return {
+                revision,
+                diff: buildRevisionDiffSummary(revision, previous),
+            };
+        });
+    }, [revisions, buildRevisionDiffSummary]);
+
+    const handleRestoreRevision = useCallback(async (revision: ChapterRevision) => {
+        if (isSaving || isRestoringRevision) return;
+
+        const shouldRestore = window.confirm('ต้องการกู้คืนฉบับนี้ใช่ไหม? ข้อมูลที่แก้ล่าสุดจะถูกแทนที่');
+        if (!shouldRestore) return;
+
+        setIsRestoringRevision(true);
+        const snapshot = buildSnapshotFromRevision(revision);
+        const isPersisted = await persistSnapshotAsDraft(snapshot);
+
+        if (!isPersisted) {
+            showNotice('error', 'กู้คืนไม่สำเร็จ', 'ไม่สามารถอัปเดตฉบับร่างบนเซิร์ฟเวอร์ได้');
+            setIsRestoringRevision(false);
+            return;
+        }
+
+        applySnapshotToEditor(snapshot);
+        await saveRevisionSnapshot('restore', snapshot);
+        showNotice('success', 'กู้คืนสำเร็จ', 'ฉบับร่างถูกย้อนกลับตามประวัติที่เลือกแล้ว');
+        setIsRestoringRevision(false);
+    }, [
+        isSaving,
+        isRestoringRevision,
+        buildSnapshotFromRevision,
+        persistSnapshotAsDraft,
+        applySnapshotToEditor,
+        saveRevisionSnapshot,
+    ]);
+
+    const handleDiscardDraft = useCallback(async () => {
+        if (isSaving || isRestoringRevision) return;
+
+        const shouldDiscard = window.confirm('ต้องการยกเลิกฉบับร่างล่าสุดใช่ไหม?');
+        if (!shouldDiscard) return;
+
+        setIsRestoringRevision(true);
+
+        try {
+            let snapshot: {
+                title: string;
+                content: ChapterContentPayload;
+                isPremium: boolean;
+                coinPrice: number;
+            } | null = null;
+
+            const { data: latestRevisionData, error: latestRevisionError } = await supabase
+                .from('chapter_revisions')
+                .select('id, revision_type, title, content, is_premium, coin_price, created_at')
+                .eq('chapter_id', chapterId)
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            if (!latestRevisionError && latestRevisionData && latestRevisionData.length > 0) {
+                const latestRevision = latestRevisionData[0] as ChapterRevision;
+                snapshot = buildSnapshotFromRevision(latestRevision);
+            }
+
+            if (!snapshot && status === 'published') {
+                const { data: chapterData, error: chapterError } = await supabase
+                    .from('chapters')
+                    .select('published_title, published_content, title, content, is_premium, coin_price')
+                    .eq('id', chapterId)
+                    .eq('story_id', storyId)
+                    .single();
+
+                if (chapterError) throw chapterError;
+
+                const fallbackTitle = typeof chapterData.published_title === 'string' && chapterData.published_title.trim()
+                    ? chapterData.published_title
+                    : chapterData.title;
+                const fallbackContent = chapterData.published_content ?? chapterData.content;
+
+                snapshot = {
+                    title: fallbackTitle,
+                    content: parseStoredChapterContent(fallbackContent),
+                    isPremium: !!chapterData.is_premium,
+                    coinPrice: chapterData.coin_price > 0 ? chapterData.coin_price : 10,
+                };
+            }
+
+            if (!snapshot) {
+                showNotice('error', 'ยกเลิกไม่ได้', 'ยังไม่มีประวัติให้ย้อนกลับในตอนนี้');
+                setIsRestoringRevision(false);
+                return;
+            }
+
+            const isPersisted = await persistSnapshotAsDraft(snapshot);
+            if (!isPersisted) {
+                showNotice('error', 'ยกเลิกไม่สำเร็จ', 'ไม่สามารถอัปเดตฉบับร่างบนเซิร์ฟเวอร์ได้');
+                setIsRestoringRevision(false);
+                return;
+            }
+
+            applySnapshotToEditor(snapshot);
+            await saveRevisionSnapshot('discard', snapshot);
+            showNotice('success', 'ยกเลิกฉบับร่างแล้ว', 'กลับไปเป็นเวอร์ชันล่าสุดในประวัติเรียบร้อย');
+        } catch (error) {
+            console.error('Discard draft failed:', error);
+            showNotice('error', 'ยกเลิกไม่สำเร็จ', 'เกิดข้อผิดพลาดขณะย้อนฉบับร่าง');
+        } finally {
+            setIsRestoringRevision(false);
+        }
+    }, [
+        isSaving,
+        isRestoringRevision,
+        chapterId,
+        storyId,
+        status,
+        buildSnapshotFromRevision,
+        parseStoredChapterContent,
+        persistSnapshotAsDraft,
+        applySnapshotToEditor,
+        saveRevisionSnapshot,
+    ]);
 
     // Close popups when clicking outside
     useEffect(() => {
@@ -120,9 +797,70 @@ export default function EditChapterPage() {
     }, [notice]);
 
     useEffect(() => {
+        if (!isMounted || isLoading || isSaving || !user) return;
+
+        if (serverAutoSaveTimerRef.current) {
+            clearTimeout(serverAutoSaveTimerRef.current);
+        }
+
+        serverAutoSaveTimerRef.current = setTimeout(() => {
+            void flushServerDraftAutoSave();
+        }, 1500);
+
+        return () => {
+            if (serverAutoSaveTimerRef.current) {
+                clearTimeout(serverAutoSaveTimerRef.current);
+                serverAutoSaveTimerRef.current = null;
+            }
+        };
+    }, [
+        title,
+        blocks,
+        povCharacterId,
+        chatTheme,
+        isPremium,
+        coinPrice,
+        status,
+        isMounted,
+        isLoading,
+        isSaving,
+        user,
+        flushServerDraftAutoSave,
+    ]);
+
+    useEffect(() => {
+        return () => {
+            const ctx = sendSoundContextRef.current;
+            if (ctx) {
+                ctx.close().catch(() => undefined);
+                sendSoundContextRef.current = null;
+            }
+
+            if (serverAutoSaveTimerRef.current) {
+                clearTimeout(serverAutoSaveTimerRef.current);
+                serverAutoSaveTimerRef.current = null;
+            }
+            void flushServerDraftAutoSave(false);
+        };
+    }, [flushServerDraftAutoSave]);
+
+    useEffect(() => {
+        const handleBeforeUnload = () => {
+            void flushServerDraftAutoSave(false);
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [flushServerDraftAutoSave]);
+
+    useEffect(() => {
+        if (!user || !chapterId) return;
+        void loadRevisions();
+    }, [user, chapterId, loadRevisions]);
+
+    useEffect(() => {
         setIsMounted(true);
 
-        const cacheKey = `flowfic_chapter_${chapterId}`;
         const cached = sessionStorage.getItem(cacheKey);
         if (cached) {
             try {
@@ -133,8 +871,25 @@ export default function EditChapterPage() {
                 setLastSavedAt(parsed.lastSavedAt);
                 setBlocks(parsed.blocks);
                 setPovCharacterId(parsed.povCharacterId);
+                setChatTheme(typeof parsed.chatTheme === 'string' ? parsed.chatTheme : 'white');
                 setIsPremium(!!parsed.isPremium);
                 setCoinPrice(Number.isFinite(parsed.coinPrice) ? Math.max(1, Number(parsed.coinPrice)) : 10);
+                const parsedBlocks = Array.isArray(parsed.blocks) ? (parsed.blocks as Block[]) : [];
+                const cachedDraftContent: ChapterContentPayload = {
+                    povCharacterId: parsed.povCharacterId || null,
+                    chatTheme: typeof parsed.chatTheme === 'string' ? parsed.chatTheme : 'white',
+                    backgroundSound: null,
+                    blocks: parsedBlocks.length > 0
+                        ? parsedBlocks
+                        : [{ id: 'block-empty', type: 'paragraph' as const, text: '', characterId: null }],
+                };
+                updateSavedDraftSignature(buildSignatureFromSnapshot({
+                    title: parsed.title || '',
+                    content: cachedDraftContent,
+                    isPremium: !!parsed.isPremium,
+                    coinPrice: Number.isFinite(parsed.coinPrice) ? Math.max(1, Number(parsed.coinPrice)) : 10,
+                    statusValue: (parsed.status === 'published' ? 'published' : 'draft'),
+                }));
                 setIsLoading(false);
             } catch (e) {
                 console.error("Cache parsing error", e);
@@ -186,7 +941,11 @@ export default function EditChapterPage() {
                 .single();
 
             if (data && !error) {
-                setTitle(data.title);
+                const draftTitle = typeof data.draft_title === 'string' && data.draft_title.trim()
+                    ? data.draft_title
+                    : data.title;
+
+                setTitle(draftTitle);
                 setStatus(data.status as 'draft' | 'published');
                 setLastSavedAt(data.updated_at || null);
                 setIsPremium(!!data.is_premium);
@@ -194,14 +953,19 @@ export default function EditChapterPage() {
 
                 let parsedBlocks: Block[];
                 let parsedPov: string | null = null;
+                let parsedChatTheme = 'white';
+                const draftContent = data.draft_content ?? data.content;
 
                 // Parse content into blocks
-                if (data.content && typeof data.content === 'object' && 'blocks' in data.content) {
-                    parsedBlocks = (data.content as any).blocks as Block[];
-                    parsedPov = (data.content as any).povCharacterId || null;
-                } else if (data.content && typeof data.content === 'object' && 'text' in data.content) {
+                if (draftContent && typeof draftContent === 'object' && 'blocks' in draftContent) {
+                    parsedBlocks = (draftContent as any).blocks as Block[];
+                    parsedPov = (draftContent as any).povCharacterId || null;
+                    parsedChatTheme = typeof (draftContent as any).chatTheme === 'string'
+                        ? (draftContent as any).chatTheme
+                        : 'white';
+                } else if (draftContent && typeof draftContent === 'object' && 'text' in draftContent) {
                     // Legacy migration: text -> blocks
-                    const text = (data.content as any).text as string;
+                    const text = (draftContent as any).text as string;
                     parsedBlocks = text.split('\n').filter((line: string) => line.trim() !== '').map((line: string, idx: number) => ({
                         id: `block-${Date.now()}-${idx}`,
                         type: 'paragraph' as const,
@@ -209,9 +973,9 @@ export default function EditChapterPage() {
                         characterId: null
                     }));
                     if (parsedBlocks.length === 0) parsedBlocks = [{ id: `block-${Date.now()}`, type: 'paragraph', text: '', characterId: null }];
-                } else if (typeof data.content === 'string') {
+                } else if (typeof draftContent === 'string') {
                     // Legacy migration: simple string -> blocks
-                    parsedBlocks = data.content.split('\n').filter((line: string) => line.trim() !== '').map((line: string, idx: number) => ({
+                    parsedBlocks = draftContent.split('\n').filter((line: string) => line.trim() !== '').map((line: string, idx: number) => ({
                         id: `block-${Date.now()}-${idx}`,
                         type: 'paragraph' as const,
                         text: line,
@@ -224,14 +988,31 @@ export default function EditChapterPage() {
 
                 setBlocks(parsedBlocks);
                 setPovCharacterId(parsedPov);
+                setChatTheme(parsedChatTheme);
+                const loadedDraftContent: ChapterContentPayload = {
+                    povCharacterId: isChatStyle ? parsedPov : null,
+                    chatTheme: isChatStyle ? parsedChatTheme : undefined,
+                    backgroundSound: null,
+                    blocks: parsedBlocks.length > 0
+                        ? parsedBlocks
+                        : [{ id: 'block-empty', type: 'paragraph' as const, text: '', characterId: null }],
+                };
+                updateSavedDraftSignature(buildSignatureFromSnapshot({
+                    title: draftTitle,
+                    content: loadedDraftContent,
+                    isPremium: !!data.is_premium,
+                    coinPrice: (data.coin_price && data.coin_price > 0) ? data.coin_price : 10,
+                    statusValue: data.status === 'published' ? 'published' : 'draft',
+                }));
 
                 sessionStorage.setItem(cacheKey, JSON.stringify({
                     characters: charsData || [],
-                    title: data.title,
+                    title: draftTitle,
                     status: data.status,
                     lastSavedAt: data.updated_at || null,
                     blocks: parsedBlocks,
                     povCharacterId: parsedPov,
+                    chatTheme: parsedChatTheme,
                     isPremium: !!data.is_premium,
                     coinPrice: (data.coin_price && data.coin_price > 0) ? data.coin_price : 10,
                 }));
@@ -251,7 +1032,17 @@ export default function EditChapterPage() {
                 fetchChapterAndCharacters();
             }
         }
-    }, [chapterId, storyId, user, isLoadingAuth, router]);
+    }, [
+        cacheKey,
+        chapterId,
+        storyId,
+        user,
+        isLoadingAuth,
+        router,
+        isChatStyle,
+        buildSignatureFromSnapshot,
+        updateSavedDraftSignature,
+    ]);
 
     const handleSave = async (publish: boolean = false) => {
         if (!title.trim()) {
@@ -259,35 +1050,79 @@ export default function EditChapterPage() {
             return;
         }
 
-        setIsSaving(true);
         const newStatus = publish ? 'published' : status;
+        const cleanBlocks = blocks.filter(b => b.text.trim() !== '' || b.characterId !== null || b.type === 'image');
+        const normalizedBlocks = cleanBlocks.length > 0
+            ? cleanBlocks
+            : [{ id: `block-${Date.now()}`, type: 'paragraph' as const, text: '', characterId: null }];
+        const contentPayload: ChapterContentPayload = {
+            povCharacterId: isChatStyle ? povCharacterId : null,
+            chatTheme: isChatStyle ? chatTheme : undefined,
+            backgroundSound: null,
+            blocks: normalizedBlocks,
+        };
+        const draftSignatureForSave = buildSignatureFromSnapshot({
+            title,
+            content: contentPayload,
+            isPremium,
+            coinPrice,
+            statusValue: newStatus,
+        });
+
+        if (!publish && draftSignatureForSave === savedDraftSignature) {
+            showNotice('success', 'ไม่มีการเปลี่ยนแปลง', 'ร่างล่าสุดตรงกับข้อมูลที่บันทึกไว้แล้ว');
+            return;
+        }
+
+        setIsSaving(true);
 
         try {
+            const nowIso = new Date().toISOString();
+            const updatePayload: Record<string, unknown> = {
+                draft_title: title,
+                draft_content: contentPayload,
+                draft_updated_at: nowIso,
+                status: newStatus,
+                updated_at: nowIso,
+            };
+            const shouldUpdateLiveMonetization = publish || status !== 'published';
+            if (shouldUpdateLiveMonetization) {
+                updatePayload.is_premium = isPremium;
+                updatePayload.coin_price = isPremium ? Math.max(1, coinPrice) : 0;
+            }
 
-            const cleanBlocks = blocks.filter(b => b.text.trim() !== '' || b.characterId !== null || b.type === 'image');
+            if (publish) {
+                updatePayload.published_title = title;
+                updatePayload.published_content = contentPayload;
+                updatePayload.published_updated_at = nowIso;
+                // Keep legacy columns as published snapshot for backward compatibility.
+                updatePayload.title = title;
+                updatePayload.content = contentPayload;
+            } else if (status !== 'published') {
+                // For unpublished chapters, keep legacy columns aligned with draft.
+                updatePayload.title = title;
+                updatePayload.content = contentPayload;
+            }
 
             const { error } = await supabase
                 .from('chapters')
-                .update({
-                    title,
-                    content: {
-                        povCharacterId: isChatStyle ? povCharacterId : null,
-                        chatTheme: isChatStyle ? chatTheme : undefined,
-                        blocks: cleanBlocks.length > 0 ? cleanBlocks : [{ id: `block-${Date.now()}`, type: 'paragraph', text: '', characterId: null }]
-                    },
-                    status: newStatus,
-                    is_premium: isPremium,
-                    coin_price: isPremium ? Math.max(1, coinPrice) : 0,
-                    updated_at: new Date().toISOString()
-                })
+                .update(updatePayload)
                 .eq('id', chapterId)
                 .eq('story_id', storyId);
 
             if (error) throw error;
 
             setStatus(newStatus);
-            setLastSavedAt(new Date().toISOString());
+            setLastSavedAt(nowIso);
+            updateSavedDraftSignature(draftSignatureForSave);
             if (cleanBlocks.length !== blocks.length) setBlocks(cleanBlocks); // optimize view
+            clearDraft(); // Clear auto-save draft after successful save
+            void saveRevisionSnapshot(publish ? 'publish' : 'manual_save', {
+                title,
+                content: contentPayload,
+                isPremium,
+                coinPrice,
+            });
 
             if (publish) {
                 showNotice('success', 'เผยแพร่ตอนสำเร็จ', 'กำลังพาไปหน้าจัดการเรื่อง...');
@@ -364,6 +1199,7 @@ export default function EditChapterPage() {
             }
             return [...prev, newBlock];
         });
+        playChatSendSound();
 
         setChatInputValue('');
         setIsCharPopupOpen(false);
@@ -707,6 +1543,16 @@ export default function EditChapterPage() {
                         {lastSavedAt && (
                             <span>บันทึกล่าสุด {new Date(lastSavedAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</span>
                         )}
+                        {autoSaveStatus === 'pending' && (
+                            <span className={styles.autoSaveIndicator}>
+                                <Clock size={12} /> กำลังบันทึกอัตโนมัติ...
+                            </span>
+                        )}
+                        {autoSaveStatus === 'saved' && (
+                            <span className={styles.autoSaveIndicatorSaved}>
+                                <CheckCircle2 size={12} /> บันทึกอัตโนมัติแล้ว
+                            </span>
+                        )}
                     </div>
                 </div>
 
@@ -721,57 +1567,108 @@ export default function EditChapterPage() {
                 </div>
 
                 <div className={styles.headerActions}>
-                    <button className={styles.saveDraftBtn} onClick={() => handleSave(false)} disabled={isSaving}>
-                        {isSaving ? <Loader2 size={16} className={styles.spinner} /> : <Save size={16} />}
-                        บันทึกร่าง
-                    </button>
-                    <button className={styles.publishBtn} onClick={() => handleSave(true)} disabled={isSaving}>
-                        {isSaving ? <Loader2 size={16} className={styles.spinner} /> : 'เผยแพร่ตอน'}
-                    </button>
-                </div>
-            </header>
-
-            <div className={`${styles.content} ${!isChatStyle ? styles.contentNarrative : ''}`}>
-                <div className={styles.titleArea}>
-                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.9rem', color: '#334155' }}>
+                    <div className={styles.headerPremiumControls}>
+                        <label className={styles.headerPremiumToggle}>
                             <input
                                 type="checkbox"
                                 checked={isPremium}
                                 onChange={(e) => setIsPremium(e.target.checked)}
                             />
-                            ตอนพิเศษ (ปลดล็อกด้วยเหรียญ)
+                            ตอนพิเศษ
                         </label>
                         {isPremium && (
-                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.9rem', color: '#334155' }}>
-                                ราคา
+                            <label className={styles.headerPremiumPrice}>
+                                <span>ราคา</span>
                                 <input
                                     type="number"
                                     min={1}
                                     step={1}
                                     value={coinPrice}
                                     onChange={(e) => setCoinPrice(Math.max(1, Number(e.target.value) || 1))}
-                                    style={{ width: '96px', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0.35rem 0.45rem' }}
+                                    className={styles.headerPremiumInput}
                                 />
-                                เหรียญ
+                                <span>เหรียญ</span>
                             </label>
                         )}
                     </div>
-                    {isChatStyle && characters.length > 0 && (
-                        <div className={styles.povSelector}>
-                            <label htmlFor="pov-character">มุมมองหลัก (POV):</label>
-                            <select
-                                id="pov-character"
-                                value={povCharacterId || ''}
-                                onChange={(e) => setPovCharacterId(e.target.value || null)}
-                                className={styles.povSelect}
-                            >
-                                <option value="">-- ไม่ระบุ (บุคคลที่ 3) --</option>
-                                {characters.map(char => (
-                                    <option key={char.id} value={char.id}>{char.name}</option>
-                                ))}
-                            </select>
-                            <span className={styles.povHelp}>* ข้อความของมุมมองหลักจะอยู่ฝั่งขวา</span>
+                    <button
+                        className={styles.discardDraftBtn}
+                        onClick={() => void handleDiscardDraft()}
+                        disabled={isSaving || isRestoringRevision}
+                    >
+                        <RotateCcw size={16} />
+                        ยกเลิกฉบับร่าง
+                    </button>
+                    <button
+                        className={styles.saveDraftBtn}
+                        onClick={() => handleSave(false)}
+                        disabled={isSaving || isRestoringRevision || !isDraftDirty}
+                        title={!isDraftDirty ? 'ยังไม่มีการเปลี่ยนแปลงจากร่างล่าสุด' : undefined}
+                    >
+                        {isSaving ? <Loader2 size={16} className={styles.spinner} /> : <Save size={16} />}
+                        บันทึกร่าง
+                    </button>
+                    <button className={styles.publishBtn} onClick={() => handleSave(true)} disabled={isSaving || isRestoringRevision}>
+                        {isSaving ? <Loader2 size={16} className={styles.spinner} /> : 'เผยแพร่ตอน'}
+                    </button>
+                </div>
+            </header>
+
+            {/* Recovery Banner */}
+            {hasRecovery && recoveryDraft && (
+                <div className={styles.recoveryBanner}>
+                    <div className={styles.recoveryContent}>
+                        <div className={styles.recoveryIcon}>
+                            <RotateCcw size={20} />
+                        </div>
+                        <div className={styles.recoveryText}>
+                            <strong>พบฉบับร่างที่ยังไม่ได้บันทึก</strong>
+                            <span>
+                                บันทึกอัตโนมัติเมื่อ{' '}
+                                {recoveryTimestamp
+                                    ? new Date(recoveryTimestamp).toLocaleString('th-TH', {
+                                        day: 'numeric', month: 'short',
+                                        hour: '2-digit', minute: '2-digit'
+                                    })
+                                    : 'ไม่ทราบเวลา'
+                                }
+                            </span>
+                        </div>
+                        <div className={styles.recoveryActions}>
+                            <button className={styles.recoveryRestoreBtn} onClick={handleAcceptRecovery}>
+                                <RotateCcw size={14} /> กู้คืนฉบับร่าง
+                            </button>
+                            <button className={styles.recoveryDismissBtn} onClick={handleDismissRecovery}>
+                                <X size={14} /> ละทิ้ง
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className={styles.editorWorkspace}>
+                <div className={styles.editorMainColumn}>
+                    <div className={`${styles.content} ${!isChatStyle ? styles.contentNarrative : ''} ${isChatStyle ? styles.contentChat : ''}`}>
+                <div className={styles.titleArea}>
+                    {isChatStyle && (
+                        <div className={styles.chatSetupStack}>
+                            {characters.length > 0 && (
+                                <div className={styles.povSelector}>
+                                    <label htmlFor="pov-character">มุมมองหลัก (POV):</label>
+                                    <select
+                                        id="pov-character"
+                                        value={povCharacterId || ''}
+                                        onChange={(e) => setPovCharacterId(e.target.value || null)}
+                                        className={styles.povSelect}
+                                    >
+                                        <option value="">-- ไม่ระบุ (บุคคลที่ 3) --</option>
+                                        {characters.map(char => (
+                                            <option key={char.id} value={char.id}>{char.name}</option>
+                                        ))}
+                                    </select>
+                                    <span className={styles.povHelp}>* ข้อความของมุมมองหลักจะอยู่ฝั่งขวา</span>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -1093,6 +1990,65 @@ export default function EditChapterPage() {
                         </div>
                     </div>
                 )}
+                    </div>
+                </div>
+                <aside className={styles.revisionSidebar}>
+                    <section className={styles.revisionPanel}>
+                        <div className={styles.revisionPanelHeader}>
+                            <h3>ประวัติการแก้ไข</h3>
+                            <span>
+                                {isLoadingRevisions ? 'กำลังโหลด...' : `${revisions.length} รายการ`}
+                            </span>
+                        </div>
+                        {revisions.length === 0 ? (
+                            <p className={styles.revisionEmpty}>
+                                ยังไม่มีประวัติการแก้ไขในตอนนี้
+                            </p>
+                        ) : (
+                            <div className={styles.revisionList}>
+                                {revisionRows.map(({ revision, diff }) => (
+                                    <div className={styles.revisionItem} key={revision.id}>
+                                        <div className={styles.revisionMeta}>
+                                            <strong>{getRevisionTypeLabel(revision.revision_type)}</strong>
+                                            <span>
+                                                {new Date(revision.created_at).toLocaleString('th-TH', {
+                                                    day: '2-digit',
+                                                    month: 'short',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit',
+                                                })}
+                                            </span>
+                                        </div>
+                                        <div className={styles.revisionActions}>
+                                            <span className={styles.revisionTitle}>{revision.title || 'ไม่มีชื่อ'}</span>
+                                            <button
+                                                type="button"
+                                                className={styles.revisionRestoreBtn}
+                                                onClick={() => void handleRestoreRevision(revision)}
+                                                disabled={isSaving || isRestoringRevision}
+                                            >
+                                                กู้คืนเวอร์ชันนี้
+                                            </button>
+                                        </div>
+                                        <div className={styles.revisionChangeSummary}>
+                                            {diff.highlights.join(' • ')}
+                                        </div>
+                                        <div className={styles.revisionDiffPreview}>
+                                            <div>
+                                                <span>ก่อนหน้า</span>
+                                                <p>{diff.beforeText}</p>
+                                            </div>
+                                            <div>
+                                                <span>เวอร์ชันนี้</span>
+                                                <p>{diff.afterText}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </section>
+                </aside>
             </div>
 
             {/* Quick Add Character Modal */}

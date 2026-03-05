@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import {
   COIN_PACKAGES,
@@ -7,12 +8,20 @@ import {
   getCoinPackageById,
   getCoinPackageTotalCoins,
 } from '@/lib/monetization';
+import {
+  MONETIZATION_POLICY_VERSION,
+  CHECKOUT_IDEMPOTENCY_WINDOW_MS,
+  buildCheckoutRequestFingerprint,
+  buildCoinPricingSnapshotId,
+  buildVipPricingSnapshotId,
+} from '@/lib/monetization-policy';
 import { createStripeCheckoutSession } from '@/lib/server/stripe-api';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 type CheckoutPayload = {
   kind: 'coins' | 'vip';
   packageId?: string;
+  idempotencyKey?: string;
 };
 
 type StripeErrorResponse = {
@@ -20,6 +29,27 @@ type StripeErrorResponse = {
     message?: string;
   };
 };
+
+type FinanceStatusRow = {
+  finance_status: 'normal' | 'restricted_finance' | 'banned_finance';
+  restriction_until: string | null;
+};
+
+type CheckoutRequestRow = {
+  id: string;
+  user_id: string;
+  idempotency_key: string;
+  request_fingerprint: string;
+  status: string;
+  checkout_session_id: string | null;
+  checkout_url: string | null;
+  policy_version: string;
+  pricing_snapshot_id: string;
+  request_id: string;
+  created_at: string;
+};
+
+const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9:_-]{8,128}$/;
 
 function getPublicSupabaseClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -32,6 +62,13 @@ function getPublicSupabaseClient() {
   return createClient(supabaseUrl, supabaseAnonKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+}
+
+function normalizeIdempotencyKey(raw: string | undefined): string | null {
+  const key = (raw || '').trim();
+  if (!key) return null;
+  if (!IDEMPOTENCY_KEY_PATTERN.test(key)) return null;
+  return key;
 }
 
 async function getAuthenticatedUser(request: NextRequest) {
@@ -52,7 +89,36 @@ async function getAuthenticatedUser(request: NextRequest) {
 }
 
 function getAppOrigin(request: NextRequest) {
-  return process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
+  const rawOrigin = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
+  return rawOrigin.replace(/\/+$/, '');
+}
+
+async function safeRecordRiskSignal(params: {
+  userId: string;
+  signalType: string;
+  scoreDelta: number;
+  metadata?: Record<string, unknown>;
+}) {
+  try {
+    const supabaseAdmin = getSupabaseAdmin();
+    await supabaseAdmin.rpc('record_finance_risk_signal', {
+      p_user_id: params.userId,
+      p_signal_type: params.signalType,
+      p_score_delta: params.scoreDelta,
+      p_signal_window_minutes: 60,
+      p_metadata: params.metadata || {},
+    });
+  } catch {
+    // Keep checkout flow resilient even before SQL migration is fully applied.
+  }
+}
+
+function isFinanceRestricted(row: FinanceStatusRow | null) {
+  if (!row) return false;
+  if (row.finance_status === 'banned_finance') return true;
+  if (row.finance_status !== 'restricted_finance') return false;
+  if (!row.restriction_until) return true;
+  return new Date(row.restriction_until).getTime() > Date.now();
 }
 
 export async function POST(request: NextRequest) {
@@ -67,6 +133,166 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid checkout type' }, { status: 400 });
     }
 
+    const normalizedIdempotencyKey = normalizeIdempotencyKey(body.idempotencyKey);
+    if (body.idempotencyKey && !normalizedIdempotencyKey) {
+      return NextResponse.json({ error: 'Invalid idempotency key format' }, { status: 400 });
+    }
+
+    const supabaseAdmin = getSupabaseAdmin();
+
+    const { data: financeStatusRow } = await supabaseAdmin
+      .from('user_finance_statuses')
+      .select('finance_status, restriction_until')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (financeStatusRow?.finance_status === 'banned_finance') {
+      return NextResponse.json({ error: 'Finance access banned', code: 'FINANCE_BANNED' }, { status: 403 });
+    }
+
+    if (isFinanceRestricted((financeStatusRow as FinanceStatusRow | null) || null)) {
+      return NextResponse.json({ error: 'Finance access temporarily restricted', code: 'FINANCE_RESTRICTED' }, { status: 423 });
+    }
+
+    const requestFingerprint = buildCheckoutRequestFingerprint({
+      kind: body.kind,
+      packageId: body.packageId || null,
+    });
+
+    let priceMinor = 0;
+    let coinAmount = 0;
+    let pricingSnapshotId = '';
+
+    if (body.kind === 'coins') {
+      const pkg = body.packageId ? getCoinPackageById(body.packageId) : null;
+      if (!pkg) {
+        await safeRecordRiskSignal({
+          userId: user.id,
+          signalType: 'invalid_coin_package',
+          scoreDelta: 8,
+          metadata: { packageId: body.packageId || null },
+        });
+        return NextResponse.json({ error: 'Invalid coin package' }, { status: 400 });
+      }
+      priceMinor = pkg.priceThb * 100;
+      coinAmount = getCoinPackageTotalCoins(pkg);
+      pricingSnapshotId = buildCoinPricingSnapshotId({
+        packageId: pkg.id,
+        priceMinor,
+        coinAmount,
+      });
+    } else {
+      priceMinor = VIP_MONTHLY_PRICE_THB * 100;
+      pricingSnapshotId = buildVipPricingSnapshotId({
+        planCode: VIP_PLAN_CODE,
+        priceMinor,
+      });
+    }
+
+    let requestId = crypto.randomUUID();
+
+    if (normalizedIdempotencyKey) {
+      const nowIso = new Date().toISOString();
+
+      const { error: reserveError } = await supabaseAdmin
+        .from('payment_checkout_requests')
+        .insert({
+          user_id: user.id,
+          idempotency_key: normalizedIdempotencyKey,
+          kind: body.kind,
+          package_id: body.packageId || null,
+          request_fingerprint: requestFingerprint,
+          status: 'pending',
+          policy_version: MONETIZATION_POLICY_VERSION,
+          pricing_snapshot_id: pricingSnapshotId,
+          price_minor: priceMinor,
+          coin_amount: coinAmount,
+          request_id: requestId,
+          created_at: nowIso,
+          updated_at: nowIso,
+        });
+
+      if (reserveError?.code === '23505') {
+        const { data: existingRow, error: existingError } = await supabaseAdmin
+          .from('payment_checkout_requests')
+          .select('id, user_id, idempotency_key, request_fingerprint, status, checkout_session_id, checkout_url, policy_version, pricing_snapshot_id, request_id, created_at')
+          .eq('user_id', user.id)
+          .eq('idempotency_key', normalizedIdempotencyKey)
+          .maybeSingle();
+
+        if (existingError) {
+          throw existingError;
+        }
+
+        const existing = (existingRow as CheckoutRequestRow | null) || null;
+        if (existing) {
+          const ageMs = Date.now() - new Date(existing.created_at).getTime();
+          const isInWindow = ageMs <= CHECKOUT_IDEMPOTENCY_WINDOW_MS;
+
+          if (isInWindow && existing.request_fingerprint !== requestFingerprint) {
+            return NextResponse.json(
+              {
+                error: 'Idempotency key reuse with different payload',
+                code: 'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD',
+              },
+              { status: 409 }
+            );
+          }
+
+          if (isInWindow && existing.checkout_url && existing.checkout_session_id) {
+            return NextResponse.json({
+              checkoutUrl: existing.checkout_url,
+              checkoutSessionId: existing.checkout_session_id,
+              kind: body.kind,
+              policyVersion: existing.policy_version,
+              pricingSnapshotId: existing.pricing_snapshot_id,
+              requestId: existing.request_id,
+              availablePackages: body.kind === 'coins' ? COIN_PACKAGES : undefined,
+              deduped: true,
+            });
+          }
+
+          if (isInWindow && !existing.checkout_url && existing.status === 'pending') {
+            return NextResponse.json(
+              {
+                error: 'Idempotent request is still processing',
+                code: 'IDEMPOTENCY_IN_PROGRESS',
+                requestId: existing.request_id,
+              },
+              { status: 409 }
+            );
+          }
+
+          requestId = crypto.randomUUID();
+          const { error: resetError } = await supabaseAdmin
+            .from('payment_checkout_requests')
+            .update({
+              kind: body.kind,
+              package_id: body.packageId || null,
+              request_fingerprint: requestFingerprint,
+              status: 'pending',
+              checkout_session_id: null,
+              checkout_url: null,
+              policy_version: MONETIZATION_POLICY_VERSION,
+              pricing_snapshot_id: pricingSnapshotId,
+              price_minor: priceMinor,
+              coin_amount: coinAmount,
+              request_id: requestId,
+              created_at: nowIso,
+              updated_at: nowIso,
+            })
+            .eq('user_id', user.id)
+            .eq('idempotency_key', normalizedIdempotencyKey);
+
+          if (resetError) {
+            throw resetError;
+          }
+        }
+      } else if (reserveError) {
+        throw reserveError;
+      }
+    }
+
     const origin = getAppOrigin(request);
     const successUrl = `${origin}/pricing?checkout=success`;
     const cancelUrl = `${origin}/pricing?checkout=cancel`;
@@ -77,6 +303,12 @@ export async function POST(request: NextRequest) {
     formData.set('client_reference_id', user.id);
     formData.set('metadata[user_id]', user.id);
     formData.set('metadata[kind]', body.kind);
+    formData.set('metadata[policy_version]', MONETIZATION_POLICY_VERSION);
+    formData.set('metadata[pricing_snapshot_id]', pricingSnapshotId);
+    formData.set('metadata[request_id]', requestId);
+    if (normalizedIdempotencyKey) {
+      formData.set('metadata[idempotency_key]', normalizedIdempotencyKey);
+    }
 
     if (body.kind === 'coins') {
       const pkg = body.packageId ? getCoinPackageById(body.packageId) : null;
@@ -87,6 +319,7 @@ export async function POST(request: NextRequest) {
       formData.set('mode', 'payment');
       formData.set('metadata[coin_package_id]', pkg.id);
       formData.set('metadata[coin_amount]', String(getCoinPackageTotalCoins(pkg)));
+      formData.set('metadata[price_minor]', String(pkg.priceThb * 100));
       formData.set('payment_method_types[0]', 'card');
       formData.set('line_items[0][quantity]', '1');
       formData.set('line_items[0][price_data][currency]', 'thb');
@@ -97,7 +330,6 @@ export async function POST(request: NextRequest) {
         `Base ${pkg.coins} + bonus ${pkg.bonus} coins`
       );
     } else {
-      const supabaseAdmin = getSupabaseAdmin();
       const { data: entitlement } = await supabaseAdmin
         .from('vip_entitlements')
         .select('stripe_customer_id')
@@ -106,14 +338,18 @@ export async function POST(request: NextRequest) {
 
       formData.set('mode', 'subscription');
       formData.set('metadata[plan_code]', VIP_PLAN_CODE);
+      formData.set('metadata[price_minor]', String(VIP_MONTHLY_PRICE_THB * 100));
       formData.set('line_items[0][quantity]', '1');
       formData.set('line_items[0][price_data][currency]', 'thb');
       formData.set('line_items[0][price_data][unit_amount]', String(VIP_MONTHLY_PRICE_THB * 100));
       formData.set('line_items[0][price_data][recurring][interval]', 'month');
       formData.set('line_items[0][price_data][product_data][name]', 'FlowFic VIP Pass');
-      formData.set('line_items[0][price_data][product_data][description]', 'Unlimited AI chat and premium perks');
+      formData.set('line_items[0][price_data][product_data][description]', 'Read premium coin-gated chapters without spending coins');
       formData.set('subscription_data[metadata][user_id]', user.id);
       formData.set('subscription_data[metadata][plan_code]', VIP_PLAN_CODE);
+      formData.set('subscription_data[metadata][policy_version]', MONETIZATION_POLICY_VERSION);
+      formData.set('subscription_data[metadata][pricing_snapshot_id]', pricingSnapshotId);
+      formData.set('subscription_data[metadata][request_id]', requestId);
 
       if (entitlement?.stripe_customer_id) {
         formData.set('customer', entitlement.stripe_customer_id);
@@ -122,12 +358,40 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const stripeRes = await createStripeCheckoutSession(formData);
+    const stripeIdempotencyKey = normalizedIdempotencyKey
+      ? `checkout:${user.id}:${normalizedIdempotencyKey}`
+      : `checkout:${user.id}:${requestId}`;
+
+    const stripeRes = await createStripeCheckoutSession(formData, stripeIdempotencyKey);
     if (!stripeRes.ok || !stripeRes.data.url) {
       const errorPayload = stripeRes.data as StripeErrorResponse;
       const stripeStatus =
         stripeRes.status >= 400 && stripeRes.status < 600 ? stripeRes.status : 502;
       const stripeMessage = errorPayload.error?.message || 'Failed to create checkout session';
+
+      if (normalizedIdempotencyKey) {
+        await supabaseAdmin
+          .from('payment_checkout_requests')
+          .update({
+            status: 'failed',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', user.id)
+          .eq('idempotency_key', normalizedIdempotencyKey);
+      }
+
+      await safeRecordRiskSignal({
+        userId: user.id,
+        signalType: 'checkout_failed',
+        scoreDelta: 5,
+        metadata: {
+          kind: body.kind,
+          packageId: body.packageId || null,
+          stripeStatus,
+          stripeMessage,
+        },
+      });
+
       console.error('Stripe checkout failed (Next API):', {
         stripeStatus,
         stripeMessage,
@@ -140,10 +404,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (normalizedIdempotencyKey) {
+      await supabaseAdmin
+        .from('payment_checkout_requests')
+        .update({
+          status: 'created',
+          checkout_session_id: stripeRes.data.id,
+          checkout_url: stripeRes.data.url,
+          policy_version: MONETIZATION_POLICY_VERSION,
+          pricing_snapshot_id: pricingSnapshotId,
+          request_id: requestId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', user.id)
+        .eq('idempotency_key', normalizedIdempotencyKey);
+    }
+
     return NextResponse.json({
       checkoutUrl: stripeRes.data.url,
       checkoutSessionId: stripeRes.data.id,
       kind: body.kind,
+      policyVersion: MONETIZATION_POLICY_VERSION,
+      pricingSnapshotId,
+      requestId,
       availablePackages: body.kind === 'coins' ? COIN_PACKAGES : undefined,
     });
   } catch (error) {

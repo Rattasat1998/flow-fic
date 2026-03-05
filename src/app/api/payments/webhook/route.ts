@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'node:crypto';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { MONETIZATION_POLICY_VERSION } from '@/lib/monetization-policy';
 import { getStripeSubscription } from '@/lib/server/stripe-api';
 
 type StripeEvent = {
@@ -19,6 +20,13 @@ type StripeSubscriptionObject = {
   current_period_end?: number;
   customer?: string;
   metadata?: Record<string, string>;
+};
+
+type ApplyCoinTransactionResult = {
+  success: boolean;
+  message: string;
+  txn_id: string | null;
+  new_balance: number;
 };
 
 const SIGNATURE_TOLERANCE_SECONDS = 300;
@@ -85,43 +93,53 @@ function getMetadata(obj: Record<string, unknown>) {
   return metadata;
 }
 
-async function creditUserCoins(userId: string, coins: number, stripeSessionId: string) {
+async function postCoinTransaction(params: {
+  userId: string;
+  amount: number;
+  stripeSessionId: string;
+  policyVersion?: string;
+  reason?: string;
+}) {
   const supabaseAdmin = getSupabaseAdmin();
 
-  const { data: existingWallet } = await supabaseAdmin
-    .from('wallets')
-    .select('coin_balance')
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  const nextBalance = (existingWallet?.coin_balance || 0) + coins;
-
-  const { error: walletError } = await supabaseAdmin
-    .from('wallets')
-    .upsert(
-      {
-        user_id: userId,
-        coin_balance: nextBalance,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id' }
-    );
-
-  if (walletError) {
-    throw walletError;
-  }
-
-  const { error: txnError } = await supabaseAdmin.from('coin_transactions').insert({
-    user_id: userId,
-    amount: coins,
-    txn_type: 'stripe_topup',
-    description: `Stripe top-up (${coins} coins)`,
-    stripe_session_id: stripeSessionId,
+  const { data, error } = await supabaseAdmin.rpc('apply_coin_transaction', {
+    p_user_id: params.userId,
+    p_amount: params.amount,
+    p_txn_type: 'stripe_topup',
+    p_description: `Stripe top-up (${params.amount} coins)`,
+    p_chapter_id: null,
+    p_stripe_session_id: params.stripeSessionId,
+    p_reference_type: 'stripe_session',
+    p_reference_id: params.stripeSessionId,
+    p_policy_version: params.policyVersion || MONETIZATION_POLICY_VERSION,
+    p_reversal_of_txn_id: null,
+    p_reason: params.reason || 'Stripe checkout settled',
+    p_actor_user_id: null,
+    p_correlation_id: `stripe:${params.stripeSessionId}`,
+    p_allow_negative: false,
   });
 
-  if (txnError) {
-    throw txnError;
+  if (error) {
+    throw error;
   }
+
+  const result = (Array.isArray(data) && data.length > 0
+    ? (data[0] as ApplyCoinTransactionResult)
+    : null);
+
+  if (!result) {
+    throw new Error('Missing apply_coin_transaction result');
+  }
+
+  if (!result.success && result.message === 'DUPLICATE_REFERENCE') {
+    return { duplicate: true, newBalance: result.new_balance, txnId: result.txn_id };
+  }
+
+  if (!result.success) {
+    throw new Error(`apply_coin_transaction failed: ${result.message}`);
+  }
+
+  return { duplicate: false, newBalance: result.new_balance, txnId: result.txn_id };
 }
 
 async function upsertVipEntitlement(
@@ -177,6 +195,7 @@ async function resolveVipUserIdFromSubscription(
 async function processCheckoutSessionCompleted(eventObject: Record<string, unknown>) {
   const sessionMode = getStringValue(eventObject, 'mode');
   const sessionId = getStringValue(eventObject, 'id');
+  const paymentStatus = getStringValue(eventObject, 'payment_status');
   const clientReferenceId = getStringValue(eventObject, 'client_reference_id');
   const metadata = getMetadata(eventObject);
   const userId = metadata.user_id || clientReferenceId;
@@ -184,9 +203,19 @@ async function processCheckoutSessionCompleted(eventObject: Record<string, unkno
   if (!sessionId || !userId) return;
 
   if (sessionMode === 'payment' && metadata.kind === 'coins') {
+    if (paymentStatus !== 'paid') {
+      return;
+    }
+
     const coins = Number(metadata.coin_amount || '0');
     if (Number.isFinite(coins) && coins > 0) {
-      await creditUserCoins(userId, coins, sessionId);
+      await postCoinTransaction({
+        userId,
+        amount: coins,
+        stripeSessionId: sessionId,
+        policyVersion: metadata.policy_version,
+        reason: 'Stripe paid checkout.session.completed',
+      });
     }
     return;
   }
@@ -259,6 +288,8 @@ export async function POST(request: NextRequest) {
   const { error: insertEventError } = await supabaseAdmin.from('stripe_events').insert({
     event_id: event.id,
     event_type: event.type,
+    event_payload: event,
+    processing_status: 'received',
   });
 
   if (insertEventError?.code === '23505') {
@@ -274,6 +305,7 @@ export async function POST(request: NextRequest) {
       case 'checkout.session.completed':
         await processCheckoutSessionCompleted(event.data.object);
         break;
+      case 'customer.subscription.created':
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted':
         await processSubscriptionUpdatedOrDeleted(event.data.object as StripeSubscriptionObject);
@@ -282,11 +314,29 @@ export async function POST(request: NextRequest) {
         break;
     }
 
+    await supabaseAdmin
+      .from('stripe_events')
+      .update({
+        processing_status: 'processed',
+        processed_at: new Date().toISOString(),
+        last_error: null,
+      })
+      .eq('event_id', event.id);
+
     return NextResponse.json({ received: true });
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Webhook processing failed';
     console.error('Stripe webhook processing failed:', error);
 
-    await supabaseAdmin.from('stripe_events').delete().eq('event_id', event.id);
+    await supabaseAdmin
+      .from('stripe_events')
+      .update({
+        processing_status: 'failed',
+        processed_at: new Date().toISOString(),
+        last_error: message,
+      })
+      .eq('event_id', event.id);
+
     return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
   }
 }

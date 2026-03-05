@@ -424,10 +424,22 @@ export default function ComicCreatorPage() {
                     story_id: storyId,
                     user_id: user.id,
                     title: `${title} — หน้า 1-${pageUrls.length}`,
+                    draft_title: `${title} — หน้า 1-${pageUrls.length}`,
+                    published_title: `${title} — หน้า 1-${pageUrls.length}`,
                     content: {
                         type: 'comic',
                         pages: pageUrls,
                     },
+                    draft_content: {
+                        type: 'comic',
+                        pages: pageUrls,
+                    },
+                    published_content: {
+                        type: 'comic',
+                        pages: pageUrls,
+                    },
+                    draft_updated_at: new Date().toISOString(),
+                    published_updated_at: new Date().toISOString(),
                     order_index: 0,
                     status: 'published',
                 });

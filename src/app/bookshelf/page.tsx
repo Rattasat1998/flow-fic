@@ -3,23 +3,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Bookmark, Trash2 } from 'lucide-react';
+import { Bookmark } from 'lucide-react';
 import styles from './bookshelf.module.css';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { CompactStoryCard } from '@/components/story/CompactStoryCard';
 
 type FavoriteStory = {
     id: string;
     title: string;
     coverUrl: string;
     penName: string;
-    synopsis: string | null;
-    chapterTitle: string;
     chapterReadIndex: number;
     writingStyle: 'narrative' | 'chat' | 'thread';
     category: 'novel' | 'fanfic' | 'cartoon';
     completionStatus: string;
-    favoritedAt: string;
 };
 
 export default function BookshelfPage() {
@@ -28,7 +26,6 @@ export default function BookshelfPage() {
     const [stories, setStories] = useState<FavoriteStory[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [removingId, setRemovingId] = useState<string | null>(null);
-    const [now] = useState(() => Date.now());
 
     function normalizeCategory(cat?: string | null): 'novel' | 'fanfic' | 'cartoon' {
         if (cat === 'fanfic' || cat === 'cartoon') return cat;
@@ -91,7 +88,7 @@ export default function BookshelfPage() {
 
             const { data: storyData } = await supabase
                 .from('stories')
-                .select('id, title, cover_url, pen_name, synopsis, writing_style, category, completion_status, status')
+                .select('id, title, cover_url, pen_name, writing_style, category, completion_status, status')
                 .in('id', storyIds)
                 .eq('status', 'published');
 
@@ -135,13 +132,10 @@ export default function BookshelfPage() {
                     title: story.title,
                     coverUrl: story.cover_url || 'https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?auto=format&fit=crop&w=800&q=80',
                     penName: story.pen_name,
-                    synopsis: story.synopsis,
-                    chapterTitle: chapterMeta?.title || 'ตอนแรก',
                     chapterReadIndex: chapterMeta?.readIndex ?? 0,
                     writingStyle: normalizeWritingStyle(story.writing_style),
                     category: normalizeCategory(story.category),
                     completionStatus: story.completion_status || 'ongoing',
-                    favoritedAt: fav.created_at,
                 });
             }
 
@@ -187,17 +181,6 @@ export default function BookshelfPage() {
             .filter((group) => group.stories.length > 0);
     }, [stories]);
 
-    const timeAgo = (dateStr: string) => {
-        const diff = now - new Date(dateStr).getTime();
-        const mins = Math.floor(diff / 60000);
-        if (mins < 60) return `${mins} นาทีที่แล้ว`;
-        const hours = Math.floor(mins / 60);
-        if (hours < 24) return `${hours} ชั่วโมงที่แล้ว`;
-        const days = Math.floor(hours / 24);
-        if (days < 30) return `${days} วันที่แล้ว`;
-        return new Date(dateStr).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
-    };
-
     if (isLoadingAuth || isLoading) {
         return (
             <main className={styles.main}>
@@ -242,39 +225,24 @@ export default function BookshelfPage() {
                                     <h2 className={styles.categoryHeading}>{group.label}</h2>
                                     <span className={styles.categoryCount}>{group.stories.length} เรื่อง</span>
                                 </div>
-                                <div className={styles.grid}>
+                                <div className={styles.storyRail}>
                                     {group.stories.map((story) => {
                                         const readHref = `/story/${story.id}/read?chapter=${story.chapterReadIndex}`;
+                                        const tags = [writingStyleLabel(story.writingStyle), categoryLabel(story.category)];
+
                                         return (
-                                            <div key={story.id} className={styles.card}>
-                                                <Link href={readHref} className={styles.cardImageLink}>
-                                                    <img src={story.coverUrl} alt={story.title} className={styles.cardImage} />
-                                                    <span className={styles.categoryBadge}>{categoryLabel(story.category)}</span>
-                                                </Link>
-                                                <div className={styles.cardBody}>
-                                                    <Link href={readHref} className={styles.cardTitle}>
-                                                        {story.title}
-                                                    </Link>
-                                                    <div className={styles.cardAuthor}>โดย {story.penName}</div>
-                                                    <div className={styles.cardCategoryText}>{writingStyleLabel(story.writingStyle)}</div>
-                                                    <div className={styles.cardCategoryText}>ประเภท: {categoryLabel(story.category)}</div>
-                                                    <div className={styles.cardChapter}>ตอนที่เก็บ: {story.chapterTitle}</div>
-                                                    {story.synopsis && (
-                                                        <p className={styles.cardSynopsis}>{story.synopsis}</p>
-                                                    )}
-                                                    <div className={styles.cardFooter}>
-                                                        <span className={styles.cardTime}>เก็บเมื่อ {timeAgo(story.favoritedAt)}</span>
-                                                        <button
-                                                            className={styles.removeBtn}
-                                                            onClick={() => handleRemoveFavorite(story.id)}
-                                                            disabled={removingId === story.id}
-                                                            title="นำออกจากชั้น"
-                                                        >
-                                                            <Trash2 size={14} />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
+                                            <CompactStoryCard
+                                                key={story.id}
+                                                href={readHref}
+                                                coverUrl={story.coverUrl}
+                                                title={story.title}
+                                                author={story.penName}
+                                                tags={tags}
+                                                isCompleted={story.completionStatus === 'completed'}
+                                                onRemove={() => handleRemoveFavorite(story.id)}
+                                                removeLabel="นำออกจากชั้น"
+                                                removeDisabled={removingId === story.id}
+                                            />
                                         );
                                     })}
                                 </div>

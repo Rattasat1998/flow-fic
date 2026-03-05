@@ -1,6 +1,7 @@
 type StripeRequestOptions = {
   method?: 'GET' | 'POST';
   formData?: URLSearchParams;
+  headers?: Record<string, string>;
 };
 
 type StripeApiResponse<T> = {
@@ -36,13 +37,14 @@ function getStripeSecretKey() {
 
 async function stripeRequest<T>(
   path: string,
-  { method = 'POST', formData }: StripeRequestOptions = {}
+  { method = 'POST', formData, headers = {} }: StripeRequestOptions = {}
 ): Promise<StripeApiResponse<T>> {
   const response = await fetch(`${STRIPE_API_BASE}${path}`, {
     method,
     headers: {
       Authorization: `Bearer ${getStripeSecretKey()}`,
       ...(method === 'POST' ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
+      ...headers,
     },
     body: method === 'POST' ? formData?.toString() : undefined,
     cache: 'no-store',
@@ -64,10 +66,11 @@ async function stripeRequest<T>(
   return { ok: response.ok, status: response.status, data };
 }
 
-export async function createStripeCheckoutSession(formData: URLSearchParams) {
+export async function createStripeCheckoutSession(formData: URLSearchParams, idempotencyKey?: string) {
   return stripeRequest<StripeCheckoutSessionResponse>('/checkout/sessions', {
     method: 'POST',
     formData,
+    headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
   });
 }
 

@@ -174,10 +174,18 @@
     font-weight: 600;
 }
 
-.grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 1.25rem;
+.storyRail {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    padding-bottom: 0.4rem;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.storyRail::-webkit-scrollbar {
+    display: none;
 }
 
 /* ─── Card ─── */
@@ -325,9 +333,8 @@
         padding: 1.25rem 1rem 3rem;
     }
 
-    .grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 0.85rem;
+    .storyRail {
+        gap: 10px;
     }
 
     .heading {
