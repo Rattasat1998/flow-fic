@@ -19,6 +19,7 @@ type CheckoutPayload = {
   kind: 'coins' | 'vip';
   packageId?: string;
   idempotencyKey?: string;
+  paymentMethod?: 'card' | 'promptpay';
 };
 
 type StripeErrorResponse = {
@@ -123,7 +124,10 @@ Deno.serve(async (request) => {
   try {
     const accessToken = getAccessToken(request);
     if (!accessToken) {
-      return jsonResponse({ error: 'Unauthorized' }, 401);
+      return jsonResponse(
+        { error: 'Unauthorized', code: 'MISSING_AUTHORIZATION_BEARER' },
+        401
+      );
     }
 
     const supabaseUrl = getSupabaseUrl();
@@ -140,13 +144,25 @@ Deno.serve(async (request) => {
     } = await supabasePublic.auth.getUser(accessToken);
 
     if (userError || !user) {
-      return jsonResponse({ error: 'Unauthorized' }, 401);
+      return jsonResponse(
+        { error: 'Unauthorized', code: 'INVALID_OR_EXPIRED_ACCESS_TOKEN' },
+        401
+      );
     }
 
     const body = (await request.json()) as CheckoutPayload;
     if (body.kind !== 'coins' && body.kind !== 'vip') {
       return jsonResponse({ error: 'Invalid checkout type' }, 400);
     }
+    if (body.paymentMethod && body.paymentMethod !== 'card' && body.paymentMethod !== 'promptpay') {
+      return jsonResponse({ error: 'Invalid payment method' }, 400);
+    }
+    if (body.kind === 'vip' && body.paymentMethod === 'promptpay') {
+      return jsonResponse({ error: 'PromptPay is available for coin top-up only' }, 400);
+    }
+
+    const coinPaymentMethod: 'card' | 'promptpay' =
+      body.kind === 'coins' && body.paymentMethod === 'promptpay' ? 'promptpay' : 'card';
 
     const normalizedIdempotencyKey = normalizeIdempotencyKey(body.idempotencyKey);
     if (body.idempotencyKey && !normalizedIdempotencyKey) {
@@ -174,6 +190,7 @@ Deno.serve(async (request) => {
     const requestFingerprint = buildCheckoutRequestFingerprint({
       kind: body.kind,
       packageId: body.packageId || null,
+      paymentMethod: body.kind === 'coins' ? coinPaymentMethod : null,
     });
 
     let priceMinor = 0;
@@ -326,10 +343,14 @@ Deno.serve(async (request) => {
       }
 
       formData.set('mode', 'payment');
+      if (user.email) {
+        formData.set('customer_email', user.email);
+      }
       formData.set('metadata[coin_package_id]', pkg.id);
       formData.set('metadata[coin_amount]', String(getCoinPackageTotalCoins(pkg)));
       formData.set('metadata[price_minor]', String(pkg.priceThb * 100));
-      formData.set('payment_method_types[0]', 'card');
+      formData.set('metadata[payment_method]', coinPaymentMethod);
+      formData.set('payment_method_types[0]', coinPaymentMethod);
       formData.set('line_items[0][quantity]', '1');
       formData.set('line_items[0][price_data][currency]', 'thb');
       formData.set('line_items[0][price_data][unit_amount]', String(pkg.priceThb * 100));

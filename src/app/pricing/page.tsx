@@ -14,8 +14,10 @@ type VipEntitlementRow = {
     current_period_end: string | null;
 };
 
+type CoinPaymentMethod = 'card' | 'promptpay';
+
 function PricingContent() {
-    const { user, session } = useAuth();
+    const { user } = useAuth();
     const searchParams = useSearchParams();
     useTracking({ autoPageView: true, pagePath: '/pricing' });
 
@@ -78,12 +80,11 @@ function PricingContent() {
         return new Date(vipEntitlement.current_period_end).getTime() > Date.now();
     }, [vipEntitlement]);
 
-    const functionsBaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-        ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1`
-        : null;
-
-    const startCheckout = async (payload: { kind: 'coins' | 'vip'; packageId?: string }, loadingKey: string) => {
-        if (!session?.access_token || !user) {
+    const startCheckout = async (
+        payload: { kind: 'coins' | 'vip'; packageId?: string; paymentMethod?: CoinPaymentMethod },
+        loadingKey: string
+    ) => {
+        if (!user) {
             alert('กรุณาเข้าสู่ระบบก่อนทำรายการ');
             return;
         }
@@ -91,62 +92,67 @@ function PricingContent() {
         setCheckoutError(null);
         setIsCheckoutLoading(loadingKey);
         try {
-            const edgeCheckoutUrl = functionsBaseUrl ? `${functionsBaseUrl}/stripe-checkout` : null;
-            const baseHeaders: Record<string, string> = {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${session.access_token}`,
-            };
+            const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError) {
+                throw sessionError;
+            }
+            let activeSession = sessionData.session || null;
+            if (activeSession?.expires_at && activeSession.expires_at * 1000 <= Date.now() + 15_000) {
+                const { data: refreshedData, error: refreshError } = await supabase.auth.refreshSession();
+                if (refreshError) {
+                    throw refreshError;
+                }
+                activeSession = refreshedData.session || null;
+            }
+
+            if (!activeSession?.access_token) {
+                throw new Error('ไม่พบเซสชันผู้ใช้ กรุณาเข้าสู่ระบบใหม่');
+            }
+
+            const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+            const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+            if (!supabaseUrl || !supabaseAnonKey) {
+                throw new Error('ระบบยังไม่พร้อมชำระเงิน: ขาดค่า Supabase environment');
+            }
+
             const idempotencyKey = typeof window !== 'undefined' && window.crypto?.randomUUID
                 ? window.crypto.randomUUID()
                 : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-            const requestBody = JSON.stringify({ ...payload, idempotencyKey });
 
-            const callCheckout = async (url: string, headers: Record<string, string>) => {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers,
-                    body: requestBody,
-                });
-                let result: { checkoutUrl?: string; error?: string } = {};
-                try {
-                    result = (await response.json()) as { checkoutUrl?: string; error?: string };
-                } catch {
-                    result = {};
-                }
-                return { response, result };
-            };
+            const edgeCheckoutUrl = `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/stripe-checkout`;
+            const response = await fetch(edgeCheckoutUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    apikey: supabaseAnonKey,
+                    Authorization: `Bearer ${activeSession.access_token}`,
+                },
+                body: JSON.stringify({ ...payload, idempotencyKey }),
+            });
 
-            let lastError = 'สร้างลิงก์ชำระเงินไม่สำเร็จ';
-
+            let result: { checkoutUrl?: string; error?: string; code?: string } = {};
             try {
-                const nextApiResult = await callCheckout('/api/payments/checkout', baseHeaders);
-                if (nextApiResult.response.ok && nextApiResult.result.checkoutUrl) {
-                    window.location.href = nextApiResult.result.checkoutUrl;
-                    return;
-                }
-                lastError = nextApiResult.result.error || lastError;
+                result = (await response.json()) as { checkoutUrl?: string; error?: string; code?: string };
             } catch {
-                // Try edge function fallback below.
+                result = {};
             }
 
-            if (edgeCheckoutUrl) {
-                const edgeHeaders = { ...baseHeaders };
-                if (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-                    edgeHeaders.apikey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-                }
-                try {
-                    const edgeResult = await callCheckout(edgeCheckoutUrl, edgeHeaders);
-                    if (edgeResult.response.ok && edgeResult.result.checkoutUrl) {
-                        window.location.href = edgeResult.result.checkoutUrl;
-                        return;
-                    }
-                    lastError = edgeResult.result.error || lastError;
-                } catch {
-                    // Fall through to final error.
-                }
+            if (result.checkoutUrl) {
+                window.location.href = result.checkoutUrl;
+                return;
             }
 
-            throw new Error(lastError);
+            if (response.status === 401) {
+                if (result.code) {
+                    throw new Error(`เซสชันหมดอายุหรือไม่ถูกต้อง (${result.code}) กรุณาออกจากระบบแล้วเข้าสู่ระบบใหม่`);
+                }
+                throw new Error('เซสชันหมดอายุหรือไม่ถูกต้อง กรุณาออกจากระบบแล้วเข้าสู่ระบบใหม่');
+            }
+
+            if (result.error && result.code) {
+                throw new Error(`${result.error} (${result.code})`);
+            }
+            throw new Error(result.error || 'สร้างลิงก์ชำระเงินไม่สำเร็จ');
         } catch (error) {
             setCheckoutError(error instanceof Error ? error.message : 'เกิดข้อผิดพลาดในการสร้างรายการชำระเงิน');
             setIsCheckoutLoading(null);
@@ -232,7 +238,7 @@ function PricingContent() {
                 <section className={styles.coinsSection}>
                     <div className={styles.sectionTitle}>
                         <h2>เติมเหรียญ Flow Coins</h2>
-                        <p>ใช้สำหรับปลดล็อกตอนพิเศษ (NC, ตอนจบลับ) หรือส่งของขวัญให้ผู้แต่ง</p>
+                        <p>ใช้สำหรับปลดล็อกตอนพิเศษ (NC, ตอนจบลับ) หรือส่งของขวัญให้ผู้แต่ง รองรับทั้งบัตรและ QR PromptPay</p>
                     </div>
 
                     <div className={styles.coinsGrid}>
@@ -251,13 +257,28 @@ function PricingContent() {
                                     <div className={styles.noBonus}>ไม่มีโบนัส</div>
                                 )}
 
-                                <button
-                                    className={styles.purchaseBtn}
-                                    onClick={() => startCheckout({ kind: 'coins', packageId: pkg.id }, `coins-${pkg.id}`)}
-                                    disabled={isCheckoutLoading !== null}
-                                >
-                                    {isCheckoutLoading === `coins-${pkg.id}` ? 'กำลังสร้างรายการ...' : `฿${pkg.priceThb}`}
-                                </button>
+                                <div className={styles.purchaseActions}>
+                                    <button
+                                        className={styles.purchaseBtn}
+                                        onClick={() => startCheckout(
+                                            { kind: 'coins', packageId: pkg.id, paymentMethod: 'card' },
+                                            `coins-${pkg.id}-card`
+                                        )}
+                                        disabled={isCheckoutLoading !== null}
+                                    >
+                                        {isCheckoutLoading === `coins-${pkg.id}-card` ? 'กำลังสร้างรายการ...' : `บัตร ฿${pkg.priceThb}`}
+                                    </button>
+                                    <button
+                                        className={styles.purchaseBtnSecondary}
+                                        onClick={() => startCheckout(
+                                            { kind: 'coins', packageId: pkg.id, paymentMethod: 'promptpay' },
+                                            `coins-${pkg.id}-promptpay`
+                                        )}
+                                        disabled={isCheckoutLoading !== null}
+                                    >
+                                        {isCheckoutLoading === `coins-${pkg.id}-promptpay` ? 'กำลังสร้าง QR...' : `QR PromptPay ฿${pkg.priceThb}`}
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>

@@ -68,6 +68,11 @@ export default function PrivacyPage() {
           ระบบอาจใช้คุกกี้หรือข้อมูลเซสชันที่จำเป็นเพื่อคงสถานะการล็อกอินและการทำงานพื้นฐานของเว็บไซต์
           การปิดใช้งานคุกกี้บางประเภทอาจทำให้บริการบางส่วนใช้งานไม่ได้
         </p>
+        <p style={{ marginTop: "0.75rem" }}>
+          อ่านรายละเอียดเพิ่มเติมได้ที่
+          {" "}
+          <Link href="/cookie-tracking-notice">ประกาศคุกกี้และการติดตามการใช้งาน</Link>
+        </p>
       </section>
 
       <section style={{ marginBottom: "2rem" }}>
@@ -87,7 +92,13 @@ export default function PrivacyPage() {
         <Link href="/terms">ข้อกำหนดและเงื่อนไขการใช้บริการ (Terms of Service)</Link>
       </p>
       <p style={{ marginBottom: "0.75rem" }}>
+        <Link href="/billing-policies">ศูนย์นโยบาย (Policy Center)</Link>
+      </p>
+      <p style={{ marginBottom: "0.75rem" }}>
         <Link href="/data-deletion">คำแนะนำการลบข้อมูล (Data Deletion)</Link>
+      </p>
+      <p style={{ marginBottom: "0.75rem" }}>
+        <Link href="/legal-contact-and-versioning">ข้อมูลติดต่อทางกฎหมายและเวอร์ชันเอกสาร</Link>
       </p>
       <Link href="/">กลับหน้าแรก</Link>
     </main>

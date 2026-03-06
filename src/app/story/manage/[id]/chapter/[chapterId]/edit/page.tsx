@@ -951,40 +951,13 @@ export default function EditChapterPage() {
                 setIsPremium(!!data.is_premium);
                 setCoinPrice((data.coin_price && data.coin_price > 0) ? data.coin_price : 10);
 
-                let parsedBlocks: Block[];
-                let parsedPov: string | null = null;
-                let parsedChatTheme = 'white';
                 const draftContent = data.draft_content ?? data.content;
 
                 // Parse content into blocks
-                if (draftContent && typeof draftContent === 'object' && 'blocks' in draftContent) {
-                    parsedBlocks = (draftContent as any).blocks as Block[];
-                    parsedPov = (draftContent as any).povCharacterId || null;
-                    parsedChatTheme = typeof (draftContent as any).chatTheme === 'string'
-                        ? (draftContent as any).chatTheme
-                        : 'white';
-                } else if (draftContent && typeof draftContent === 'object' && 'text' in draftContent) {
-                    // Legacy migration: text -> blocks
-                    const text = (draftContent as any).text as string;
-                    parsedBlocks = text.split('\n').filter((line: string) => line.trim() !== '').map((line: string, idx: number) => ({
-                        id: `block-${Date.now()}-${idx}`,
-                        type: 'paragraph' as const,
-                        text: line,
-                        characterId: null
-                    }));
-                    if (parsedBlocks.length === 0) parsedBlocks = [{ id: `block-${Date.now()}`, type: 'paragraph', text: '', characterId: null }];
-                } else if (typeof draftContent === 'string') {
-                    // Legacy migration: simple string -> blocks
-                    parsedBlocks = draftContent.split('\n').filter((line: string) => line.trim() !== '').map((line: string, idx: number) => ({
-                        id: `block-${Date.now()}-${idx}`,
-                        type: 'paragraph' as const,
-                        text: line,
-                        characterId: null
-                    }));
-                    if (parsedBlocks.length === 0) parsedBlocks = [{ id: `block-${Date.now()}`, type: 'paragraph', text: '', characterId: null }];
-                } else {
-                    parsedBlocks = [{ id: `block-${Date.now()}`, type: 'paragraph', text: '', characterId: null }];
-                }
+                const parsedContent = parseStoredChapterContent(draftContent);
+                const parsedBlocks = parsedContent.blocks;
+                const parsedPov = parsedContent.povCharacterId;
+                const parsedChatTheme = parsedContent.chatTheme || 'white';
 
                 setBlocks(parsedBlocks);
                 setPovCharacterId(parsedPov);
@@ -1735,7 +1708,7 @@ export default function EditChapterPage() {
                                                             width: 'auto',
                                                             minWidth: '60px',
                                                             maxWidth: '100%',
-                                                            fieldSizing: 'content' as any,
+                                                            fieldSizing: 'content',
                                                         }}
                                                         value={block.text}
                                                         onChange={(e) => {

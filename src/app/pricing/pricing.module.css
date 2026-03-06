@@ -350,11 +350,30 @@
     user-select: none;
 }
 
+.purchaseActions {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
 .purchaseBtn {
     width: 100%;
     background-color: white;
     border: 1px solid var(--border);
     color: var(--foreground);
+    font-weight: 700;
+    padding: 0.6rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.purchaseBtnSecondary {
+    width: 100%;
+    background-color: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1d4ed8;
     font-weight: 700;
     padding: 0.6rem;
     border-radius: 8px;
@@ -368,8 +387,20 @@
     border-color: #f59e0b;
 }
 
+.coinCard:hover .purchaseBtnSecondary {
+    background-color: #2563eb;
+    color: white;
+    border-color: #2563eb;
+}
+
 .popularCard .purchaseBtn {
     background-color: var(--primary);
     color: white;
     border-color: var(--primary);
+}
+
+.popularCard .purchaseBtnSecondary {
+    background-color: #dbeafe;
+    color: #1e3a8a;
+    border-color: #93c5fd;
 }

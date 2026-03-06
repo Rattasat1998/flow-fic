@@ -148,6 +148,11 @@ export default function TermsPage() {
         <p>
           ทีมงานอาจเปลี่ยนแปลงราคา แพ็กเกจ หรือค่าธรรมเนียมได้ตามความเหมาะสม โดยประกาศผ่านเว็บไซต์
         </p>
+        <p style={{ marginTop: "0.75rem" }}>
+          รายละเอียดเพิ่มเติมของเงื่อนไขด้านการเงินอยู่ที่
+          {" "}
+          <Link href="/billing-policies">ศูนย์นโยบาย (Policy Center)</Link>
+        </p>
       </section>
 
       <section style={{ marginBottom: "1.5rem" }}>
@@ -171,8 +176,22 @@ export default function TermsPage() {
         </ol>
       </section>
 
+      <section style={{ marginBottom: "2rem" }}>
+        <h2>16. เอกสารนโยบายเพิ่มเติม</h2>
+        <ol style={{ paddingLeft: "1.2rem", marginTop: "0.5rem" }}>
+          <li><Link href="/billing-policies">ศูนย์นโยบาย (Policy Center)</Link></li>
+          <li><Link href="/copyright-takedown-policy">นโยบายลิขสิทธิ์และการแจ้งถอดเนื้อหา</Link></li>
+          <li><Link href="/community-enforcement-policy">นโยบายชุมชนและการบังคับใช้</Link></li>
+          <li><Link href="/cookie-tracking-notice">ประกาศคุกกี้และการติดตามการใช้งาน</Link></li>
+          <li><Link href="/legal-contact-and-versioning">ข้อมูลติดต่อทางกฎหมายและเวอร์ชันเอกสาร</Link></li>
+        </ol>
+      </section>
+
       <p style={{ marginBottom: "0.75rem" }}>
         <Link href="/privacy">นโยบายความเป็นส่วนตัว (Privacy Policy)</Link>
+      </p>
+      <p style={{ marginBottom: "0.75rem" }}>
+        <Link href="/billing-policies">ศูนย์นโยบาย (Policy Center)</Link>
       </p>
       <p style={{ marginBottom: "0.75rem" }}>
         <Link href="/data-deletion">คำแนะนำการลบข้อมูล (Data Deletion)</Link>

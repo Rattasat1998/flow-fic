@@ -650,8 +650,8 @@ export default function ComicCreatorPage() {
                                         zIndex: 10 + img.zIndex, // keep above canvas which relies on DOM flow
                                     }}
                                     className={selectedImageId === img.id ? styles.selectedImage : ''}
-                                    onMouseDown={(e: any) => { e.stopPropagation(); setSelectedImageId(img.id); }}
-                                    onTouchStart={(e: any) => { e.stopPropagation(); setSelectedImageId(img.id); }}
+                                    onMouseDown={(e: MouseEvent) => { e.stopPropagation(); setSelectedImageId(img.id); }}
+                                    onTouchStart={(e: TouchEvent) => { e.stopPropagation(); setSelectedImageId(img.id); }}
                                     bounds="parent"
                                     lockAspectRatio={true}
                                 >

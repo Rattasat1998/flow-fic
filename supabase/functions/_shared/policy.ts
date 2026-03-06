@@ -17,6 +17,7 @@ export function buildVipPricingSnapshotId(params: { planCode: string; priceMinor
 export function buildCheckoutRequestFingerprint(params: {
   kind: 'coins' | 'vip';
   packageId?: string | null;
+  paymentMethod?: 'card' | 'promptpay' | null;
 }) {
-  return `${params.kind}:${params.packageId || ''}`;
+  return `${params.kind}:${params.packageId || ''}:${params.paymentMethod || ''}`;
 }

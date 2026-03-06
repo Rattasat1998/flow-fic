@@ -30,6 +30,71 @@ export type Character = {
     created_at: string;
 };
 
+type ManageChapter = {
+    id: string;
+    title: string;
+    status: 'draft' | 'published';
+    views: number;
+    comments: number;
+    date: string;
+    isPremium: boolean;
+    coinPrice: number;
+    hasUnpublishedChanges: boolean;
+};
+
+type ManageStory = {
+    id: string;
+    title: string;
+    penName: string;
+    writingStyle: string;
+    status: StoryPublicationStatus;
+    completionStatus: StoryCompletionStatus;
+    synopsis: string;
+    category: string;
+    mainCategory: string;
+    subCategory: string;
+    coverImage: string | null;
+    readCount: number;
+    heartCount: number;
+    commentCount: number;
+    chapters: ManageChapter[];
+};
+
+type EditFormState = {
+    title: string;
+    penName: string;
+    synopsis: string;
+    category: string;
+    mainCategory: string;
+    subCategory: string;
+    coverUrl: string | null;
+};
+
+type CharacterFormState = {
+    name: string;
+    age: string;
+    occupation: string;
+    personality: string;
+    imageUrl: string | null;
+};
+
+type CharacterUpdatePayload = {
+    name: string;
+    age: string | null;
+    occupation: string | null;
+    personality: string | null;
+    image_url?: string;
+};
+
+type MutableChapterContentBlock = Record<string, unknown> & {
+    characterId?: string | null;
+};
+
+type MutableChapterContent = Record<string, unknown> & {
+    povCharacterId?: string | null;
+    blocks?: MutableChapterContentBlock[];
+};
+
 const toComparableJson = (value: unknown): string => {
     try {
         return JSON.stringify(value ?? null);
@@ -44,8 +109,8 @@ export default function StoryManagerPage() {
     const storyId = params.id as string;
     const { user, isLoading: isLoadingAuth } = useAuth();
 
-    const [storyData, setStoryData] = useState<any | null>(null);
-    const [chapters, setChapters] = useState<any[]>([]);
+    const [storyData, setStoryData] = useState<ManageStory | null>(null);
+    const [chapters, setChapters] = useState<ManageChapter[]>([]);
     const [characters, setCharacters] = useState<Character[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isFromDB, setIsFromDB] = useState(false);
@@ -53,7 +118,7 @@ export default function StoryManagerPage() {
 
     // Edit modal state
     const [showEditModal, setShowEditModal] = useState(false);
-    const [editForm, setEditForm] = useState({
+    const [editForm, setEditForm] = useState<EditFormState>({
         title: '',
         penName: '',
         synopsis: '',
@@ -68,7 +133,7 @@ export default function StoryManagerPage() {
 
     // Character modal state
     const [showCharModal, setShowCharModal] = useState(false);
-    const [charForm, setCharForm] = useState({
+    const [charForm, setCharForm] = useState<CharacterFormState>({
         name: '',
         age: '',
         occupation: '',
@@ -97,10 +162,14 @@ export default function StoryManagerPage() {
         const cached = sessionStorage.getItem(cacheKey);
         if (cached) {
             try {
-                const parsed = JSON.parse(cached);
-                setStoryData(parsed.storyData);
-                setChapters(parsed.chapters);
-                setCharacters(parsed.characters);
+                const parsed = JSON.parse(cached) as Partial<{
+                    storyData: ManageStory;
+                    chapters: ManageChapter[];
+                    characters: Character[];
+                }>;
+                setStoryData(parsed.storyData ?? null);
+                setChapters(parsed.chapters ?? []);
+                setCharacters(parsed.characters ?? []);
                 setIsFromDB(true);
                 setIsLoading(false);
             } catch (e) {
@@ -139,7 +208,7 @@ export default function StoryManagerPage() {
                     .eq('story_id', storyId)
                     .order('order_index', { ascending: true });
 
-                const formattedChapters = (chaptersData || []).map(ch => ({
+                const formattedChapters: ManageChapter[] = (chaptersData || []).map(ch => ({
                     id: ch.id,
                     title: ch.draft_title || ch.title,
                     status: ch.status as 'draft' | 'published',
@@ -166,7 +235,7 @@ export default function StoryManagerPage() {
                     })(),
                 }));
 
-                const dbStory = {
+                const dbStory: ManageStory = {
                     id: storyData.id,
                     title: storyData.title,
                     penName: storyData.pen_name,
@@ -338,7 +407,7 @@ export default function StoryManagerPage() {
         const previousCompletionStatus = normalizeCompletionStatus(story.completionStatus);
 
         // Optimistic UI update
-        setStoryData((prev: any) => prev ? {
+        setStoryData((prev) => prev ? {
             ...prev,
             status: targetPublicationStatus,
             completionStatus: targetCompletionStatus,
@@ -363,7 +432,7 @@ export default function StoryManagerPage() {
             }
         } catch (err) {
             console.error('Error updating story status:', err);
-            setStoryData((prev: any) => prev ? {
+            setStoryData((prev) => prev ? {
                 ...prev,
                 status: previousPublicationStatus,
                 completionStatus: previousCompletionStatus,
@@ -395,7 +464,10 @@ export default function StoryManagerPage() {
             setEditCoverFile(file);
             const reader = new FileReader();
             reader.onload = (event) => {
-                if (event.target?.result) setEditForm((f: any) => ({ ...f, coverUrl: event.target!.result as string }));
+                const result = event.target?.result;
+                if (typeof result === 'string') {
+                    setEditForm((prev) => ({ ...prev, coverUrl: result }));
+                }
             };
             reader.readAsDataURL(file);
         }
@@ -453,7 +525,7 @@ export default function StoryManagerPage() {
             }
 
             // 4. Update local state
-            setStoryData((prev: any) => prev ? {
+            setStoryData((prev) => prev ? {
                 ...prev,
                 title: editForm.title,
                 penName: editForm.penName,
@@ -477,7 +549,7 @@ export default function StoryManagerPage() {
         if (file) {
             setCharImageFile(file);
             const objectUrl = URL.createObjectURL(file);
-            setCharForm((prev: any) => ({ ...prev, imageUrl: objectUrl }));
+            setCharForm((prev) => ({ ...prev, imageUrl: objectUrl }));
         }
     };
 
@@ -514,7 +586,7 @@ export default function StoryManagerPage() {
 
             if (editingCharId) {
                 // Update existing character
-                const updateData: any = {
+                const updateData: CharacterUpdatePayload = {
                     name: charForm.name,
                     age: charForm.age || null,
                     occupation: charForm.occupation || null,
@@ -561,9 +633,10 @@ export default function StoryManagerPage() {
 
             handleCloseCharModal();
 
-        } catch (err: any) {
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'unknown';
             console.error('Failed to save character:', err);
-            alert(`เกิดข้อผิดพลาดในการบันทึกตัวละคร: ${err.message}`);
+            alert(`เกิดข้อผิดพลาดในการบันทึกตัวละคร: ${message}`);
         } finally {
             setIsSavingChar(false);
         }
@@ -635,9 +708,9 @@ export default function StoryManagerPage() {
                                 if (!chapter.content) continue;
 
                                 let needsUpdate = false;
-                                let parsedContent = typeof chapter.content === 'string'
-                                    ? JSON.parse(chapter.content)
-                                    : chapter.content;
+                                const parsedContent: MutableChapterContent = typeof chapter.content === 'string'
+                                    ? JSON.parse(chapter.content) as MutableChapterContent
+                                    : chapter.content as MutableChapterContent;
 
                                 // Nullify POV character if matched
                                 if (parsedContent?.povCharacterId === charId) {
@@ -647,7 +720,7 @@ export default function StoryManagerPage() {
 
                                 // Nullify block characterId if matched (converting to narrative)
                                 if (parsedContent?.blocks && Array.isArray(parsedContent.blocks)) {
-                                    parsedContent.blocks = parsedContent.blocks.map((block: any) => {
+                                    parsedContent.blocks = parsedContent.blocks.map((block) => {
                                         if (block.characterId === charId) {
                                             needsUpdate = true;
                                             return { ...block, characterId: null };
@@ -881,7 +954,7 @@ export default function StoryManagerPage() {
                                     {...provided.droppableProps}
                                     ref={provided.innerRef}
                                 >
-                                    {story.chapters.map((chapter: any, index: number) => (
+                                    {story.chapters.map((chapter, index) => (
                                         <Draggable key={chapter.id} draggableId={chapter.id} index={index}>
                                             {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
                                                 <div

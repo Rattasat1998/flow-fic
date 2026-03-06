@@ -94,11 +94,12 @@ interface UseTrackingOptions {
 export function useTracking(options: UseTrackingOptions = {}) {
     const { user } = useAuth();
     const sessionIdRef = useRef<string>('ssr');
-    const mountTimeRef = useRef<number>(Date.now());
+    const mountTimeRef = useRef<number>(0);
     const hasFiredPageView = useRef(false);
 
     // Initialize session id on client
     useEffect(() => {
+        mountTimeRef.current = Date.now();
         sessionIdRef.current = getOrCreateSessionId();
     }, []);
 
@@ -183,7 +184,6 @@ export function useTracking(options: UseTrackingOptions = {}) {
             };
 
             try {
-                const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
                 const beaconHeaders = new Headers(headers);
                 // sendBeacon doesn't support custom headers, so fall back to fetch keepalive
                 fetch(url, {
@@ -197,18 +197,20 @@ export function useTracking(options: UseTrackingOptions = {}) {
             }
         };
 
-        window.addEventListener('beforeunload', handleUnload);
-        document.addEventListener('visibilitychange', () => {
+        const handleVisibilityChange = () => {
             if (document.visibilityState === 'hidden') handleUnload();
-        });
+        };
+
+        window.addEventListener('beforeunload', handleUnload);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
             window.removeEventListener('beforeunload', handleUnload);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, [options.pagePath, options.storyId, options.chapterId, user]);
 
     return {
         trackEvent,
-        sessionId: sessionIdRef.current,
     };
 }

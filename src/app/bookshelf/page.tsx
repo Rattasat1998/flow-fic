@@ -20,6 +20,12 @@ type FavoriteStory = {
     completionStatus: string;
 };
 
+type ReaderChapterMetaRow = {
+    id: string;
+    title: string | null;
+    order_index: number;
+};
+
 export default function BookshelfPage() {
     const router = useRouter();
     const { user, isLoading: isLoadingAuth } = useAuth();
@@ -98,19 +104,31 @@ export default function BookshelfPage() {
                 return;
             }
 
-            const { data: chapterData } = await supabase
-                .from('chapters')
-                .select('id, story_id, title, order_index')
-                .in('story_id', storyIds)
-                .eq('status', 'published')
-                .order('story_id', { ascending: true })
-                .order('order_index', { ascending: true });
+            const chapterRpcResults = await Promise.all(
+                storyIds.map(async (id) => {
+                    const { data, error: chapterError } = await supabase.rpc('get_reader_chapters', {
+                        p_story_id: id,
+                        p_preview_mode: false,
+                        p_preview_chapter_id: null,
+                    });
+
+                    if (chapterError) {
+                        return { storyId: id, rows: [] as ReaderChapterMetaRow[] };
+                    }
+
+                    const rows = ((data as ReaderChapterMetaRow[] | null) || [])
+                        .slice()
+                        .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+                    return { storyId: id, rows };
+                })
+            );
 
             const chaptersByStory = new Map<string, Array<{ id: string; title: string }>>();
-            (chapterData || []).forEach((chapter) => {
-                const list = chaptersByStory.get(chapter.story_id) || [];
-                list.push({ id: chapter.id, title: chapter.title });
-                chaptersByStory.set(chapter.story_id, list);
+            chapterRpcResults.forEach(({ storyId, rows }) => {
+                chaptersByStory.set(
+                    storyId,
+                    rows.map((chapter) => ({ id: chapter.id, title: chapter.title || 'ไม่มีชื่อ' }))
+                );
             });
 
             const chapterMetaById = new Map<string, { title: string; readIndex: number }>();

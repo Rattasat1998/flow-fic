@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -27,7 +28,22 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <AuthProvider>
-          {children}
+          <div className="appShell">
+            <div className="appContent">{children}</div>
+            <footer className="appFooter">
+              <div className="appFooterInner">
+                <div className="appFooterLinks">
+                  <Link href="/terms">ข้อกำหนดและเงื่อนไข</Link>
+                  <Link href="/privacy">นโยบายความเป็นส่วนตัว</Link>
+                  <Link href="/billing-policies">ศูนย์นโยบาย</Link>
+                  <Link href="/cookie-tracking-notice">คุกกี้</Link>
+                  <Link href="/data-deletion">การลบข้อมูล</Link>
+                  <Link href="/legal-contact-and-versioning">ติดต่อทางกฎหมาย</Link>
+                </div>
+                <p className="appFooterCopy">© {new Date().getFullYear()} FlowFic</p>
+              </div>
+            </footer>
+          </div>
         </AuthProvider>
       </body>
     </html>

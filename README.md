@@ -30,6 +30,8 @@ STRIPE_SECRET_KEY=sk_test_or_sk_live_key
 STRIPE_WEBHOOK_SECRET=whsec_xxx
 NEXT_PUBLIC_APP_URL=https://your-domain.com
 FINANCE_ADMIN_USER_IDS=uuid1,uuid2
+CRON_SECRET=your_random_secret_for_vercel_cron
+RECONCILIATION_MISMATCH_THRESHOLD=0
 UNSPLASH_ACCESS_KEY=your_unsplash_access_key
 UNSPLASH_SECRET_KEY=your_unsplash_secret_key
 ```
@@ -38,6 +40,8 @@ UNSPLASH_SECRET_KEY=your_unsplash_secret_key
 `SUPABASE_SERVICE_ROLE_KEY` must NOT be a publishable key (`sb_publishable_*`).
 `STRIPE_SECRET_KEY` must be a Stripe secret key (`sk_*`), not publishable (`pk_*`).
 `FINANCE_ADMIN_USER_IDS` controls access to admin payment operations APIs.
+`CRON_SECRET` is required to authorize Vercel Cron calls to internal reconciliation endpoints.
+`RECONCILIATION_MISMATCH_THRESHOLD` sets the alert threshold for daily reconciliation (default `0`).
 
 ## Monetization Rollout (v1)
 
@@ -68,9 +72,23 @@ Stripe webhook endpoint should stay enabled at:
 with events:
 
 - `checkout.session.completed`
+- `checkout.session.async_payment_succeeded` (required for QR PromptPay settlement)
+- `checkout.session.async_payment_failed`
 - `customer.subscription.created`
 - `customer.subscription.updated`
 - `customer.subscription.deleted`
+
+## Daily Reconciliation Cron
+
+`vercel.json` schedules daily reconciliation at `00:10 UTC` via:
+
+`/api/internal/reconciliation/daily`
+
+This endpoint requires header:
+
+`Authorization: Bearer <CRON_SECRET>`
+
+Vercel automatically sends this header for cron jobs when `CRON_SECRET` is configured in the project environment.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 

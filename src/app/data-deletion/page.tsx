@@ -57,6 +57,9 @@ export default function DataDeletionPage() {
         <Link href="/terms">Terms of Service</Link>
       </p>
       <p>
+        <Link href="/billing-policies">Billing Policies</Link>
+      </p>
+      <p>
         <Link href="/privacy">Privacy Policy</Link>
       </p>
       <p>

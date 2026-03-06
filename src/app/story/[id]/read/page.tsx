@@ -28,17 +28,15 @@ type DBStory = {
   user_id: string;
 };
 
-type DBChapter = {
+type ReaderChapterRpcRow = {
   id: string;
-  title: string;
-  draft_title: string | null;
-  published_title: string | null;
-  content: unknown;
-  draft_content: unknown;
-  published_content: unknown;
+  title: string | null;
   order_index: number;
   is_premium: boolean;
   coin_price: number;
+  can_read: boolean;
+  access_source: string;
+  content_payload: unknown;
 };
 
 // New Block Types
@@ -82,11 +80,6 @@ type CommentRow = {
 type StorySettings = {
   allowComments: boolean;
   hideHeartCount: boolean;
-};
-
-type VipEntitlementRow = {
-  status: string;
-  current_period_end: string | null;
 };
 
 type ChapterUnlockRow = {
@@ -182,10 +175,45 @@ export default function StoryPage({ params }: StoryPageProps) {
   const [showComments, setShowComments] = useState(false);
   const [storySettings, setStorySettings] = useState<StorySettings>(defaultStorySettings);
   const [coinBalance, setCoinBalance] = useState(0);
-  const [vipEntitlement, setVipEntitlement] = useState<VipEntitlementRow | null>(null);
+  const [isVipAccessActive, setIsVipAccessActive] = useState(false);
   const [unlockedChapterIds, setUnlockedChapterIds] = useState<string[]>([]);
   const [isUnlockingChapterId, setIsUnlockingChapterId] = useState<string | null>(null);
   const [unlockError, setUnlockError] = useState<string | null>(null);
+
+  const fetchReaderChapters = useCallback(
+    async (chapterIdFilter?: string) => {
+      const { data, error } = await supabase.rpc('get_reader_chapters', {
+        p_story_id: storyId,
+        p_preview_mode: isPreviewMode,
+        p_preview_chapter_id: chapterIdFilter || null,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      const rows = ((data as ReaderChapterRpcRow[] | null) || [])
+        .slice()
+        .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+
+      return rows.map((row) => {
+        const parsedContent = row.can_read && row.content_payload
+          ? parseChapterBlocks(row.content_payload)
+          : { povCharacterId: null, blocks: [], chatTheme: 'white' };
+
+        return {
+          id: row.id,
+          title: row.title || 'ไม่มีชื่อ',
+          povCharacterId: parsedContent.povCharacterId,
+          blocks: parsedContent.blocks,
+          chatTheme: parsedContent.chatTheme,
+          isPremium: !!row.is_premium,
+          coinPrice: Math.max(0, row.coin_price || 0),
+        } satisfies ReaderChapter;
+      });
+    },
+    [storyId, isPreviewMode]
+  );
 
   useEffect(() => {
     const fetchReaderStory = async () => {
@@ -241,48 +269,14 @@ export default function StoryPage({ params }: StoryPageProps) {
         setCharacters(charsData);
       }
 
-      // Fetch Chapters
-      let chapterQuery = supabase
-        .from('chapters')
-        .select('id, title, draft_title, published_title, content, draft_content, published_content, order_index, is_premium, coin_price')
-        .eq('story_id', storyId);
-
-      if (isPreviewMode) {
-        if (previewChapterId) {
-          chapterQuery = chapterQuery.eq('id', previewChapterId);
-        }
-      } else {
-        chapterQuery = chapterQuery.eq('status', 'published');
-      }
-
-      const { data: chapterData, error: chapterError } = await chapterQuery
-        .order('order_index', { ascending: true });
-
-      if (chapterError) {
+      let parsedChapters: ReaderChapter[] = [];
+      try {
+        parsedChapters = await fetchReaderChapters(previewChapterId || undefined);
+      } catch {
         setLoadError('ไม่สามารถโหลดตอนของเรื่องนี้ได้');
         setIsLoading(false);
         return;
       }
-
-      const parsedChapters = ((chapterData as DBChapter[]) || []).map(chapter => {
-        const sourceTitle = isPreviewMode
-          ? (chapter.draft_title || chapter.title || chapter.published_title || 'ไม่มีชื่อ')
-          : (chapter.published_title || chapter.title);
-        const sourceContent = isPreviewMode
-          ? (chapter.draft_content ?? chapter.content ?? chapter.published_content)
-          : (chapter.published_content ?? chapter.content);
-        const parsedContent = parseChapterBlocks(sourceContent);
-
-        return {
-          id: chapter.id,
-          title: sourceTitle,
-          povCharacterId: parsedContent.povCharacterId,
-          blocks: parsedContent.blocks,
-          chatTheme: parsedContent.chatTheme,
-          isPremium: !!chapter.is_premium,
-          coinPrice: Math.max(0, chapter.coin_price || 0),
-        };
-      });
 
       if (!isPreviewMode && user) {
         const [{ data: walletData }, { data: vipData }, { data: unlockRows }] = await Promise.all([
@@ -304,12 +298,16 @@ export default function StoryPage({ params }: StoryPageProps) {
         ]);
 
         setCoinBalance(walletData?.coin_balance || 0);
-        setVipEntitlement((vipData as VipEntitlementRow | null) || null);
-        setUnlockedChapterIds(((unlockRows as ChapterUnlockRow[] | null) || []).map((row) => row.chapter_id));
+        const unlockedIds = ((unlockRows as ChapterUnlockRow[] | null) || []).map((row) => row.chapter_id);
+        setUnlockedChapterIds(unlockedIds);
+        const vipActiveForRead = !!vipData
+          && vipData.status === 'active'
+          && (!vipData.current_period_end || new Date(vipData.current_period_end).getTime() > Date.now());
+        setIsVipAccessActive(vipActiveForRead);
       } else {
         setCoinBalance(0);
-        setVipEntitlement(null);
         setUnlockedChapterIds([]);
+        setIsVipAccessActive(false);
       }
 
       // Fetch like count + user like status
@@ -382,7 +380,7 @@ export default function StoryPage({ params }: StoryPageProps) {
     };
 
     fetchReaderStory();
-  }, [storyId, user, isPreviewMode, previewChapterId, initialChapterIndex]);
+  }, [storyId, user, isPreviewMode, previewChapterId, initialChapterIndex, fetchReaderChapters]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -393,10 +391,7 @@ export default function StoryPage({ params }: StoryPageProps) {
   }, [messages]);
 
   const isStoryOwner = !!user && dbStory?.user_id === user.id;
-  const isVipActive = useMemo(() => {
-    if (!vipEntitlement) return false;
-    return vipEntitlement.status === 'active';
-  }, [vipEntitlement]);
+  const isVipActive = isVipAccessActive;
 
   const unlockedChapterIdSet = useMemo(() => new Set(unlockedChapterIds), [unlockedChapterIds]);
 
@@ -639,6 +634,15 @@ export default function StoryPage({ params }: StoryPageProps) {
     setUnlockedChapterIds((prev) => (prev.includes(chapter.id) ? prev : [...prev, chapter.id]));
     if (typeof result.new_balance === 'number') {
       setCoinBalance(result.new_balance);
+    }
+    try {
+      const refreshedChapters = await fetchReaderChapters(chapter.id);
+      const refreshedChapter = refreshedChapters[0] || null;
+      if (refreshedChapter) {
+        setDbChapters((prev) => prev.map((item) => (item.id === refreshedChapter.id ? refreshedChapter : item)));
+      }
+    } catch {
+      setUnlockError('ปลดล็อกสำเร็จ แต่โหลดเนื้อหาล่าช้า กรุณารีเฟรชหน้าอีกครั้ง');
     }
     trackEvent('chapter_unlock', `/story/${storyId}/read`, {
       storyId,

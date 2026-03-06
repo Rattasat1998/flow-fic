@@ -317,6 +317,9 @@ export async function POST(request: NextRequest) {
       }
 
       formData.set('mode', 'payment');
+      if (user.email) {
+        formData.set('customer_email', user.email);
+      }
       formData.set('metadata[coin_package_id]', pkg.id);
       formData.set('metadata[coin_amount]', String(getCoinPackageTotalCoins(pkg)));
       formData.set('metadata[price_minor]', String(pkg.priceThb * 100));

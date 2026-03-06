@@ -36,6 +36,18 @@ type DBChapter = {
     coin_price: number;
 };
 
+type ReaderChapterRow = {
+    id: string;
+    title: string | null;
+    order_index: number;
+    read_count: number;
+    created_at: string | null;
+    is_premium: boolean;
+    coin_price: number;
+    can_read: boolean;
+    access_source: string;
+};
+
 const fallbackCover = 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=600&q=80';
 
 export default function StoryDetailsPage({ params }: StoryDetailsProps) {
@@ -71,12 +83,26 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
                 return;
             }
 
-            const { data: chapterData } = await supabase
-                .from('chapters')
-                .select('id, title, order_index, read_count, created_at, is_premium, coin_price')
-                .eq('story_id', storyId)
-                .eq('status', 'published')
-                .order('order_index', { ascending: true });
+            const { data: chapterRows, error: chapterRowsError } = await supabase.rpc('get_reader_chapters', {
+                p_story_id: storyId,
+                p_preview_mode: false,
+                p_preview_chapter_id: null,
+            });
+
+            if (chapterRowsError) {
+                setIsLoading(false);
+                return;
+            }
+
+            const chapterData = ((chapterRows as ReaderChapterRow[] | null) || []).map((chapter) => ({
+                id: chapter.id,
+                title: chapter.title || 'ไม่มีชื่อ',
+                order_index: chapter.order_index,
+                read_count: chapter.read_count || 0,
+                created_at: chapter.created_at || new Date(0).toISOString(),
+                is_premium: !!chapter.is_premium,
+                coin_price: Math.max(0, chapter.coin_price || 0),
+            }));
 
             // Fetch like count
             const { count: likesCount } = await supabase

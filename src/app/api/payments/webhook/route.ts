@@ -303,7 +303,11 @@ export async function POST(request: NextRequest) {
   try {
     switch (event.type) {
       case 'checkout.session.completed':
+      case 'checkout.session.async_payment_succeeded':
         await processCheckoutSessionCompleted(event.data.object);
+        break;
+      case 'checkout.session.async_payment_failed':
+        // Keep event in audit log; no ledger side effect for failed async payment.
         break;
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
