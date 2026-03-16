@@ -9,8 +9,15 @@ export interface TrackingMetadata {
     referrer?: string;
     search_query?: string;
     category_filter?: string;
+    sub_category_filter?: string;
+    focus_core?: boolean;
     tab?: string;
     coin_price?: number;
+    from_chapter_id?: string;
+    to_chapter_id?: string;
+    choice_id?: string;
+    selection_mode?: 'manual' | 'timeout_auto';
+    countdown_seconds?: number;
     method?: string;
     duration_ms?: number;
     scroll_depth?: number;
@@ -25,6 +32,7 @@ export type EventType =
     | 'chapter_read'
     | 'pricing_view'
     | 'chapter_unlock'
+    | 'choice_select'
     | 'like'
     | 'favorite'
     | 'comment';
@@ -93,6 +101,7 @@ interface UseTrackingOptions {
 
 export function useTracking(options: UseTrackingOptions = {}) {
     const { user } = useAuth();
+    const userId = user?.id ?? null;
     const sessionIdRef = useRef<string>('ssr');
     const mountTimeRef = useRef<number>(0);
     const hasFiredPageView = useRef(false);
@@ -123,7 +132,7 @@ export function useTracking(options: UseTrackingOptions = {}) {
             supabase
                 .from('page_events')
                 .insert({
-                    user_id: user?.id || null,
+                    user_id: userId,
                     session_id: sessionId,
                     event_type: eventType,
                     page_path: pagePath,
@@ -137,7 +146,7 @@ export function useTracking(options: UseTrackingOptions = {}) {
                     }
                 });
         },
-        [user]
+        [userId]
     );
 
     // Auto page_view on mount
@@ -166,7 +175,7 @@ export function useTracking(options: UseTrackingOptions = {}) {
 
             // Use sendBeacon for reliable delivery on page unload
             const payload = {
-                user_id: user?.id || null,
+                user_id: userId,
                 session_id: sessionIdRef.current,
                 event_type: 'page_leave' as const,
                 page_path: options.pagePath,
@@ -208,7 +217,7 @@ export function useTracking(options: UseTrackingOptions = {}) {
             window.removeEventListener('beforeunload', handleUnload);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [options.pagePath, options.storyId, options.chapterId, user]);
+    }, [options.pagePath, options.storyId, options.chapterId, userId]);
 
     return {
         trackEvent,

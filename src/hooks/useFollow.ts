@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase';
 interface UseFollowOptions {
     storyId: string;
     userId: string | null | undefined;
+    initialFollowerCount?: number;
+    initialIsFollowing?: boolean;
 }
 
 interface UseFollowReturn {
@@ -15,23 +17,52 @@ interface UseFollowReturn {
     isLoading: boolean;
 }
 
-export function useFollow({ storyId, userId }: UseFollowOptions): UseFollowReturn {
-    const [isFollowing, setIsFollowing] = useState(false);
-    const [followerCount, setFollowerCount] = useState(0);
-    const [isLoading, setIsLoading] = useState(true);
+export function useFollow({
+    storyId,
+    userId,
+    initialFollowerCount,
+    initialIsFollowing,
+}: UseFollowOptions): UseFollowReturn {
+    const hasInitialState = Number.isFinite(initialFollowerCount) || typeof initialIsFollowing === 'boolean';
+    const [isFollowing, setIsFollowing] = useState(Boolean(initialIsFollowing));
+    const [followerCount, setFollowerCount] = useState(
+        Number.isFinite(initialFollowerCount) ? Math.max(0, Number(initialFollowerCount)) : 0
+    );
+    const [isLoading, setIsLoading] = useState(!hasInitialState);
+
+    useEffect(() => {
+        if (Number.isFinite(initialFollowerCount)) {
+            setFollowerCount(Math.max(0, Number(initialFollowerCount)));
+        } else {
+            setFollowerCount(0);
+        }
+
+        if (typeof initialIsFollowing === 'boolean') {
+            setIsFollowing(initialIsFollowing);
+        } else {
+            setIsFollowing(false);
+        }
+
+        setIsLoading(!(Number.isFinite(initialFollowerCount) || typeof initialIsFollowing === 'boolean'));
+    }, [storyId, userId, initialFollowerCount, initialIsFollowing]);
 
     // Fetch initial state
     useEffect(() => {
         if (!storyId) return;
+        let cancelled = false;
 
         const fetchFollowState = async () => {
-            setIsLoading(true);
+            if (!(Number.isFinite(initialFollowerCount) || typeof initialIsFollowing === 'boolean')) {
+                setIsLoading(true);
+            }
 
             // Get follower count
             const { count } = await supabase
                 .from('follows')
                 .select('*', { count: 'exact', head: true })
                 .eq('story_id', storyId);
+
+            if (cancelled) return;
 
             setFollowerCount(count || 0);
 
@@ -44,14 +75,21 @@ export function useFollow({ storyId, userId }: UseFollowOptions): UseFollowRetur
                     .eq('user_id', userId)
                     .maybeSingle();
 
+                if (cancelled) return;
                 setIsFollowing(!!data);
+            } else {
+                setIsFollowing(false);
             }
 
+            if (cancelled) return;
             setIsLoading(false);
         };
 
         fetchFollowState();
-    }, [storyId, userId]);
+        return () => {
+            cancelled = true;
+        };
+    }, [storyId, userId, initialFollowerCount, initialIsFollowing]);
 
     const toggleFollow = useCallback(async () => {
         if (!userId) {

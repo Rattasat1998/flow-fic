@@ -7,6 +7,7 @@ import { Heart } from 'lucide-react';
 import styles from './loves.module.css';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { BrandLogo } from '@/components/brand/BrandLogo';
 import { CompactStoryCard } from '@/components/story/CompactStoryCard';
 
 type LovedStory = {
@@ -29,6 +30,7 @@ type ReaderChapterMetaRow = {
 export default function LovesPage() {
   const router = useRouter();
   const { user, isLoading: isLoadingAuth } = useAuth();
+  const userId = user?.id ?? null;
   const [stories, setStories] = useState<LovedStory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [removingId, setRemovingId] = useState<string | null>(null);
@@ -61,7 +63,7 @@ export default function LovesPage() {
 
   useEffect(() => {
     if (isLoadingAuth) return;
-    if (!user) {
+    if (!userId) {
       router.push('/');
       return;
     }
@@ -72,7 +74,7 @@ export default function LovesPage() {
       const { data: likeData, error } = await supabase
         .from('likes')
         .select('id, story_id, chapter_id, created_at')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
       if (error || !likeData || likeData.length === 0) {
@@ -93,7 +95,7 @@ export default function LovesPage() {
 
       const { data: storyData } = await supabase
         .from('stories')
-        .select('id, title, cover_url, pen_name, writing_style, category, completion_status, status')
+        .select('id, title, cover_url, cover_wide_url, pen_name, writing_style, category, completion_status, status')
         .in('id', storyIds)
         .eq('status', 'published');
 
@@ -149,7 +151,7 @@ export default function LovesPage() {
         merged.push({
           id: story.id,
           title: story.title,
-          coverUrl: story.cover_url || 'https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?auto=format&fit=crop&w=800&q=80',
+          coverUrl: story.cover_url || story.cover_wide_url || 'https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?auto=format&fit=crop&w=800&q=80',
           penName: story.pen_name,
           chapterReadIndex: chapterMeta?.readIndex ?? 0,
           writingStyle: normalizeWritingStyle(story.writing_style),
@@ -163,7 +165,7 @@ export default function LovesPage() {
     };
 
     fetchLoves();
-  }, [user, isLoadingAuth, router]);
+  }, [userId, isLoadingAuth, router]);
 
   const handleRemoveLike = async (storyId: string) => {
     if (!user) return;
@@ -213,7 +215,7 @@ export default function LovesPage() {
     <main className={styles.main}>
       <nav className={styles.navbar}>
         <div className={styles.navLeft}>
-          <Link href="/" className={styles.logo}>FLOWFIC</Link>
+          <BrandLogo href="/" size="sm" className={styles.logo} />
           <span className={styles.navDivider}>/</span>
           <span className={styles.pageTitle}>รักเลยของฉัน</span>
         </div>
@@ -247,7 +249,7 @@ export default function LovesPage() {
                 </div>
                 <div className={styles.storyRail}>
                   {group.stories.map((story) => {
-                    const readHref = `/story/${story.id}/read?chapter=${story.chapterReadIndex}`;
+                    const readHref = `/story/${story.id}/read`;
                     const tags = [writingStyleLabel(story.writingStyle), categoryLabel(story.category)];
 
                     return (

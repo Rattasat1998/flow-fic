@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import styles from './page.module.css';
 
 type AdminLog = {
@@ -64,6 +65,7 @@ function safePretty(value: unknown) {
 
 export default function AdminPaymentsPage() {
   const { user, session, isLoading } = useAuth();
+  const userId = user?.id ?? null;
 
   const [isSubmittingAction, setIsSubmittingAction] = useState<string | null>(null);
   const [logs, setLogs] = useState<AdminLog[]>([]);
@@ -101,8 +103,18 @@ export default function AdminPaymentsPage() {
 
   const latestLog = useMemo(() => (logs.length > 0 ? logs[0] : null), [logs]);
 
+  const getAccessToken = useCallback(async () => {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) {
+      console.error('[Admin Payments] Session error:', error);
+      return null;
+    }
+    return data.session?.access_token || null;
+  }, []);
+
   const fetchHistory = useCallback(async () => {
-    if (!session?.access_token) {
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
       setHistoryError('กรุณาเข้าสู่ระบบก่อนใช้งาน');
       return;
     }
@@ -127,7 +139,7 @@ export default function AdminPaymentsPage() {
       const response = await fetch(`/api/admin/payments/history?${params.toString()}`, {
         method: 'GET',
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       });
 
@@ -151,15 +163,15 @@ export default function AdminPaymentsPage() {
       setHistoryLoading(false);
     }
   }, [
+    getAccessToken,
     historyLimit,
     historyUserId,
     historyPaymentCaseId,
     historySourceTransactionId,
-    session?.access_token,
   ]);
 
   useEffect(() => {
-    if (!user || !session?.access_token) {
+    if (!userId) {
       setAccessState('denied');
       setAccessMessage('กรุณาเข้าสู่ระบบก่อนใช้งานหน้าแอดมิน');
       return;
@@ -167,13 +179,21 @@ export default function AdminPaymentsPage() {
 
     let isCancelled = false;
     const verifyAccess = async () => {
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        if (isCancelled) return;
+        setAccessState('denied');
+        setAccessMessage('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
+        return;
+      }
+
       setAccessState('checking');
       setAccessMessage(null);
       try {
         const response = await fetch('/api/admin/payments/access', {
           method: 'GET',
           headers: {
-            Authorization: `Bearer ${session.access_token}`,
+            Authorization: `Bearer ${accessToken}`,
           },
         });
 
@@ -211,7 +231,7 @@ export default function AdminPaymentsPage() {
     return () => {
       isCancelled = true;
     };
-  }, [user, session?.access_token]);
+  }, [getAccessToken, userId]);
 
   useEffect(() => {
     if (accessState !== 'allowed') return;
@@ -227,7 +247,8 @@ export default function AdminPaymentsPage() {
   };
 
   const callAdminApi = async (action: string, path: string, payload: Record<string, unknown>) => {
-    if (!session?.access_token) {
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
       setFormError('กรุณาเข้าสู่ระบบก่อนใช้งาน');
       return false;
     }
@@ -240,7 +261,7 @@ export default function AdminPaymentsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify(payload),
       });

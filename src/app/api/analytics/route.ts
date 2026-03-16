@@ -37,7 +37,14 @@ export async function GET() {
             .limit(50);
 
         // 6. Funnel data (last 7 days)
-        const funnelSteps = ['page_view', 'story_view', 'chapter_read', 'pricing_view', 'chapter_unlock'];
+        const funnelSteps = [
+            'page_view',
+            'story_view',
+            'chapter_read',
+            'choice_select',
+            'pricing_view',
+            'chapter_unlock',
+        ];
         const funnelPromises = funnelSteps.map((step) =>
             admin
                 .from('page_events')

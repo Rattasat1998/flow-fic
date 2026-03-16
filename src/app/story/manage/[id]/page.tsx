@@ -1,21 +1,28 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Settings, BarChart2, Edit3, Image as ImageIcon, GripVertical, Trash2, X, Save, Loader2, Upload } from 'lucide-react';
+import { Plus, Settings, BarChart2, Edit3, Image as ImageIcon, GripVertical, Trash2, X, Save, Loader2, Upload, Search } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult, DroppableProvided, DraggableProvided, DraggableStateSnapshot, DroppableStateSnapshot } from '@hello-pangea/dnd';
 import styles from './manage.module.css';
 import { supabase } from '@/lib/supabase';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { MAIN_CATEGORIES, SUB_CATEGORIES } from '@/lib/categories';
 import { useAuth } from '@/contexts/AuthContext';
 
 type StoryCompletionStatus = 'ongoing' | 'completed';
 type StoryPublicationStatus = 'draft' | 'published';
+type StoryPathMode = 'linear' | 'branching';
+const BRANCHING_FEATURE_ENABLED = FEATURE_FLAGS.branching;
 const normalizeCompletionStatus = (value: string | null | undefined): StoryCompletionStatus => {
     return value === 'completed' ? 'completed' : 'ongoing';
 };
 const normalizePublicationStatus = (value: string | null | undefined): StoryPublicationStatus => {
     return value === 'published' ? 'published' : 'draft';
+};
+const normalizePathMode = (value: string | null | undefined): StoryPathMode => {
+    if (!BRANCHING_FEATURE_ENABLED) return 'linear';
+    return value === 'branching' ? 'branching' : 'linear';
 };
 
 export type Character = {
@@ -42,6 +49,18 @@ type ManageChapter = {
     hasUnpublishedChanges: boolean;
 };
 
+type ChapterBranchLink = {
+    fromChapterId: string;
+    toChapterId: string;
+};
+
+type DecoratedManageChapter = ManageChapter & {
+    isEntry: boolean;
+    incomingChoiceCount: number;
+    outgoingChoiceCount: number;
+    branchRole: 'entry' | 'hub' | 'target' | 'unlinked';
+};
+
 type ManageStory = {
     id: string;
     title: string;
@@ -53,7 +72,10 @@ type ManageStory = {
     category: string;
     mainCategory: string;
     subCategory: string;
+    pathMode: StoryPathMode;
+    entryChapterId: string | null;
     coverImage: string | null;
+    coverWideImage: string | null;
     readCount: number;
     heartCount: number;
     commentCount: number;
@@ -67,8 +89,23 @@ type EditFormState = {
     category: string;
     mainCategory: string;
     subCategory: string;
+    pathMode: StoryPathMode;
     coverUrl: string | null;
+    coverWideUrl: string | null;
 };
+
+type UnsplashImage = {
+    id: string;
+    alt: string;
+    thumb: string;
+    regular: string;
+    full: string;
+    author: string;
+    authorUrl: string;
+    unsplashUrl: string;
+};
+
+type UnsplashTarget = 'cover' | 'wide';
 
 type CharacterFormState = {
     name: string;
@@ -107,10 +144,14 @@ export default function StoryManagerPage() {
     const params = useParams();
     const router = useRouter();
     const storyId = params.id as string;
+    const manageCacheKey = `flowfic_manage_${storyId}`;
+    const manageScrollKey = `flowfic_manage_scroll_${storyId}`;
     const { user, isLoading: isLoadingAuth } = useAuth();
+    const userId = user?.id ?? null;
 
     const [storyData, setStoryData] = useState<ManageStory | null>(null);
     const [chapters, setChapters] = useState<ManageChapter[]>([]);
+    const [chapterLinks, setChapterLinks] = useState<ChapterBranchLink[]>([]);
     const [characters, setCharacters] = useState<Character[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isFromDB, setIsFromDB] = useState(false);
@@ -125,11 +166,20 @@ export default function StoryManagerPage() {
         category: '',
         mainCategory: '',
         subCategory: '',
-        coverUrl: null as string | null
+        pathMode: 'linear',
+        coverUrl: null as string | null,
+        coverWideUrl: null as string | null,
     });
     const [editCoverFile, setEditCoverFile] = useState<File | null>(null);
+    const [editCoverWideFile, setEditCoverWideFile] = useState<File | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isUpdatingStoryStatus, setIsUpdatingStoryStatus] = useState(false);
+    const [showUnsplashModal, setShowUnsplashModal] = useState(false);
+    const [unsplashTarget, setUnsplashTarget] = useState<UnsplashTarget>('cover');
+    const [unsplashQuery, setUnsplashQuery] = useState('');
+    const [unsplashResults, setUnsplashResults] = useState<UnsplashImage[]>([]);
+    const [isUnsplashLoading, setIsUnsplashLoading] = useState(false);
+    const [unsplashError, setUnsplashError] = useState<string | null>(null);
 
     // Character modal state
     const [showCharModal, setShowCharModal] = useState(false);
@@ -154,21 +204,23 @@ export default function StoryManagerPage() {
 
     // Required to prevent Next.js hydration errors with @hello-pangea/dnd
     const [isMounted, setIsMounted] = useState(false);
+    const hasRestoredScrollRef = useRef(false);
 
     useEffect(() => {
         setIsMounted(true);
 
-        const cacheKey = `flowfic_manage_${storyId}`;
-        const cached = sessionStorage.getItem(cacheKey);
+        const cached = sessionStorage.getItem(manageCacheKey);
         if (cached) {
             try {
                 const parsed = JSON.parse(cached) as Partial<{
                     storyData: ManageStory;
                     chapters: ManageChapter[];
+                    chapterLinks: ChapterBranchLink[];
                     characters: Character[];
                 }>;
                 setStoryData(parsed.storyData ?? null);
                 setChapters(parsed.chapters ?? []);
+                setChapterLinks(parsed.chapterLinks ?? []);
                 setCharacters(parsed.characters ?? []);
                 setIsFromDB(true);
                 setIsLoading(false);
@@ -178,7 +230,7 @@ export default function StoryManagerPage() {
         }
 
         const fetchStory = async () => {
-            if (!storyId || !user) return;
+            if (!storyId || !userId) return;
 
             // Try fetching from Supabase first
             const { data: storyData, error: storyError } = await supabase
@@ -194,19 +246,24 @@ export default function StoryManagerPage() {
             }
 
             // Security check: only the owner can manage
-            if (storyData.user_id !== user.id) {
+            if (storyData.user_id !== userId) {
                 setAuthError(true);
                 setIsLoading(false);
                 return;
             }
 
             if (!storyError && storyData) {
+                const nextPathMode = normalizePathMode(storyData.path_mode);
                 // Fetch chapters for this story
                 const { data: chaptersData, error: chaptersError } = await supabase
                     .from('chapters')
                     .select('id, title, draft_title, published_title, content, draft_content, published_content, status, order_index, created_at, read_count, is_premium, coin_price, draft_updated_at, published_updated_at')
                     .eq('story_id', storyId)
                     .order('order_index', { ascending: true });
+
+                if (chaptersError) {
+                    throw chaptersError;
+                }
 
                 const formattedChapters: ManageChapter[] = (chaptersData || []).map(ch => ({
                     id: ch.id,
@@ -235,6 +292,28 @@ export default function StoryManagerPage() {
                     })(),
                 }));
 
+                let branchLinksData: ChapterBranchLink[] = [];
+                if (BRANCHING_FEATURE_ENABLED && nextPathMode === 'branching') {
+                    const { data: rawLinks, error: chapterLinksError } = await supabase
+                        .from('chapter_choices')
+                        .select('from_chapter_id, to_chapter_id')
+                        .eq('story_id', storyId);
+
+                    if (chapterLinksError) {
+                        console.error('Failed to fetch chapter choices:', chapterLinksError);
+                    } else {
+                        branchLinksData = ((rawLinks || []) as Array<{
+                            from_chapter_id: string | null;
+                            to_chapter_id: string | null;
+                        }>)
+                            .filter((row) => typeof row.from_chapter_id === 'string' && typeof row.to_chapter_id === 'string')
+                            .map((row) => ({
+                                fromChapterId: row.from_chapter_id as string,
+                                toChapterId: row.to_chapter_id as string,
+                            }));
+                    }
+                }
+
                 const dbStory: ManageStory = {
                     id: storyData.id,
                     title: storyData.title,
@@ -246,7 +325,10 @@ export default function StoryManagerPage() {
                     category: storyData.category,
                     mainCategory: storyData.main_category || '',
                     subCategory: storyData.sub_category || '',
+                    pathMode: nextPathMode,
+                    entryChapterId: storyData.entry_chapter_id || null,
                     coverImage: storyData.cover_url,
+                    coverWideImage: storyData.cover_wide_url,
                     readCount: storyData.read_count || 0,
                     heartCount: 0,
                     commentCount: 0,
@@ -262,12 +344,14 @@ export default function StoryManagerPage() {
 
                 setStoryData(dbStory);
                 setChapters(formattedChapters);
+                setChapterLinks(branchLinksData);
                 setCharacters(charsData || []);
                 setIsFromDB(true);
 
-                sessionStorage.setItem(cacheKey, JSON.stringify({
+                sessionStorage.setItem(manageCacheKey, JSON.stringify({
                     storyData: dbStory,
                     chapters: formattedChapters,
+                    chapterLinks: branchLinksData,
                     characters: charsData || []
                 }));
             }
@@ -275,18 +359,150 @@ export default function StoryManagerPage() {
         };
 
         if (!isLoadingAuth) {
-            if (!user) {
+            if (!userId) {
                 router.push('/');
             } else {
                 fetchStory();
             }
         }
-    }, [storyId, user, isLoadingAuth, router]);
+    }, [manageCacheKey, storyId, userId, isLoadingAuth, router]);
 
     const story = storyData ? { ...storyData, chapters } : null;
     const editorStyle = story?.writingStyle || 'narrative';
+    const isBranchingStory = BRANCHING_FEATURE_ENABLED && story?.pathMode === 'branching';
     const publishedCount = chapters.filter(chapter => chapter.status === 'published').length;
     const isStoryCompleted = story?.completionStatus === 'completed';
+    const canRestoreManageScroll = isMounted && !isLoading && !!story;
+    const effectiveEntryChapterId = isBranchingStory
+        ? (story?.entryChapterId || chapters[0]?.id || null)
+        : null;
+    const decoratedChapters = useMemo<DecoratedManageChapter[]>(() => {
+        if (!isBranchingStory) {
+            return chapters.map((chapter) => ({
+                ...chapter,
+                isEntry: false,
+                incomingChoiceCount: 0,
+                outgoingChoiceCount: 0,
+                branchRole: 'unlinked',
+            }));
+        }
+
+        const incomingCounts = new Map<string, number>();
+        const outgoingCounts = new Map<string, number>();
+
+        chapterLinks.forEach((link) => {
+            outgoingCounts.set(link.fromChapterId, (outgoingCounts.get(link.fromChapterId) || 0) + 1);
+            incomingCounts.set(link.toChapterId, (incomingCounts.get(link.toChapterId) || 0) + 1);
+        });
+
+        return chapters.map((chapter) => {
+            const incomingChoiceCount = incomingCounts.get(chapter.id) || 0;
+            const outgoingChoiceCount = outgoingCounts.get(chapter.id) || 0;
+            const isEntry = chapter.id === effectiveEntryChapterId;
+            const branchRole: DecoratedManageChapter['branchRole'] = isEntry
+                ? 'entry'
+                : outgoingChoiceCount > 0
+                    ? 'hub'
+                    : incomingChoiceCount > 0
+                        ? 'target'
+                        : 'unlinked';
+
+            return {
+                ...chapter,
+                isEntry,
+                incomingChoiceCount,
+                outgoingChoiceCount,
+                branchRole,
+            };
+        });
+    }, [chapters, chapterLinks, effectiveEntryChapterId, isBranchingStory]);
+    const branchingSections = useMemo(() => {
+        if (!isBranchingStory) return [];
+
+        const sectionMap: Array<{
+            key: DecoratedManageChapter['branchRole'];
+            title: string;
+            description: string;
+            chapters: DecoratedManageChapter[];
+        }> = [
+            {
+                key: 'entry',
+                title: 'ตอนจุดเริ่มต้น',
+                description: 'จุดเริ่มอ่านหลักของเรื่อง',
+                chapters: decoratedChapters.filter((chapter) => chapter.isEntry),
+            },
+            {
+                key: 'hub',
+                title: 'ตอนที่มีทางเลือก',
+                description: 'ตอนที่ผู้อ่านต้องตัดสินใจ',
+                chapters: decoratedChapters.filter((chapter) => !chapter.isEntry && chapter.outgoingChoiceCount > 0),
+            },
+            {
+                key: 'target',
+                title: 'ตอนปลายทาง',
+                description: 'ตอนที่ถูกพามาจากทางเลือก',
+                chapters: decoratedChapters.filter((chapter) => !chapter.isEntry && chapter.outgoingChoiceCount === 0 && chapter.incomingChoiceCount > 0),
+            },
+            {
+                key: 'unlinked',
+                title: 'ตอนยังไม่เชื่อม',
+                description: 'ตอนที่ยังไม่ถูกใช้ใน flow',
+                chapters: decoratedChapters.filter((chapter) => !chapter.isEntry && chapter.outgoingChoiceCount === 0 && chapter.incomingChoiceCount === 0),
+            },
+        ];
+
+        return sectionMap.filter((section) => section.chapters.length > 0);
+    }, [decoratedChapters, isBranchingStory]);
+
+    const saveManageScrollPosition = useCallback(() => {
+        if (typeof window === 'undefined') return;
+        sessionStorage.setItem(manageScrollKey, String(window.scrollY));
+    }, [manageScrollKey]);
+
+    useEffect(() => {
+        if (!isMounted) return;
+
+        const handlePageHide = () => {
+            saveManageScrollPosition();
+        };
+
+        window.addEventListener('pagehide', handlePageHide);
+        return () => window.removeEventListener('pagehide', handlePageHide);
+    }, [isMounted, saveManageScrollPosition]);
+
+    useEffect(() => {
+        if (!canRestoreManageScroll || hasRestoredScrollRef.current) return;
+
+        const rawScroll = sessionStorage.getItem(manageScrollKey);
+        hasRestoredScrollRef.current = true;
+
+        if (!rawScroll) return;
+
+        const scrollTop = Number(rawScroll);
+        sessionStorage.removeItem(manageScrollKey);
+
+        if (!Number.isFinite(scrollTop) || scrollTop <= 0) return;
+
+        let cancelled = false;
+        window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+                if (cancelled) return;
+                window.scrollTo({ top: scrollTop, behavior: 'auto' });
+            });
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [canRestoreManageScroll, manageScrollKey]);
+
+    const buildChapterEditorUrl = useCallback((chapterId: string) => {
+        const query = new URLSearchParams({
+            style: editorStyle,
+            pathMode: story?.pathMode || 'linear',
+        });
+        return `/story/manage/${storyId}/chapter/${chapterId}/edit?${query.toString()}`;
+    }, [editorStyle, story?.pathMode, storyId]);
 
     const handleDragEnd = async (result: DropResult) => {
         if (!result.destination) return;
@@ -324,6 +540,13 @@ export default function StoryManagerPage() {
                 setDeleteConfirm(prev => ({ ...prev, isOpen: false }));
                 // Optimistic update
                 setChapters(prev => prev.filter(c => c.id !== id));
+                setChapterLinks((prev) => prev.filter((link) => link.fromChapterId !== id && link.toChapterId !== id));
+                setStoryData((prev) => prev ? {
+                    ...prev,
+                    entryChapterId: prev.entryChapterId === id
+                        ? (chapters.find((chapter) => chapter.id !== id)?.id || null)
+                        : prev.entryChapterId,
+                } : null);
 
                 if (isFromDB) {
                     const { error } = await supabase
@@ -375,7 +598,8 @@ export default function StoryManagerPage() {
             if (error) throw error;
 
             // 2. Redirect to the editor page for this new chapter
-            router.push(`/story/manage/${storyId}/chapter/${data.id}/edit?style=${editorStyle}`);
+            saveManageScrollPosition();
+            router.push(buildChapterEditorUrl(data.id));
 
         } catch (err) {
             console.error("Error creating chapter:", err);
@@ -384,7 +608,8 @@ export default function StoryManagerPage() {
     };
 
     const handleEditChapter = (chapterId: string) => {
-        router.push(`/story/manage/${storyId}/chapter/${chapterId}/edit?style=${editorStyle}`);
+        saveManageScrollPosition();
+        router.push(buildChapterEditorUrl(chapterId));
     };
 
     const handleQuickStoryStatusUpdate = async (
@@ -452,9 +677,12 @@ export default function StoryManagerPage() {
             category: story.category,
             mainCategory: story.mainCategory || '',
             subCategory: story.subCategory || '',
+            pathMode: story.pathMode,
             coverUrl: story.coverImage,
+            coverWideUrl: story.coverWideImage,
         });
         setEditCoverFile(null);
+        setEditCoverWideFile(null);
         setShowEditModal(true);
     };
 
@@ -473,11 +701,82 @@ export default function StoryManagerPage() {
         }
     };
 
+    const handleWideCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setEditCoverWideFile(file);
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const result = event.target?.result;
+                if (typeof result === 'string') {
+                    setEditForm((prev) => ({ ...prev, coverWideUrl: result }));
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleSearchUnsplash = async (rawQuery?: string) => {
+        const query = (rawQuery ?? unsplashQuery).trim();
+        if (!query) {
+            setUnsplashResults([]);
+            setUnsplashError(null);
+            return;
+        }
+
+        setIsUnsplashLoading(true);
+        setUnsplashError(null);
+
+        try {
+            const response = await fetch(`/api/unsplash/search?q=${encodeURIComponent(query)}&perPage=18`);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data?.error || 'ค้นหารูปไม่สำเร็จ');
+            }
+
+            setUnsplashResults((data.results || []) as UnsplashImage[]);
+        } catch (error) {
+            console.error('Unsplash search failed:', error);
+            setUnsplashError('ค้นหารูปไม่สำเร็จ ลองใหม่อีกครั้ง');
+        } finally {
+            setIsUnsplashLoading(false);
+        }
+    };
+
+    const openUnsplashPicker = (target: UnsplashTarget) => {
+        setUnsplashTarget(target);
+        setShowUnsplashModal(true);
+        setUnsplashError(null);
+        if (!unsplashQuery) {
+            const defaultQuery =
+                target === 'wide'
+                    ? 'cinematic anime landscape'
+                    : 'novel cover art portrait';
+            setUnsplashQuery(defaultQuery);
+            handleSearchUnsplash(defaultQuery);
+        } else if (unsplashResults.length === 0) {
+            handleSearchUnsplash(unsplashQuery);
+        }
+    };
+
+    const handleSelectUnsplashCover = (image: UnsplashImage) => {
+        if (unsplashTarget === 'wide') {
+            setEditForm((prev) => ({ ...prev, coverWideUrl: image.regular }));
+            setEditCoverWideFile(null);
+        } else {
+            setEditForm((prev) => ({ ...prev, coverUrl: image.regular }));
+            setEditCoverFile(null);
+        }
+        setShowUnsplashModal(false);
+    };
+
     const handleSaveEdit = async () => {
         if (!isFromDB || !story) return;
         setIsSaving(true);
         try {
             let finalCoverUrl = editForm.coverUrl;
+            let finalCoverWideUrl = editForm.coverWideUrl;
 
             // 1. Upload new cover if changed
             if (editCoverFile) {
@@ -505,6 +804,30 @@ export default function StoryManagerPage() {
                 }
             }
 
+            if (editCoverWideFile) {
+                const fileExt = editCoverWideFile.name.split('.').pop();
+                const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}_wide.${fileExt}`;
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('covers')
+                    .upload(fileName, editCoverWideFile);
+
+                if (uploadError) {
+                    throw uploadError;
+                }
+
+                const { data: urlData } = supabase.storage
+                    .from('covers')
+                    .getPublicUrl(uploadData.path);
+                finalCoverWideUrl = urlData.publicUrl;
+
+                if (story.coverWideImage) {
+                    const oldPath = story.coverWideImage.split('/covers/')[1];
+                    if (oldPath) {
+                        await supabase.storage.from('covers').remove([oldPath]);
+                    }
+                }
+            }
+
             // 3. Update DB
             const { error } = await supabase
                 .from('stories')
@@ -515,7 +838,12 @@ export default function StoryManagerPage() {
                     category: editForm.category,
                     main_category: editForm.mainCategory || null,
                     sub_category: editForm.subCategory || null,
+                    path_mode: BRANCHING_FEATURE_ENABLED ? editForm.pathMode : 'linear',
+                    entry_chapter_id: BRANCHING_FEATURE_ENABLED && editForm.pathMode === 'branching'
+                        ? (story.entryChapterId || chapters[0]?.id || null)
+                        : null,
                     cover_url: finalCoverUrl,
+                    cover_wide_url: finalCoverWideUrl,
                 })
                 .eq('id', storyId);
 
@@ -533,7 +861,12 @@ export default function StoryManagerPage() {
                 category: editForm.category,
                 mainCategory: editForm.mainCategory,
                 subCategory: editForm.subCategory,
+                pathMode: BRANCHING_FEATURE_ENABLED ? editForm.pathMode : 'linear',
+                entryChapterId: BRANCHING_FEATURE_ENABLED && editForm.pathMode === 'branching'
+                    ? (prev.entryChapterId || chapters[0]?.id || null)
+                    : null,
                 coverImage: finalCoverUrl,
+                coverWideImage: finalCoverWideUrl,
             } : null);
             setShowEditModal(false);
         } catch (err) {
@@ -752,6 +1085,16 @@ export default function StoryManagerPage() {
     if (!isMounted || isLoading) {
         return (null);
     }
+    if (authError) return (
+        <main className={styles.main}>
+            <header className={styles.header}>
+            </header>
+            <div className={styles.content} style={{ textAlign: 'center', padding: '4rem 2rem', color: '#64748b' }}>
+                <h2>ไม่มีสิทธิ์เข้าถึง</h2>
+                <p>คุณไม่สามารถจัดการเรื่องนี้ได้ เนื่องจากคุณไม่ใช่เจ้าของเรื่อง</p>
+            </div>
+        </main>
+    );
     if (!story) return (
         <main className={styles.main}>
             <header className={styles.header}>
@@ -774,8 +1117,8 @@ export default function StoryManagerPage() {
 
             {/* Hero Banner */}
             <div className={styles.heroBanner}>
-                {story.coverImage && (
-                    <img src={story.coverImage} alt="Cover Background" className={styles.heroBg} />
+                {(story.coverWideImage || story.coverImage) && (
+                    <img src={story.coverWideImage || story.coverImage || ''} alt="Cover Background" className={styles.heroBg} />
                 )}
                 <div className={styles.heroOverlay}>
                     <div className={styles.heroContent}>
@@ -807,6 +1150,7 @@ export default function StoryManagerPage() {
                                 <span className={styles.tagPill}>{story.category === 'fanfic' ? 'แฟนฟิค' : 'ออริจินัล'}</span>
                                 <span className={styles.tagPill}>{story.status === 'published' ? '📢 เผยแพร่แล้ว' : '📄 แบบร่าง'}</span>
                                 <span className={styles.tagPill}>{story.completionStatus === 'completed' ? '✅ จบแล้ว' : '📝 ยังไม่จบ'}</span>
+                                <span className={styles.tagPill}>{isBranchingStory ? '🎯 ทางเลือกในตอน' : '➡️ Linear'}</span>
                                 <span className={styles.tagPill}>👁️ {story.readCount >= 1000 ? `${(story.readCount / 1000).toFixed(1)}K` : story.readCount} Views</span>
                                 <span className={styles.tagPill}>❤️ {story.heartCount} Loves</span>
                             </div>
@@ -945,6 +1289,48 @@ export default function StoryManagerPage() {
                     </p>
                 )}
 
+                {isBranchingStory && decoratedChapters.length > 0 && (
+                    <div className={styles.branchOverviewGrid}>
+                        {branchingSections.map((section) => (
+                            <section
+                                key={section.key}
+                                className={`${styles.branchOverviewCard} ${styles[`branchOverviewCard${section.key[0].toUpperCase()}${section.key.slice(1)}`]}`}
+                            >
+                                <div className={styles.branchOverviewHeader}>
+                                    <div>
+                                        <h3 className={styles.branchOverviewTitle}>{section.title}</h3>
+                                        <p className={styles.branchOverviewSubtitle}>{section.description}</p>
+                                    </div>
+                                    <span className={styles.branchOverviewCount}>{section.chapters.length}</span>
+                                </div>
+                                <div className={styles.branchOverviewList}>
+                                    {section.chapters.map((chapter) => (
+                                        <button
+                                            key={chapter.id}
+                                            type="button"
+                                            className={styles.branchOverviewItem}
+                                            onClick={() => handleEditChapter(chapter.id)}
+                                        >
+                                            <span className={styles.branchOverviewItemTitle}>
+                                                ตอน {String(chapters.findIndex((item) => item.id === chapter.id) + 1).padStart(2, '0')} · {chapter.title}
+                                            </span>
+                                            <span className={styles.branchOverviewItemMeta}>
+                                                {chapter.outgoingChoiceCount > 0
+                                                    ? `${chapter.outgoingChoiceCount} ทางเลือก`
+                                                    : chapter.incomingChoiceCount > 0
+                                                        ? `ถูกชี้เข้า ${chapter.incomingChoiceCount} เส้นทาง`
+                                                        : chapter.isEntry
+                                                            ? 'ตอนเริ่มต้น'
+                                                            : 'ยังไม่เชื่อม'}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </section>
+                        ))}
+                    </div>
+                )}
+
                 {story.chapters.length > 0 ? (
                     <DragDropContext onDragEnd={handleDragEnd}>
                         <Droppable droppableId="chapters-list">
@@ -954,7 +1340,7 @@ export default function StoryManagerPage() {
                                     {...provided.droppableProps}
                                     ref={provided.innerRef}
                                 >
-                                    {story.chapters.map((chapter, index) => (
+                                    {decoratedChapters.map((chapter, index) => (
                                         <Draggable key={chapter.id} draggableId={chapter.id} index={index}>
                                             {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
                                                 <div
@@ -994,6 +1380,30 @@ export default function StoryManagerPage() {
                                                                     </span>
                                                                 )}
                                                             </div>
+                                                            {isBranchingStory && (
+                                                                <div className={styles.chapterFlowMeta}>
+                                                                    {chapter.isEntry && (
+                                                                        <span className={`${styles.chapterFlowPill} ${styles.chapterFlowPillEntry}`}>
+                                                                            จุดเริ่มต้น
+                                                                        </span>
+                                                                    )}
+                                                                    {chapter.outgoingChoiceCount > 0 && (
+                                                                        <span className={`${styles.chapterFlowPill} ${styles.chapterFlowPillHub}`}>
+                                                                            {chapter.outgoingChoiceCount} ทางเลือก
+                                                                        </span>
+                                                                    )}
+                                                                    {chapter.incomingChoiceCount > 0 && (
+                                                                        <span className={`${styles.chapterFlowPill} ${styles.chapterFlowPillTarget}`}>
+                                                                            ปลายทาง {chapter.incomingChoiceCount} เส้น
+                                                                        </span>
+                                                                    )}
+                                                                    {!chapter.isEntry && chapter.incomingChoiceCount === 0 && chapter.outgoingChoiceCount === 0 && (
+                                                                        <span className={`${styles.chapterFlowPill} ${styles.chapterFlowPillUnlinked}`}>
+                                                                            ยังไม่เชื่อมใน flow
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                     <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -1052,27 +1462,131 @@ export default function StoryManagerPage() {
                         </div>
 
                         <div className={styles.modalBody}>
-                            <div className={styles.editCoverContainer}>
-                                <label className={styles.editCoverUpload}>
-                                    {editForm.coverUrl ? (
-                                        <img src={editForm.coverUrl} alt="Cover Preview" className={styles.editCoverPreview} />
-                                    ) : (
-                                        <div className={styles.editCoverPlaceholder}>
-                                            <ImageIcon size={32} />
-                                            <span>อัปโหลดรูปภาพ</span>
+                            <div className={styles.editHeroCoverPreview}>
+                                <div
+                                    className={styles.editHeroBackdrop}
+                                    style={
+                                        editForm.coverWideUrl || editForm.coverUrl
+                                            ? { backgroundImage: `url(${editForm.coverWideUrl || editForm.coverUrl})` }
+                                            : {}
+                                    }
+                                >
+                                    <div className={styles.editHeroShade} />
+                                    <div className={styles.editHeroContent}>
+                                        <div className={styles.editHeroPoster}>
+                                            {editForm.coverUrl ? (
+                                                <div
+                                                    className={styles.editHeroPosterImage}
+                                                    style={{ backgroundImage: `url(${editForm.coverUrl})` }}
+                                                    role="img"
+                                                    aria-label="Cover preview"
+                                                />
+                                            ) : (
+                                                <div className={styles.editHeroPosterEmpty}>COVER</div>
+                                            )}
                                         </div>
-                                    )}
-                                    <div className={styles.editCoverOverlay}>
-                                        <Upload size={24} />
-                                        <span>เปลี่ยนรูปปก</span>
+                                        <div className={styles.editHeroText}>
+                                            <h3>{editForm.title.trim() || 'ตัวอย่างชื่อเรื่อง'}</h3>
+                                            <p>{editForm.penName.trim() || 'นามปากกา'}</p>
+                                        </div>
                                     </div>
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        style={{ display: 'none' }}
-                                        onChange={handleCoverChange}
-                                    />
-                                </label>
+                                </div>
+                            </div>
+
+                            <div className={styles.editField}>
+                                <label>รูปภาพปก (800x800 px)</label>
+                                <div className={styles.editCoverContainer}>
+                                    <label className={styles.editCoverUpload}>
+                                        {editForm.coverUrl ? (
+                                            <img src={editForm.coverUrl} alt="Cover Preview" className={styles.editCoverPreview} />
+                                        ) : (
+                                            <div className={styles.editCoverPlaceholder}>
+                                                <ImageIcon size={32} />
+                                                <span>อัปโหลดรูปภาพ</span>
+                                            </div>
+                                        )}
+                                        <div className={styles.editCoverOverlay}>
+                                            <Upload size={24} />
+                                            <span>เปลี่ยนรูปปก</span>
+                                        </div>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            style={{ display: 'none' }}
+                                            onChange={handleCoverChange}
+                                        />
+                                    </label>
+                                </div>
+                                <div className={styles.coverActionRow}>
+                                    <button
+                                        type="button"
+                                        className={styles.unsplashPickerBtn}
+                                        onClick={() => openUnsplashPicker('cover')}
+                                    >
+                                        <Search size={15} />
+                                        เลือกรูปจาก Unsplash
+                                    </button>
+                                    {editForm.coverUrl && (
+                                        <button
+                                            type="button"
+                                            className={styles.clearCoverBtn}
+                                            onClick={() => {
+                                                setEditForm((prev) => ({ ...prev, coverUrl: null }));
+                                                setEditCoverFile(null);
+                                            }}
+                                        >
+                                            ลบรูปปก
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className={styles.editField}>
+                                <label>รูปภาพปกแนวกว้างสำหรับหน้าแรก (แนะนำ 1600x900)</label>
+                                <div className={styles.editCoverContainer}>
+                                    <label className={styles.editWideCoverUpload}>
+                                        {editForm.coverWideUrl ? (
+                                            <img src={editForm.coverWideUrl} alt="Wide Cover Preview" className={styles.editCoverPreview} />
+                                        ) : (
+                                            <div className={styles.editCoverPlaceholder}>
+                                                <ImageIcon size={28} />
+                                                <span>อัปโหลดภาพแนวกว้าง</span>
+                                            </div>
+                                        )}
+                                        <div className={styles.editCoverOverlay}>
+                                            <Upload size={22} />
+                                            <span>เปลี่ยนภาพกว้าง</span>
+                                        </div>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            style={{ display: 'none' }}
+                                            onChange={handleWideCoverChange}
+                                        />
+                                    </label>
+                                </div>
+                                <div className={styles.coverActionRow}>
+                                    <button
+                                        type="button"
+                                        className={styles.unsplashPickerBtn}
+                                        onClick={() => openUnsplashPicker('wide')}
+                                    >
+                                        <Search size={15} />
+                                        เลือกภาพแนวกว้างจาก Unsplash
+                                    </button>
+                                    {editForm.coverWideUrl && (
+                                        <button
+                                            type="button"
+                                            className={styles.clearCoverBtn}
+                                            onClick={() => {
+                                                setEditForm((prev) => ({ ...prev, coverWideUrl: null }));
+                                                setEditCoverWideFile(null);
+                                            }}
+                                        >
+                                            ลบรูปปกแนวกว้าง
+                                        </button>
+                                    )}
+                                </div>
                             </div>
 
                             <div className={styles.editField}>
@@ -1114,6 +1628,28 @@ export default function StoryManagerPage() {
                                     </button>
                                 </div>
                             </div>
+
+                            {BRANCHING_FEATURE_ENABLED && (
+                                <div className={styles.editField}>
+                                    <label>รูปแบบการเล่าเรื่อง</label>
+                                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                        <button
+                                            type="button"
+                                            className={`${styles.editCategoryBtn} ${editForm.pathMode === 'branching' ? styles.editCategoryActive : ''}`}
+                                            onClick={() => setEditForm(f => ({ ...f, pathMode: 'branching' }))}
+                                        >
+                                            เส้นทางแตกแขนงข้ามตอน
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`${styles.editCategoryBtn} ${editForm.pathMode === 'linear' ? styles.editCategoryActive : ''}`}
+                                            onClick={() => setEditForm(f => ({ ...f, pathMode: 'linear' }))}
+                                        >
+                                            เส้นเดียวตามลำดับตอน
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
                             <div className={styles.editField}>
                                 <label>หมวดหมู่หลัก <span style={{ color: '#ef4444' }}>*</span></label>
@@ -1182,6 +1718,76 @@ export default function StoryManagerPage() {
                                 ⚠️ นี่คือข้อมูลตัวอย่าง (Demo) ไม่สามารถแก้ไขได้
                             </p>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {showUnsplashModal && (
+                <div className={styles.modalOverlay} onClick={() => setShowUnsplashModal(false)}>
+                    <div className={`${styles.modal} ${styles.unsplashModal}`} onClick={(e) => e.stopPropagation()}>
+                        <div className={styles.modalHeader}>
+                            <h2 className={styles.modalTitle}>
+                                {unsplashTarget === 'wide' ? 'เลือกภาพปกแนวกว้างจาก Unsplash' : 'เลือกรูปปกจาก Unsplash'}
+                            </h2>
+                            <button className={styles.iconBtn} onClick={() => setShowUnsplashModal(false)}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className={styles.modalBody}>
+                            <div className={styles.unsplashSearchRow}>
+                                <input
+                                    type="text"
+                                    value={unsplashQuery}
+                                    onChange={(e) => setUnsplashQuery(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleSearchUnsplash();
+                                        }
+                                    }}
+                                    className={styles.unsplashSearchInput}
+                                    placeholder={
+                                        unsplashTarget === 'wide'
+                                            ? 'เช่น cinematic anime landscape, fantasy sky'
+                                            : 'เช่น fantasy book cover, mystery, anime portrait'
+                                    }
+                                />
+                                <button
+                                    type="button"
+                                    className={styles.unsplashSearchBtn}
+                                    onClick={() => handleSearchUnsplash()}
+                                    disabled={isUnsplashLoading || !unsplashQuery.trim()}
+                                >
+                                    {isUnsplashLoading ? <Loader2 size={16} className={styles.spinner} /> : 'ค้นหา'}
+                                </button>
+                            </div>
+
+                            {unsplashError && (
+                                <div className={styles.unsplashError}>{unsplashError}</div>
+                            )}
+
+                            {!isUnsplashLoading && !unsplashError && unsplashResults.length === 0 && (
+                                <div className={styles.unsplashEmpty}>ยังไม่พบรูป ลองค้นหาคำอื่น</div>
+                            )}
+
+                            <div className={styles.unsplashGrid}>
+                                {unsplashResults.map((image) => (
+                                    <button
+                                        key={image.id}
+                                        type="button"
+                                        className={styles.unsplashCard}
+                                        onClick={() => handleSelectUnsplashCover(image)}
+                                    >
+                                        <img
+                                            src={image.thumb}
+                                            alt={image.alt}
+                                            className={`${styles.unsplashThumb} ${unsplashTarget === 'wide' ? styles.unsplashThumbWide : ''}`}
+                                        />
+                                        <span className={styles.unsplashCredit}>by {image.author}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}

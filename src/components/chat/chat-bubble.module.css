@@ -36,7 +36,8 @@
 .bubbleContainer {
     display: flex;
     flex-direction: column;
-    max-width: 65%;
+    max-width: 74%;
+    min-width: 0;
 }
 
 .playerContainer {
@@ -83,6 +84,7 @@
 
 .text {
     white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
 .emotionTag {
@@ -109,6 +111,12 @@
     border-radius: 9999px;
     border: 1px solid #e2e8f0;
     letter-spacing: 0.02em;
+}
+
+@media (max-width: 640px) {
+    .bubbleContainer {
+        max-width: 82%;
+    }
 }
 
 /* =========================================

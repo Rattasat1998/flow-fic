@@ -262,6 +262,116 @@
     color: var(--primary);
 }
 
+.heroCoverPreview {
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid #dbe4ee;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.1);
+}
+
+.heroCoverBackdrop {
+    position: relative;
+    width: 100%;
+    min-height: 220px;
+    background:
+        radial-gradient(800px 360px at 70% 20%, rgba(14, 165, 233, 0.2), transparent 60%),
+        linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    background-size: cover;
+    background-position: center;
+}
+
+.heroCoverOverlay {
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(180deg, rgba(15, 23, 42, 0.1) 0%, rgba(15, 23, 42, 0.8) 100%),
+        linear-gradient(90deg, rgba(15, 23, 42, 0.74) 0%, rgba(15, 23, 42, 0.35) 58%, rgba(15, 23, 42, 0.12) 100%);
+}
+
+.heroCoverContent {
+    position: relative;
+    z-index: 2;
+    min-height: 220px;
+    display: flex;
+    align-items: flex-end;
+    gap: 1rem;
+    padding: 1rem;
+}
+
+.heroCoverPoster {
+    width: 108px;
+    min-width: 108px;
+    aspect-ratio: 3 / 4;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(148, 163, 184, 0.45);
+    background: rgba(15, 23, 42, 0.7);
+}
+
+.heroCoverPosterImg {
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.heroCoverPosterEmpty {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    font-weight: 800;
+}
+
+.heroCoverText {
+    padding-bottom: 0.15rem;
+}
+
+.heroCoverText h3 {
+    margin: 0;
+    color: #f8fafc;
+    font-size: 1.55rem;
+    line-height: 1.15;
+    font-weight: 800;
+    text-shadow: 0 1px 6px rgba(15, 23, 42, 0.4);
+}
+
+.heroCoverText p {
+    margin: 0.42rem 0 0;
+    color: #cbd5e1;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.wideCoverUpload {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: min(100%, 420px);
+    aspect-ratio: 16 / 9;
+    background-color: #f8fafc;
+    border: 2px dashed #cbd5e1;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #64748b;
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+    position: relative;
+}
+
+.wideCoverUpload:hover {
+    background-color: #f1f5f9;
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
 .coverActions {
     display: flex;
     align-items: center;
@@ -459,6 +569,10 @@
     display: block;
 }
 
+.unsplashThumbWide {
+    aspect-ratio: 16 / 9;
+}
+
 .unsplashCredit {
     display: block;
     font-size: 0.7rem;
@@ -470,6 +584,24 @@
 }
 
 @media (max-width: 768px) {
+    .heroCoverBackdrop,
+    .heroCoverContent {
+        min-height: 190px;
+    }
+
+    .heroCoverPoster {
+        width: 92px;
+        min-width: 92px;
+    }
+
+    .heroCoverText h3 {
+        font-size: 1.15rem;
+    }
+
+    .heroCoverText p {
+        font-size: 0.82rem;
+    }
+
     .unsplashGrid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }

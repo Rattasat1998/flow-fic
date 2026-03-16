@@ -3,28 +3,24 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-    ArrowLeft,
     FileEdit,
     MessageCircle,
-    Paintbrush,
-    MessageSquareMore,
     Layers,
     AlignJustify
 } from 'lucide-react';
 import styles from './selection.module.css';
 
+type CreateWritingStyle = 'narrative' | 'chat';
+type CreateStoryFormat = 'multi' | 'single';
+
 export default function CreateSelectionPage() {
     const router = useRouter();
-    const [style, setStyle] = useState('narrative'); // 'narrative', 'chat', 'cartoon', 'thread'
-    const [format, setFormat] = useState('multi'); // 'multi', 'single'
+    const [style, setStyle] = useState<CreateWritingStyle>('narrative');
+    const [format, setFormat] = useState<CreateStoryFormat>('multi');
 
     const handleNext = () => {
-        if (style === 'cartoon') {
-            router.push('/story/create/comic');
-        } else {
-            // Include format and style in the query for the text editor
-            router.push(`/story/create/text?style=${style}&format=${format}`);
-        }
+        // Include format and style in the query for the text editor
+        router.push(`/story/create/text?style=${style}&format=${format}`);
     };
 
     return (
@@ -55,22 +51,6 @@ export default function CreateSelectionPage() {
                         >
                             <MessageCircle size={24} className={styles.icon} />
                             <span className={styles.label}>แชท</span>
-                        </button>
-
-                        <button
-                            className={`${styles.optionBtn} ${style === 'cartoon' ? styles.activeOption : ''}`}
-                            onClick={() => setStyle('cartoon')}
-                        >
-                            <Paintbrush size={24} className={styles.icon} />
-                            <span className={styles.label}>การ์ตูน / ภาพประกอบ</span>
-                        </button>
-
-                        <button
-                            className={`${styles.optionBtn} ${style === 'thread' ? styles.activeOption : ''}`}
-                            onClick={() => setStyle('thread')}
-                        >
-                            <MessageSquareMore size={24} className={styles.icon} />
-                            <span className={styles.label}>กระทู้</span>
                         </button>
                     </div>
                 </div>

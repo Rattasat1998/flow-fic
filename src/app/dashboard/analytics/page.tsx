@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { BarChart3, ArrowLeft, RefreshCw, TrendingUp, Users, Activity, Eye, Zap } from 'lucide-react';
+import { BarChart3, ArrowLeft, RefreshCw, TrendingUp, Activity, Eye, Zap } from 'lucide-react';
 import styles from './analytics.module.css';
 
 // ─── Types ──────────────────────────────────────
@@ -67,6 +67,7 @@ const FUNNEL_LABELS: Record<string, string> = {
     page_view: '🏠 หน้าหลัก',
     story_view: '📖 ดูรายละเอียดเรื่อง',
     chapter_read: '📚 อ่านบท',
+    choice_select: '🧭 เลือกเส้นทาง',
     pricing_view: '💰 หน้าราคา',
     chapter_unlock: '🔓 ปลดล็อกบท',
 };
@@ -141,8 +142,6 @@ export default function AnalyticsDashboard() {
     }
 
     const maxEventCount = Math.max(...(data.eventBreakdown.map(e => e.event_count)), 1);
-    const funnelMax = Math.max(...data.funnel.map(f => f.count), 1);
-
     return (
         <main className={styles.main}>
             {/* Header */}

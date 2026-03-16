@@ -31,17 +31,28 @@ function timeAgo(iso: string): string {
 }
 
 export default function NotificationsPage() {
-    const { user, session, isLoading: isAuthLoading } = useAuth();
+    const { user, isLoading: isAuthLoading } = useAuth();
+    const userId = user?.id ?? null;
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
 
+    const getAccessToken = useCallback(async () => {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) {
+            console.error('[Notifications] Session error:', error);
+            return null;
+        }
+        return data.session?.access_token || null;
+    }, []);
+
     const fetchNotifications = useCallback(async () => {
-        if (!session?.access_token) return;
+        const accessToken = await getAccessToken();
+        if (!accessToken) return;
         setIsLoading(true);
         try {
             const res = await fetch('/api/notifications?limit=50', {
-                headers: { Authorization: `Bearer ${session.access_token}` },
+                headers: { Authorization: `Bearer ${accessToken}` },
             });
             if (!res.ok) throw new Error('Failed to fetch');
             const data = await res.json();
@@ -52,15 +63,16 @@ export default function NotificationsPage() {
         } finally {
             setIsLoading(false);
         }
-    }, [session?.access_token]);
+    }, [getAccessToken]);
 
     useEffect(() => {
-        if (!isAuthLoading && session) fetchNotifications();
-        else if (!isAuthLoading && !session) setIsLoading(false);
-    }, [isAuthLoading, session, fetchNotifications]);
+        if (!isAuthLoading && userId) void fetchNotifications();
+        else if (!isAuthLoading && !userId) setIsLoading(false);
+    }, [isAuthLoading, userId, fetchNotifications]);
 
     const markAsRead = async (id: string) => {
-        if (!session?.access_token) return;
+        const accessToken = await getAccessToken();
+        if (!accessToken) return;
 
         // Optimistic update
         setNotifications(prev =>
@@ -73,7 +85,7 @@ export default function NotificationsPage() {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${session.access_token}`,
+                    Authorization: `Bearer ${accessToken}`,
                 },
                 body: JSON.stringify({ notificationId: id }),
             });
@@ -83,7 +95,8 @@ export default function NotificationsPage() {
     };
 
     const markAllRead = async () => {
-        if (!session?.access_token) return;
+        const accessToken = await getAccessToken();
+        if (!accessToken) return;
 
         setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
         setUnreadCount(0);
@@ -93,7 +106,7 @@ export default function NotificationsPage() {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${session.access_token}`,
+                    Authorization: `Bearer ${accessToken}`,
                 },
                 body: JSON.stringify({ markAll: true }),
             });

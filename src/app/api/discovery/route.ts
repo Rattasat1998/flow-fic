@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import type {
   DiscoveryCompletionFilter,
   DiscoveryLengthFilter,
   DiscoveryRailKey,
   DiscoveryResponse,
   DiscoveryStory,
+  DiscoverySubCategoryFilter,
 } from '@/types/discovery';
 
 const VALID_COMPLETIONS = new Set<DiscoveryCompletionFilter>(['all', 'ongoing', 'completed']);
@@ -16,6 +18,11 @@ function parseQuery(raw: string | null): string {
 }
 
 function parseCategory(raw: string | null): string {
+  const value = (raw || 'all').trim();
+  return value.length > 0 ? value : 'all';
+}
+
+function parseSubCategory(raw: string | null): DiscoverySubCategoryFilter {
   const value = (raw || 'all').trim();
   return value.length > 0 ? value : 'all';
 }
@@ -36,6 +43,13 @@ function parseLimit(raw: string | null): number {
   return Math.max(1, Math.min(24, Math.floor(parsed)));
 }
 
+function parseFocusCore(raw: string | null): boolean {
+  const normalized = (raw || '').trim().toLowerCase();
+  if (normalized === 'false' || normalized === '0') return false;
+  if (normalized === 'true' || normalized === '1') return true;
+  return true;
+}
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === 'string') return error;
@@ -47,8 +61,11 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const q = parseQuery(url.searchParams.get('q'));
     const category = parseCategory(url.searchParams.get('category'));
+    const subCategory = parseSubCategory(url.searchParams.get('subCategory'));
     const completion = parseCompletion(url.searchParams.get('completion'));
     const length = parseLength(url.searchParams.get('length'));
+    const requestedFocusCore = parseFocusCore(url.searchParams.get('focusCore'));
+    const focusCore = FEATURE_FLAGS.discoveryCoreFocus ? requestedFocusCore : false;
     const limit = parseLimit(url.searchParams.get('limit'));
 
     const admin = getSupabaseAdmin();
@@ -60,8 +77,10 @@ export async function GET(request: NextRequest) {
           p_rail: rail,
           p_q: q || null,
           p_category: category,
+          p_sub_category: subCategory,
           p_completion: completion,
           p_length: length,
+          p_focus_core: focusCore,
           p_limit: limit,
         });
 
@@ -86,7 +105,7 @@ export async function GET(request: NextRequest) {
     });
 
     const response: DiscoveryResponse = {
-      filters: { q, category, completion, length, limit },
+      filters: { q, category, subCategory, completion, length, focusCore, limit },
       rails,
       generatedAt: new Date().toISOString(),
     };

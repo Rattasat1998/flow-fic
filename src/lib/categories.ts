@@ -10,10 +10,14 @@ export type SubCategory = {
     mainCategoryId: string;
 };
 
+export const CORE_MAIN_CATEGORY_ID = 'mystery' as const;
+export const CORE_SUB_CATEGORY_IDS = ['mystery_horror', 'mystery_detective'] as const;
+export type CoreSubCategoryId = typeof CORE_SUB_CATEGORY_IDS[number];
+
 export const MAIN_CATEGORIES: MainCategory[] = [
+    { id: 'mystery', label: 'สืบสวน/ลึกลับ/สยองขวัญ' },
     { id: 'romance', label: 'นิยายรัก' },
     { id: 'fantasy', label: 'แฟนตาซี/Sci-Fi/ไลท์โนเวล' },
-    { id: 'mystery', label: 'สืบสวน/ลึกลับ/สยองขวัญ' },
     { id: 'social', label: 'สะท้อนสังคม/แนวกทางเลือก/เยาวชน' },
     { id: 'boy_love', label: 'Boy Love' },
     { id: 'girl_love', label: 'Girl Love' }
@@ -158,3 +162,17 @@ export const SUB_CATEGORIES: SubCategory[] = [
         mainCategoryId: 'girl_love'
     }
 ];
+
+export function getMainCategoryLabel(mainCategoryId: string | null | undefined): string {
+    if (!mainCategoryId) return '';
+    return MAIN_CATEGORIES.find((category) => category.id === mainCategoryId)?.label || mainCategoryId;
+}
+
+export function getSubCategoryLabel(subCategoryId: string | null | undefined): string {
+    if (!subCategoryId) return '';
+    return SUB_CATEGORIES.find((subcategory) => subcategory.id === subCategoryId)?.label || subCategoryId;
+}
+
+export function isCoreSubCategory(subCategoryId: string | null | undefined): subCategoryId is CoreSubCategoryId {
+    return !!subCategoryId && CORE_SUB_CATEGORY_IDS.includes(subCategoryId as CoreSubCategoryId);
+}

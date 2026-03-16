@@ -18,6 +18,7 @@ type CoinPaymentMethod = 'card' | 'promptpay';
 
 function PricingContent() {
     const { user } = useAuth();
+    const userId = user?.id ?? null;
     const searchParams = useSearchParams();
     useTracking({ autoPageView: true, pagePath: '/pricing' });
 
@@ -26,13 +27,14 @@ function PricingContent() {
     const [isLoadingEntitlement, setIsLoadingEntitlement] = useState(true);
     const [checkoutError, setCheckoutError] = useState<string | null>(null);
     const [isCheckoutLoading, setIsCheckoutLoading] = useState<string | null>(null);
+    const [checkoutDialogState, setCheckoutDialogState] = useState<'success' | 'failed' | null>(null);
 
     const checkoutStatus = searchParams.get('checkout');
 
     const fetchWalletData = useCallback(async () => {
         setIsLoadingEntitlement(true);
 
-        if (!user) {
+        if (!userId) {
             setCoinBalance(0);
             setVipEntitlement(null);
             setIsLoadingEntitlement(false);
@@ -47,12 +49,12 @@ function PricingContent() {
                 supabase
                     .from('wallets')
                     .select('coin_balance')
-                    .eq('user_id', user.id)
+                    .eq('user_id', userId)
                     .maybeSingle(),
                 supabase
                     .from('vip_entitlements')
                     .select('status, current_period_end')
-                    .eq('user_id', user.id)
+                    .eq('user_id', userId)
                     .maybeSingle(),
             ]);
 
@@ -66,12 +68,24 @@ function PricingContent() {
         } finally {
             setIsLoadingEntitlement(false);
         }
-    }, [user]);
+    }, [userId]);
 
     useEffect(() => {
         fetchWalletData();
         // Refresh after returning from Stripe checkout.
     }, [fetchWalletData, checkoutStatus]);
+
+    useEffect(() => {
+        if (checkoutStatus === 'success') {
+            setCheckoutDialogState('success');
+            return;
+        }
+        if (checkoutStatus === 'cancel' || checkoutError) {
+            setCheckoutDialogState('failed');
+            return;
+        }
+        setCheckoutDialogState(null);
+    }, [checkoutStatus, checkoutError]);
 
     const isVipActive = useMemo(() => {
         if (!vipEntitlement) return false;
@@ -284,15 +298,23 @@ function PricingContent() {
                     </div>
                 </section>
 
-                {(checkoutStatus === 'success' || checkoutStatus === 'cancel' || checkoutError) && (
-                    <section style={{ marginTop: '-1rem', textAlign: 'center', color: checkoutStatus === 'success' ? '#15803d' : '#b91c1c' }}>
-                        {checkoutStatus === 'success' && <p>ชำระเงินสำเร็จ ระบบกำลังอัปเดตสิทธิ์ของคุณ</p>}
-                        {checkoutStatus === 'cancel' && <p>คุณยกเลิกรายการชำระเงินแล้ว</p>}
-                        {checkoutError && <p>{checkoutError}</p>}
-                    </section>
-                )}
-
             </div>
+
+            {checkoutDialogState && (
+                <div className={styles.checkoutDialogBackdrop} role="dialog" aria-modal="true" aria-labelledby="checkout-dialog-title">
+                    <div className={styles.checkoutDialogCard}>
+                        <h3 id="checkout-dialog-title" className={styles.checkoutDialogTitle}>
+                            {checkoutDialogState === 'success' ? 'เติมเงินสำเร็จ' : 'เติมเงินไม่สำเร็จ'}
+                        </h3>
+                        <button
+                            className={styles.checkoutDialogButton}
+                            onClick={() => setCheckoutDialogState(null)}
+                        >
+                            ตกลง
+                        </button>
+                    </div>
+                </div>
+            )}
         </main>
     );
 }

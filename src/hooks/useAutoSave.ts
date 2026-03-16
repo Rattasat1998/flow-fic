@@ -19,6 +19,9 @@ export interface AutoSaveDraft {
     backgroundSound: string | null;
     isPremium: boolean;
     coinPrice: number;
+    chapterChoices?: unknown;
+    isEndingChapter?: boolean;
+    choiceTimerSeconds?: number;
     savedAt: string;        // ISO timestamp of auto-save
     serverSavedAt: string;  // lastSavedAt from server when editor loaded
 }
@@ -31,6 +34,9 @@ interface AutoSaveState {
     backgroundSound: string | null;
     isPremium: boolean;
     coinPrice: number;
+    chapterChoices?: unknown;
+    isEndingChapter?: boolean;
+    choiceTimerSeconds?: number;
 }
 
 interface UseAutoSaveOptions {
@@ -56,6 +62,8 @@ interface UseAutoSaveReturn {
     onEditorChange: (state: AutoSaveState) => void;
     /** Call this after a successful save to clear the draft */
     clearDraft: () => void;
+    /** Disable beforeunload warning permanently (call before intentional navigation) */
+    disableNavigationLock: () => void;
     /** Auto-save status indicator */
     autoSaveStatus: 'idle' | 'pending' | 'saved';
 }
@@ -73,6 +81,9 @@ function serializeState(state: AutoSaveState): string {
         backgroundSound: state.backgroundSound,
         isPremium: state.isPremium,
         coinPrice: state.coinPrice,
+        chapterChoices: state.chapterChoices,
+        isEndingChapter: state.isEndingChapter,
+        choiceTimerSeconds: state.choiceTimerSeconds,
     });
 }
 
@@ -85,6 +96,9 @@ function serializeDraft(draft: AutoSaveDraft): string {
         backgroundSound: draft.backgroundSound,
         isPremium: draft.isPremium,
         coinPrice: draft.coinPrice,
+        chapterChoices: draft.chapterChoices,
+        isEndingChapter: draft.isEndingChapter,
+        choiceTimerSeconds: draft.choiceTimerSeconds,
     });
 }
 
@@ -131,6 +145,7 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
     const baselineSignatureRef = useRef<string | null>(null);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isDirtyRef = useRef(false);
+    const navigationLockDisabledRef = useRef(false);
     const serverSavedAtRef = useRef(serverSavedAt);
     const hasCheckedRecovery = useRef(false);
     const recoveryCandidateRef = useRef<AutoSaveDraft | null>(null);
@@ -252,6 +267,7 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
     // ── beforeunload warning ──
     useEffect(() => {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (navigationLockDisabledRef.current) return;
             if (isDirtyRef.current) {
                 // Flush immediately before leaving
                 flushDraft();
@@ -268,6 +284,12 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
         };
     }, [flushDraft]);
 
+    const disableNavigationLock = useCallback(() => {
+        navigationLockDisabledRef.current = true;
+        isDirtyRef.current = false;
+        if (timerRef.current) clearTimeout(timerRef.current);
+    }, []);
+
     return {
         hasRecovery,
         recoveryDraft,
@@ -276,6 +298,7 @@ export function useAutoSave(options: UseAutoSaveOptions): UseAutoSaveReturn {
         dismissRecovery,
         onEditorChange,
         clearDraft,
+        disableNavigationLock,
         autoSaveStatus,
     };
 }

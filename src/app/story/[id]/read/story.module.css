@@ -192,8 +192,14 @@
   gap: 1rem;
 }
 
+.readerNavLeft {
+  min-width: 0;
+  flex: 1;
+}
+
 .readerNavRight {
   gap: 1.5rem;
+  flex-shrink: 0;
 }
 
 .readerNavHome {
@@ -216,6 +222,7 @@
   font-size: 1rem;
   font-weight: 500;
   color: #334155;
+  width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -264,15 +271,26 @@
 .readerAuthor {
   font-size: 1rem;
   color: #0f172a;
-  margin-bottom: 3rem;
+  margin-bottom: 1.2rem;
   text-align: center;
+}
+
+.readerWideCover {
+  width: 100%;
+  max-width: 760px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 14px;
+  margin-bottom: 1.4rem;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
 }
 
 .readerCover {
   max-width: 300px;
   width: 100%;
   border-radius: 8px;
-  margin-bottom: 3rem;
+  margin-bottom: 2.1rem;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 }
 
@@ -315,6 +333,89 @@
 .readerContent p {
   margin-bottom: 1.5rem;
   text-indent: 2rem;
+}
+
+.readerBlock {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.readerBlockAvatar,
+.readerBlockFallbackAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.readerBlockAvatar {
+  object-fit: cover;
+}
+
+.readerBlockFallbackAvatar {
+  background-color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.readerBlockTextWrapper {
+  flex: 1;
+  min-width: 0;
+  background-color: #f8fafc;
+  padding: 0.75rem 1rem;
+  border-radius: 0 12px 12px 12px;
+}
+
+.readerBlockCharName {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #3b82f6;
+  margin-bottom: 0.25rem;
+}
+
+.readerBlockParagraph,
+.readerPlainParagraph {
+  margin: 0 0 1rem;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.readerBlockParagraph {
+  margin: 0;
+  line-height: 1.6;
+  text-indent: 0;
+}
+
+.readerImageOnlyWrap {
+  margin-bottom: 1.2rem;
+  display: flex;
+  justify-content: center;
+}
+
+.readerBlockImage,
+.readerImageOnly {
+  width: 100%;
+  object-fit: contain;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+}
+
+.readerBlockImage {
+  max-width: 560px;
+  max-height: 460px;
+}
+
+.readerImageOnly {
+  max-width: 640px;
+  max-height: 500px;
+  border-radius: 12px;
 }
 
 /* Action Bar Container (White Theme adjustment) */
@@ -367,6 +468,35 @@
 
   .readerNavTitle {
     max-width: 150px;
+  }
+
+  .readerBlock {
+    gap: 0.75rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .readerNavbar {
+    padding: 0 0.75rem;
+  }
+
+  .readerNavRight {
+    gap: 0.5rem;
+  }
+
+  .readerNavTitle {
+    max-width: 120px;
+    font-size: 0.92rem;
+  }
+
+  .readerBlock {
+    flex-direction: column;
+    gap: 0.55rem;
+    margin-bottom: 1.2rem;
+  }
+
+  .readerBlockTextWrapper {
+    width: 100%;
   }
 }
 
@@ -639,6 +769,302 @@
   font-weight: 600;
 }
 
+.premiumGateNotice {
+  color: #0f766e;
+  font-size: 0.83rem;
+  font-weight: 600;
+}
+
+/* =========================================
+   Coin Collection Dialog (Premium Unlock)
+   ========================================= */
+
+.unlockConfirmOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  background: rgba(15, 23, 42, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  backdrop-filter: blur(6px);
+  animation: coinOverlayFadeIn 0.3s ease-out;
+}
+
+@keyframes coinOverlayFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.unlockConfirmCard {
+  width: min(92vw, 380px);
+  background: linear-gradient(145deg, #fffbeb 0%, #ffffff 50%, #fef3c7 100%);
+  border: 1.5px solid #fcd34d;
+  border-radius: 20px;
+  box-shadow:
+    0 20px 50px rgba(245, 158, 11, 0.2),
+    0 8px 20px rgba(15, 23, 42, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: center;
+  animation: coinCardPopIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes coinCardPopIn {
+  from {
+    opacity: 0;
+    transform: scale(0.7) translateY(30px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.coinIconWrapper {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f59e0b, #eab308);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 4px 16px rgba(245, 158, 11, 0.4),
+    0 0 0 6px rgba(245, 158, 11, 0.1);
+  animation: coinBounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both;
+  position: relative;
+}
+
+.coinIconWrapper::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, transparent 30%, rgba(255, 255, 255, 0.4) 50%, transparent 70%);
+  animation: coinShimmer 2s ease-in-out infinite;
+}
+
+@keyframes coinBounce {
+  0% {
+    transform: scale(0) rotate(-20deg);
+  }
+
+  60% {
+    transform: scale(1.15) rotate(5deg);
+  }
+
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes coinShimmer {
+
+  0%,
+  100% {
+    opacity: 0;
+    transform: rotate(0deg);
+  }
+
+  50% {
+    opacity: 1;
+    transform: rotate(180deg);
+  }
+}
+
+.coinIconInner {
+  color: #ffffff;
+  font-size: 2rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+  z-index: 1;
+}
+
+.unlockConfirmCard h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #78350f;
+}
+
+.unlockConfirmCard p {
+  margin: 0;
+  color: #92400e;
+  line-height: 1.55;
+  font-size: 0.9rem;
+  text-indent: 0;
+}
+
+.coinPriceTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #b45309;
+  letter-spacing: -0.02em;
+}
+
+.unlockConfirmBalance {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: fit-content;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #92400e;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(252, 211, 77, 0.5);
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+}
+
+.unlockConfirmActions {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+.unlockConfirmCancelBtn,
+.unlockConfirmSubmitBtn {
+  border-radius: 999px;
+  padding: 0.6rem 1.2rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.unlockConfirmCancelBtn {
+  background: #ffffff;
+  color: #78350f;
+  border: 1.5px solid #fcd34d;
+}
+
+.unlockConfirmCancelBtn:hover {
+  background: #fffbeb;
+}
+
+.unlockConfirmSubmitBtn {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
+}
+
+.unlockConfirmSubmitBtn:hover {
+  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.45);
+  transform: translateY(-1px);
+}
+
+.unlockConfirmCancelBtn:disabled,
+.unlockConfirmSubmitBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ─── Coin Collected Success Toast ─── */
+
+.coinCollectedToast {
+  position: fixed;
+  top: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: linear-gradient(135deg, #fef3c7, #ffffff);
+  border: 1.5px solid #fcd34d;
+  border-radius: 999px;
+  padding: 0.6rem 1.2rem;
+  box-shadow:
+    0 8px 24px rgba(245, 158, 11, 0.25),
+    0 2px 8px rgba(15, 23, 42, 0.08);
+  animation: coinToastSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), coinToastFadeOut 0.4s ease-in 2.1s forwards;
+}
+
+@keyframes coinToastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px) scale(0.9);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+@keyframes coinToastFadeOut {
+  from {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-12px);
+  }
+}
+
+.coinToastIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f59e0b, #eab308);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  animation: coinToastBounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both;
+}
+
+@keyframes coinToastBounce {
+  0% {
+    transform: scale(0);
+  }
+
+  60% {
+    transform: scale(1.2);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+.coinToastText {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #92400e;
+  white-space: nowrap;
+}
+
+.coinToastBalance {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #b45309;
+  opacity: 0.8;
+}
+
 /* =========================================
    Comment Section
    ========================================= */
@@ -880,4 +1306,272 @@
 
 :global(.theme-midnight) .emptyState {
   color: rgba(129, 140, 248, 0.5);
+}
+.branchChoicePanel {
+  margin-top: 2rem;
+  width: 100%;
+  max-width: 760px;
+  border: 1px solid #dbe7f2;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.branchChoiceHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.branchChoiceHeader h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.branchChoiceTimer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 12px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+}
+
+.branchChoiceTimerMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  color: #9a3412;
+}
+
+.branchChoiceTimerMeta span {
+  font-weight: 700;
+}
+
+.branchChoiceTimerMeta strong {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #7c2d12;
+}
+
+.branchChoiceTimerTrack {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(154, 52, 18, 0.12);
+  overflow: hidden;
+}
+
+.branchChoiceTimerFill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f59e0b, #ef4444);
+  transition: width 0.2s linear;
+}
+
+.branchChoiceTimerDanger {
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+
+.branchChoiceTimerDanger .branchChoiceTimerMeta {
+  color: #b91c1c;
+}
+
+.branchChoiceTimerDanger .branchChoiceTimerFill {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+.branchEndingTag {
+  border-radius: 999px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.2rem 0.55rem;
+}
+
+.branchBackBtn {
+  border: 1px solid #dbe7f2;
+  background: #f8fafc;
+  color: #334155;
+  border-radius: 10px;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.84rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+.branchChoiceList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.branchChoiceBtn {
+  width: 100%;
+  border: 1px solid #dbe7f2;
+  background: #ffffff;
+  color: #0f172a;
+  border-radius: 12px;
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  cursor: pointer;
+}
+
+.branchChoiceBtn:hover {
+  border-color: #f97316;
+  box-shadow: 0 8px 22px rgba(249, 115, 22, 0.15);
+}
+
+.branchChoiceBtn:disabled {
+  cursor: not-allowed;
+}
+
+.branchChoiceBtn span {
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.branchChoiceBtn small {
+  color: #64748b;
+  font-size: 0.78rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.branchChoiceMeta {
+  color: #64748b;
+}
+
+.branchChoiceBtnLocked {
+  border-color: #fcd34d;
+  background: #fffbeb;
+}
+
+.branchChoiceBtnLocked:hover {
+  border-color: #f59e0b;
+  box-shadow: 0 8px 22px rgba(245, 158, 11, 0.15);
+}
+
+.branchChoiceBtnDisabled {
+  opacity: 0.65;
+  border-style: dashed;
+}
+
+.branchChoiceBtnDisabled:hover {
+  border-color: #dbe7f2;
+  box-shadow: none;
+}
+
+.branchChoiceInfo {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
+.branchChoiceOutcome {
+  margin: 0;
+  color: #334155;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  white-space: pre-line;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+}
+
+.branchChoiceSelected {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.35rem 0.2rem;
+}
+
+.branchChoiceResetBtn {
+  width: fit-content;
+  border: 1px solid #dbe7f2;
+  background: #ffffff;
+  color: #334155;
+  border-radius: 10px;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.branchChoiceResetBtn:hover {
+  border-color: #0ea5e9;
+  color: #0369a1;
+}
+
+.branchChoiceError {
+  margin: 0;
+  border-radius: 10px;
+  border: 1px solid #fecaca;
+  background: #fff7f7;
+  color: #b91c1c;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.chatBranchPanel {
+  width: 100%;
+  max-width: 560px;
+  margin: 0.7rem auto 1.2rem;
+  border: 1px solid #dbe7f2;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.tocPathTags {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.tocPathTagEntry,
+.tocPathTagEnding {
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  padding: 0.1rem 0.42rem;
+}
+
+.tocPathTagEntry {
+  border: 1px solid #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.tocPathTagEnding {
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
+  color: #9a3412;
 }

@@ -450,7 +450,7 @@ export default function ComicCreatorPage() {
             if (pageUrls.length > 0) {
                 await supabase
                     .from('stories')
-                    .update({ cover_url: pageUrls[0] })
+                    .update({ cover_url: pageUrls[0], cover_wide_url: pageUrls[0] })
                     .eq('id', storyId);
             }
 

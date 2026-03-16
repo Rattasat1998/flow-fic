@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Save, ImagePlus, Upload, Loader2, Search, X } from 'lucide-react';
 import styles from './text.module.css';
 import { supabase } from '@/lib/supabase';
+import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { MAIN_CATEGORIES, SUB_CATEGORIES } from '@/lib/categories';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -20,17 +21,36 @@ type UnsplashImage = {
     unsplashUrl: string;
 };
 
+type StoryPathMode = 'linear' | 'branching';
+type UnsplashTarget = 'cover' | 'wide';
+type CreateWritingStyle = 'narrative' | 'chat';
+type CreateStoryFormat = 'multi' | 'single';
+
+function parseCreateStyle(raw: string | null): CreateWritingStyle {
+    return raw === 'chat' ? 'chat' : 'narrative';
+}
+
+function parseCreateFormat(raw: string | null): CreateStoryFormat {
+    return raw === 'single' ? 'single' : 'multi';
+}
+
 function CreateTextForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { user } = useAuth();
+    const userId = user?.id ?? null;
+    const userFullName = typeof user?.user_metadata?.full_name === 'string' ? user.user_metadata.full_name : '';
 
     // Initialize state directly from URL query
-    const initialStyle = searchParams.get('style') || 'narrative';
-    const initialFormat = searchParams.get('format') || 'multi';
+    const initialStyle = parseCreateStyle(searchParams.get('style'));
+    const initialFormat = parseCreateFormat(searchParams.get('format'));
+    const isBranchingFeatureEnabled = FEATURE_FLAGS.branching;
 
-    const [writingStyle, setWritingStyle] = useState(initialStyle);
-    const [storyFormat, setStoryFormat] = useState(initialFormat);
+    const writingStyle = initialStyle;
+    const [storyFormat, setStoryFormat] = useState<CreateStoryFormat>(initialFormat);
+    const [pathMode, setPathMode] = useState<StoryPathMode>(
+        initialFormat === 'single' || !isBranchingFeatureEnabled ? 'linear' : 'branching'
+    );
 
     const [title, setTitle] = useState('');
     const [penName, setPenName] = useState('');
@@ -53,10 +73,14 @@ function CreateTextForm() {
 
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const wideFileInputRef = useRef<HTMLInputElement>(null);
     const [coverImage, setCoverImage] = useState<string | null>(null);
     const [coverFile, setCoverFile] = useState<File | null>(null);
+    const [coverWideImage, setCoverWideImage] = useState<string | null>(null);
+    const [coverWideFile, setCoverWideFile] = useState<File | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showUnsplashModal, setShowUnsplashModal] = useState(false);
+    const [unsplashTarget, setUnsplashTarget] = useState<UnsplashTarget>('cover');
     const [unsplashQuery, setUnsplashQuery] = useState('');
     const [unsplashResults, setUnsplashResults] = useState<UnsplashImage[]>([]);
     const [isUnsplashLoading, setIsUnsplashLoading] = useState(false);
@@ -65,22 +89,28 @@ function CreateTextForm() {
     // Fetch user profile for default pen_name
     useEffect(() => {
         const fetchProfile = async () => {
-            if (!user) return;
+            if (!userId) return;
             const { data } = await supabase
                 .from('profiles')
                 .select('pen_name')
-                .eq('id', user.id)
+                .eq('id', userId)
                 .single();
 
             if (data?.pen_name) {
                 setPenName(data.pen_name);
-            } else if (user.user_metadata?.full_name) {
-                setPenName(user.user_metadata.full_name);
+            } else if (userFullName) {
+                setPenName(userFullName);
             }
         };
 
         fetchProfile();
-    }, [user]);
+    }, [userFullName, userId]);
+
+    useEffect(() => {
+        if ((storyFormat === 'single' || !isBranchingFeatureEnabled) && pathMode !== 'linear') {
+            setPathMode('linear');
+        }
+    }, [storyFormat, pathMode, isBranchingFeatureEnabled]);
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -89,6 +119,18 @@ function CreateTextForm() {
             const reader = new FileReader();
             reader.onload = (event) => {
                 if (event.target?.result) setCoverImage(event.target.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleWideImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setCoverWideFile(file);
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                if (event.target?.result) setCoverWideImage(event.target.result as string);
             };
             reader.readAsDataURL(file);
         }
@@ -122,11 +164,15 @@ function CreateTextForm() {
         }
     };
 
-    const openUnsplashPicker = () => {
+    const openUnsplashPicker = (target: UnsplashTarget) => {
+        setUnsplashTarget(target);
         setShowUnsplashModal(true);
         setUnsplashError(null);
         if (!unsplashQuery) {
-            const defaultQuery = 'novel cover art';
+            const defaultQuery =
+                target === 'wide'
+                    ? 'cinematic anime landscape'
+                    : 'novel cover art portrait';
             setUnsplashQuery(defaultQuery);
             handleSearchUnsplash(defaultQuery);
         } else if (unsplashResults.length === 0) {
@@ -135,8 +181,13 @@ function CreateTextForm() {
     };
 
     const handleSelectUnsplashCover = (image: UnsplashImage) => {
-        setCoverImage(image.regular);
-        setCoverFile(null);
+        if (unsplashTarget === 'wide') {
+            setCoverWideImage(image.regular);
+            setCoverWideFile(null);
+        } else {
+            setCoverImage(image.regular);
+            setCoverFile(null);
+        }
         setShowUnsplashModal(false);
     };
 
@@ -176,6 +227,26 @@ function CreateTextForm() {
                 coverUrl = coverImage;
             }
 
+            let coverWideUrl: string | null = null;
+            if (coverWideFile) {
+                const fileExt = coverWideFile.name.split('.').pop();
+                const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}_wide.${fileExt}`;
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('covers')
+                    .upload(fileName, coverWideFile);
+
+                if (uploadError) {
+                    console.error('Wide cover upload error:', uploadError);
+                } else {
+                    const { data: urlData } = supabase.storage
+                        .from('covers')
+                        .getPublicUrl(uploadData.path);
+                    coverWideUrl = urlData.publicUrl;
+                }
+            } else if (coverWideImage && /^https?:\/\//.test(coverWideImage)) {
+                coverWideUrl = coverWideImage;
+            }
+
             // 2. Parse tags from comma-separated string
             const parsedTags = tags
                 .split(',')
@@ -197,8 +268,10 @@ function CreateTextForm() {
                     rating,
                     synopsis,
                     cover_url: coverUrl,
+                    cover_wide_url: coverWideUrl,
                     writing_style: writingStyle,
                     story_format: storyFormat,
+                    path_mode: storyFormat === 'single' || !isBranchingFeatureEnabled ? 'linear' : pathMode,
                     settings,
                     status: 'draft',
                     completion_status: 'ongoing',
@@ -233,8 +306,42 @@ function CreateTextForm() {
                 <form onSubmit={handleSubmit} className={styles.formContainer}>
                     <div className={styles.card}>
                         <h2 className={styles.cardTitle}>
-                            ข้อมูลผลงาน ({writingStyle === 'chat' ? 'แชท' : writingStyle === 'thread' ? 'กระทู้' : 'บรรยาย'})
+                            ข้อมูลผลงาน ({writingStyle === 'chat' ? 'แชท' : 'บรรยาย'})
                         </h2>
+
+                        <div className={styles.formGroup}>
+                            <label>พรีวิวภาพหน้าปกหน้าแรก</label>
+                            <div className={styles.heroCoverPreview}>
+                                <div
+                                    className={styles.heroCoverBackdrop}
+                                    style={
+                                        coverWideImage || coverImage
+                                            ? { backgroundImage: `url(${coverWideImage || coverImage})` }
+                                            : {}
+                                    }
+                                >
+                                    <div className={styles.heroCoverOverlay} />
+                                    <div className={styles.heroCoverContent}>
+                                        <div className={styles.heroCoverPoster}>
+                                            {coverImage ? (
+                                                <div
+                                                    className={styles.heroCoverPosterImg}
+                                                    style={{ backgroundImage: `url(${coverImage})` }}
+                                                    aria-label="Cover preview"
+                                                    role="img"
+                                                />
+                                            ) : (
+                                                <div className={styles.heroCoverPosterEmpty}>COVER</div>
+                                            )}
+                                        </div>
+                                        <div className={styles.heroCoverText}>
+                                            <h3>{title.trim() || 'ตัวอย่างชื่อเรื่อง'}</h3>
+                                            <p>{penName.trim() || 'นามปากกา'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
                         <div className={styles.formGroup}>
                             <label>รูปภาพปก (800x800 px) <span className={styles.required}>*</span></label>
@@ -261,7 +368,7 @@ function CreateTextForm() {
                                 <button
                                     type="button"
                                     className={styles.unsplashPickerBtn}
-                                    onClick={openUnsplashPicker}
+                                    onClick={() => openUnsplashPicker('cover')}
                                 >
                                     <Search size={15} />
                                     เลือกรูปจาก Unsplash
@@ -276,6 +383,51 @@ function CreateTextForm() {
                                         }}
                                     >
                                         ลบรูปปก
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className={styles.formGroup}>
+                            <label>รูปภาพปกแนวกว้างสำหรับหน้าแรก (แนะนำ 1600x900)</label>
+                            <div
+                                className={styles.wideCoverUpload}
+                                onClick={() => wideFileInputRef.current?.click()}
+                                style={coverWideImage ? { backgroundImage: `url(${coverWideImage})`, backgroundSize: 'cover', backgroundPosition: 'center', borderStyle: 'solid' } : {}}
+                            >
+                                {!coverWideImage && (
+                                    <>
+                                        <ImagePlus size={28} style={{ marginBottom: '0.5rem' }} />
+                                        <span style={{ fontSize: '0.85rem' }}>อัปโหลดปกแนวกว้าง</span>
+                                    </>
+                                )}
+                            </div>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                ref={wideFileInputRef}
+                                style={{ display: 'none' }}
+                                onChange={handleWideImageUpload}
+                            />
+                            <div className={styles.coverActions}>
+                                <button
+                                    type="button"
+                                    className={styles.unsplashPickerBtn}
+                                    onClick={() => openUnsplashPicker('wide')}
+                                >
+                                    <Search size={15} />
+                                    เลือกภาพแนวกว้างจาก Unsplash
+                                </button>
+                                {coverWideImage && (
+                                    <button
+                                        type="button"
+                                        className={styles.clearCoverBtn}
+                                        onClick={() => {
+                                            setCoverWideImage(null);
+                                            setCoverWideFile(null);
+                                        }}
+                                    >
+                                        ลบรูปปกแนวกว้าง
                                     </button>
                                 )}
                             </div>
@@ -409,6 +561,33 @@ function CreateTextForm() {
                         </div>
 
                         <div className={styles.formGroup}>
+                            <label>โครงสร้างเส้นเรื่อง <span className={styles.required}>*</span></label>
+                            <div className={styles.categorySelector}>
+                                <button
+                                    type="button"
+                                    className={`${styles.categoryBtn} ${pathMode === 'branching' ? styles.activeCategory : ''}`}
+                                    onClick={() => setPathMode('branching')}
+                                    disabled={storyFormat === 'single' || !isBranchingFeatureEnabled}
+                                >
+                                    เส้นทางแตกแขนงข้ามตอน
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`${styles.categoryBtn} ${pathMode === 'linear' ? styles.activeCategory : ''}`}
+                                    onClick={() => setPathMode('linear')}
+                                >
+                                    เส้นเดียวตามลำดับตอน
+                                </button>
+                            </div>
+                            {storyFormat === 'single' && (
+                                <small style={{ color: '#64748b' }}>งานเขียนตอนเดียวจบจะใช้โหมดเส้นเดียวอัตโนมัติ</small>
+                            )}
+                            {!isBranchingFeatureEnabled && (
+                                <small style={{ color: '#64748b' }}>โหมดเส้นทางแตกแขนงถูกปิดชั่วคราวโดยระบบ</small>
+                            )}
+                        </div>
+
+                        <div className={styles.formGroup}>
                             <label>คำโปรย / เรื่องย่อ</label>
                             <textarea
                                 required
@@ -453,7 +632,9 @@ function CreateTextForm() {
                 <div className={styles.modalOverlay} onClick={() => setShowUnsplashModal(false)}>
                     <div className={`${styles.modal} ${styles.unsplashModal}`} onClick={(e) => e.stopPropagation()}>
                         <div className={styles.modalHeader}>
-                            <h3 className={styles.modalTitle}>เลือกรูปปกจาก Unsplash</h3>
+                            <h3 className={styles.modalTitle}>
+                                {unsplashTarget === 'wide' ? 'เลือกภาพปกแนวกว้างจาก Unsplash' : 'เลือกรูปปกจาก Unsplash'}
+                            </h3>
                             <button type="button" className={styles.iconBtn} onClick={() => setShowUnsplashModal(false)}>
                                 <X size={18} />
                             </button>
@@ -472,7 +653,11 @@ function CreateTextForm() {
                                         }
                                     }}
                                     className={styles.unsplashSearchInput}
-                                    placeholder="เช่น fantasy book cover, mystery, anime city"
+                                    placeholder={
+                                        unsplashTarget === 'wide'
+                                            ? 'เช่น cinematic anime landscape, fantasy sky'
+                                            : 'เช่น fantasy book cover, mystery, anime portrait'
+                                    }
                                 />
                                 <button
                                     type="button"
@@ -500,7 +685,11 @@ function CreateTextForm() {
                                         className={styles.unsplashCard}
                                         onClick={() => handleSelectUnsplashCover(image)}
                                     >
-                                        <img src={image.thumb} alt={image.alt} className={styles.unsplashThumb} />
+                                        <img
+                                            src={image.thumb}
+                                            alt={image.alt}
+                                            className={`${styles.unsplashThumb} ${unsplashTarget === 'wide' ? styles.unsplashThumbWide : ''}`}
+                                        />
                                         <span className={styles.unsplashCredit}>by {image.author}</span>
                                     </button>
                                 ))}

@@ -25,12 +25,14 @@ import {
 import styles from './dashboard.module.css';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { BrandLogo } from '@/components/brand/BrandLogo';
 import { WalletLedgerPanel } from '@/components/profile/WalletLedgerPanel';
 
 type DBStoryRow = {
     id: string;
     title: string;
     cover_url: string | null;
+    cover_wide_url: string | null;
     category: string;
     pen_name: string;
     synopsis: string | null;
@@ -89,6 +91,7 @@ type CharacterImageRow = {
 
 type StoryCoverRow = {
     cover_url: string | null;
+    cover_wide_url: string | null;
 };
 
 const extractStoragePath = (publicUrl: string | null | undefined, bucket: 'covers' | 'characters' | 'comics') => {
@@ -152,6 +155,10 @@ const removeStoragePaths = async (bucket: 'covers' | 'characters' | 'comics', pa
 export default function DashboardPage() {
     const router = useRouter();
     const { user, isLoading: isLoadingAuth, signOut } = useAuth();
+    const userId = user?.id ?? null;
+    const userFullName = typeof user?.user_metadata?.full_name === 'string' ? user.user_metadata.full_name : '';
+    const userAvatarUrl = typeof user?.user_metadata?.avatar_url === 'string' ? user.user_metadata.avatar_url : null;
+    const userEmailFallback = typeof user?.email === 'string' ? user.email.split('@')[0] || 'Flow Writer' : 'Flow Writer';
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
     const profileMenuRef = useRef<HTMLDivElement>(null);
     const [activeTab, setActiveTab] = useState('all');
@@ -182,12 +189,12 @@ export default function DashboardPage() {
     // Fetch real stories and profile from Supabase
     useEffect(() => {
         const fetchDashboardData = async () => {
-            if (!user) return;
+            if (!userId) return;
 
             const { data: storyData } = await supabase
                 .from('stories')
                 .select('*')
-                .eq('user_id', user.id)
+                .eq('user_id', userId)
                 .order('created_at', { ascending: false });
 
             if (storyData) {
@@ -255,32 +262,32 @@ export default function DashboardPage() {
             const { data: profileData } = await supabase
                 .from('profiles')
                 .select('*')
-                .eq('id', user.id)
+                .eq('id', userId)
                 .single();
 
             if (profileData) {
                 setProfile({
-                    pen_name: profileData.pen_name || user.user_metadata?.full_name || 'Flow Writer',
+                    pen_name: profileData.pen_name || userFullName || 'Flow Writer',
                     bio: profileData.bio || '',
                     avatar_url: profileData.avatar_url,
                 });
             } else {
                 setProfile({
-                    pen_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Flow Writer',
+                    pen_name: userFullName || userEmailFallback,
                     bio: '',
-                    avatar_url: user.user_metadata?.avatar_url || null,
+                    avatar_url: userAvatarUrl,
                 });
             }
         };
 
         if (!isLoadingAuth) {
-            if (!user) {
+            if (!userId) {
                 router.push('/');
             } else {
                 fetchDashboardData();
             }
         }
-    }, [user, isLoadingAuth, router]);
+    }, [userAvatarUrl, userEmailFallback, userFullName, userId, isLoadingAuth, router]);
 
     useEffect(() => {
         if (!openStoryMenuId && !isProfileMenuOpen) return;
@@ -378,7 +385,7 @@ export default function DashboardPage() {
         return {
             id: s.id,
             title: s.title,
-            coverUrl: s.cover_url || 'https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?auto=format&fit=crop&w=800&q=80',
+            coverUrl: s.cover_url || s.cover_wide_url || 'https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?auto=format&fit=crop&w=800&q=80',
             type: s.category === 'fanfic' ? 'fanfic' : s.category === 'cartoon' ? 'cartoon' : 'novel',
             penName: s.pen_name,
             synopsis: s.synopsis,
@@ -445,7 +452,7 @@ export default function DashboardPage() {
         const [{ data: storyRow }, { data: chapterRows }, { data: characterRows }] = await Promise.all([
             supabase
                 .from('stories')
-                .select('cover_url')
+                .select('cover_url, cover_wide_url')
                 .eq('id', story.id)
                 .eq('user_id', user.id)
                 .maybeSingle(),
@@ -465,6 +472,8 @@ export default function DashboardPage() {
 
         const coverPath = extractStoragePath((storyRow as StoryCoverRow | null)?.cover_url, 'covers');
         if (coverPath) coverPaths.push(coverPath);
+        const coverWidePath = extractStoragePath((storyRow as StoryCoverRow | null)?.cover_wide_url, 'covers');
+        if (coverWidePath) coverPaths.push(coverWidePath);
 
         (characterRows as CharacterImageRow[] | null)?.forEach((row) => {
             const path = extractStoragePath(row.image_url, 'characters');
@@ -531,7 +540,7 @@ export default function DashboardPage() {
         <main className={styles.main}>
             <nav className={styles.navbar}>
                 <div className={styles.navLeft}>
-                    <Link href="/" className={styles.logo}>FLOWFIC STUDIO</Link>
+                    <BrandLogo href="/" size="md" className={styles.logo} withStudioLabel />
                     <span className={styles.navDivider}>/</span>
                     <span className={styles.pageTitle}>แดชบอร์ดนักเขียน</span>
                 </div>

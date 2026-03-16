@@ -301,6 +301,120 @@
     gap: 1rem;
 }
 
+.branchOverviewGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.9rem;
+}
+
+.branchOverviewCard {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.96) 100%);
+    border: 1px solid #dbe4ee;
+    border-radius: 16px;
+    padding: 1rem;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.branchOverviewCardEntry {
+    border-color: #99f6e4;
+    background:
+        radial-gradient(circle at top right, rgba(45, 212, 191, 0.18), transparent 42%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(240, 253, 250, 0.96) 100%);
+}
+
+.branchOverviewCardHub {
+    border-color: #bfdbfe;
+    background:
+        radial-gradient(circle at top right, rgba(96, 165, 250, 0.14), transparent 44%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(239, 246, 255, 0.96) 100%);
+}
+
+.branchOverviewCardTarget {
+    border-color: #fde68a;
+    background:
+        radial-gradient(circle at top right, rgba(250, 204, 21, 0.14), transparent 40%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(255, 251, 235, 0.96) 100%);
+}
+
+.branchOverviewCardUnlinked {
+    border-color: #e2e8f0;
+}
+
+.branchOverviewHeader {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    align-items: flex-start;
+    margin-bottom: 0.85rem;
+}
+
+.branchOverviewTitle {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.branchOverviewSubtitle {
+    margin: 0.25rem 0 0;
+    font-size: 0.78rem;
+    color: #64748b;
+    line-height: 1.45;
+}
+
+.branchOverviewCount {
+    min-width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    color: #0f172a;
+    font-weight: 800;
+    font-size: 0.9rem;
+}
+
+.branchOverviewList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.branchOverviewItem {
+    width: 100%;
+    border: 1px solid rgba(203, 213, 225, 0.8);
+    background: rgba(255, 255, 255, 0.92);
+    border-radius: 12px;
+    padding: 0.7rem 0.8rem;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 0.22rem;
+    cursor: pointer;
+    transition: transform 0.16s, border-color 0.16s, box-shadow 0.16s;
+}
+
+.branchOverviewItem:hover {
+    transform: translateY(-1px);
+    border-color: var(--primary);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
+.branchOverviewItemTitle {
+    font-size: 0.87rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.4;
+}
+
+.branchOverviewItemMeta {
+    font-size: 0.78rem;
+    color: #64748b;
+}
+
 .chapterItem {
     display: flex;
     align-items: center;
@@ -364,6 +478,48 @@
     display: flex;
     align-items: center;
     gap: 1rem;
+}
+
+.chapterFlowMeta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.55rem;
+}
+
+.chapterFlowPill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border-radius: 999px;
+    padding: 0.2rem 0.65rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border: 1px solid transparent;
+}
+
+.chapterFlowPillEntry {
+    background: #ccfbf1;
+    color: #0f766e;
+    border-color: #99f6e4;
+}
+
+.chapterFlowPillHub {
+    background: #dbeafe;
+    color: #1d4ed8;
+    border-color: #bfdbfe;
+}
+
+.chapterFlowPillTarget {
+    background: #fef3c7;
+    color: #b45309;
+    border-color: #fde68a;
+}
+
+.chapterFlowPillUnlinked {
+    background: #f8fafc;
+    color: #64748b;
+    border-color: #e2e8f0;
 }
 
 .draftBadge {
@@ -451,6 +607,27 @@
     .badges {
         justify-content: center;
     }
+
+    .branchOverviewGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .chapterItem {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .chapterInfo {
+        width: 100%;
+        gap: 0.9rem;
+        align-items: flex-start;
+    }
+
+    .chapterMeta {
+        flex-wrap: wrap;
+        gap: 0.55rem;
+    }
 }
 
 /* Edit Modal */
@@ -503,6 +680,88 @@
     display: flex;
     justify-content: center;
     margin-bottom: 0.5rem;
+}
+
+.editHeroCoverPreview {
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid #dbe4ee;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.1);
+}
+
+.editHeroBackdrop {
+    position: relative;
+    width: 100%;
+    min-height: 210px;
+    background:
+        radial-gradient(700px 320px at 72% 22%, rgba(14, 165, 233, 0.18), transparent 60%),
+        linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    background-size: cover;
+    background-position: center;
+}
+
+.editHeroShade {
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(180deg, rgba(15, 23, 42, 0.12) 0%, rgba(15, 23, 42, 0.82) 100%),
+        linear-gradient(90deg, rgba(15, 23, 42, 0.76) 0%, rgba(15, 23, 42, 0.36) 58%, rgba(15, 23, 42, 0.15) 100%);
+}
+
+.editHeroContent {
+    position: relative;
+    z-index: 2;
+    min-height: 210px;
+    display: flex;
+    align-items: flex-end;
+    gap: 1rem;
+    padding: 1rem;
+}
+
+.editHeroPoster {
+    width: 96px;
+    min-width: 96px;
+    aspect-ratio: 3 / 4;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(148, 163, 184, 0.45);
+    background: rgba(15, 23, 42, 0.7);
+}
+
+.editHeroPosterImage {
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.editHeroPosterEmpty {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    font-weight: 800;
+}
+
+.editHeroText h3 {
+    margin: 0;
+    color: #f8fafc;
+    font-size: 1.4rem;
+    line-height: 1.18;
+    font-weight: 800;
+    text-shadow: 0 1px 6px rgba(15, 23, 42, 0.45);
+}
+
+.editHeroText p {
+    margin: 0.42rem 0 0;
+    color: #cbd5e1;
+    font-size: 0.88rem;
+    font-weight: 600;
 }
 
 .editCoverUpload {
@@ -560,6 +819,77 @@
 
 .editCoverUpload:hover .editCoverOverlay {
     opacity: 1;
+}
+
+.editWideCoverUpload {
+    position: relative;
+    width: min(100%, 420px);
+    aspect-ratio: 16 / 9;
+    border-radius: 12px;
+    background-color: #f1f5f9;
+    border: 2px dashed #cbd5e1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #64748b;
+    cursor: pointer;
+    overflow: hidden;
+    transition: all 0.2s;
+}
+
+.editWideCoverUpload:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.editWideCoverUpload:hover .editCoverOverlay {
+    opacity: 1;
+}
+
+.coverActionRow {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+}
+
+.unsplashPickerBtn {
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #334155;
+    border-radius: 999px;
+    padding: 0.45rem 0.82rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.unsplashPickerBtn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: #f8feff;
+}
+
+.clearCoverBtn {
+    border: 1px solid #fecaca;
+    background: #fff5f5;
+    color: #b91c1c;
+    border-radius: 999px;
+    padding: 0.45rem 0.82rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.clearCoverBtn:hover {
+    border-color: #fca5a5;
+    background: #fee2e2;
 }
 
 .editField {
@@ -681,6 +1011,105 @@
     cursor: not-allowed;
 }
 
+.unsplashModal {
+    max-width: 920px;
+}
+
+.unsplashSearchRow {
+    display: flex;
+    gap: 0.6rem;
+}
+
+.unsplashSearchInput {
+    flex: 1;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    padding: 0.62rem 0.72rem;
+    font-size: 0.92rem;
+    font-family: inherit;
+}
+
+.unsplashSearchInput:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(28, 198, 172, 0.12);
+}
+
+.unsplashSearchBtn {
+    border: none;
+    border-radius: 10px;
+    background: var(--primary);
+    color: #ffffff;
+    min-width: 84px;
+    padding: 0 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.unsplashSearchBtn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.unsplashError {
+    color: #dc2626;
+    font-size: 0.9rem;
+}
+
+.unsplashEmpty {
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
+.unsplashGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.6rem;
+    max-height: 58vh;
+    overflow-y: auto;
+    padding-right: 0.15rem;
+}
+
+.unsplashCard {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #ffffff;
+    padding: 0;
+    cursor: pointer;
+    overflow: hidden;
+    text-align: left;
+    transition: transform 0.15s, box-shadow 0.2s;
+}
+
+.unsplashCard:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
+.unsplashThumb {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    display: block;
+}
+
+.unsplashThumbWide {
+    aspect-ratio: 16 / 9;
+}
+
+.unsplashCredit {
+    display: block;
+    font-size: 0.7rem;
+    color: #64748b;
+    padding: 0.35rem 0.45rem 0.45rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 @keyframes spin {
     from {
         transform: rotate(0deg);
@@ -693,6 +1122,34 @@
 
 .spinner {
     animation: spin 1s linear infinite;
+}
+
+@media (max-width: 768px) {
+    .editHeroBackdrop,
+    .editHeroContent {
+        min-height: 180px;
+    }
+
+    .editHeroPoster {
+        width: 84px;
+        min-width: 84px;
+    }
+
+    .editHeroText h3 {
+        font-size: 1.08rem;
+    }
+
+    .editHeroText p {
+        font-size: 0.8rem;
+    }
+
+    .unsplashGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .unsplashSearchBtn {
+        min-width: 72px;
+    }
 }
 
 /* =========================================

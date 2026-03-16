@@ -1,8 +1,8 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { User, Session } from '@supabase/supabase-js';
+import { AuthChangeEvent, User, Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
     user: User | null;
@@ -14,6 +14,16 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function isSameSessionSnapshot(current: Session | null, next: Session | null): boolean {
+    if (!current && !next) return true;
+    if (!current || !next) return false;
+
+    return current.user.id === next.user.id
+        && current.access_token === next.access_token
+        && current.refresh_token === next.refresh_token
+        && current.expires_at === next.expires_at;
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
@@ -40,9 +50,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // 2. Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            (_event, session) => {
-                setSession(session);
-                setUser(session?.user ?? null);
+            (event: AuthChangeEvent, nextSession) => {
+                const nextUser = nextSession?.user ?? null;
+                const shouldPreserveUserIdentity = event !== 'USER_UPDATED';
+
+                setSession((currentSession) => (
+                    isSameSessionSnapshot(currentSession, nextSession) ? currentSession : nextSession
+                ));
+                setUser((currentUser) => {
+                    if (
+                        shouldPreserveUserIdentity
+                        && currentUser?.id
+                        && nextUser?.id === currentUser.id
+                    ) {
+                        return currentUser;
+                    }
+
+                    return nextUser;
+                });
                 setIsLoading(false);
             }
         );
@@ -53,12 +78,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
     }, []);
 
-    const getOAuthRedirectUrl = () => {
+    const getOAuthRedirectUrl = useCallback(() => {
         if (typeof window === 'undefined') return undefined;
         return `${window.location.origin}/auth/callback`;
-    };
+    }, []);
 
-    const signInWithFacebook = async () => {
+    const signInWithFacebook = useCallback(async () => {
         try {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'facebook',
@@ -72,9 +97,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error('Error signing in with Facebook:', error);
             throw error;
         }
-    };
+    }, [getOAuthRedirectUrl]);
 
-    const signInWithGoogle = async () => {
+    const signInWithGoogle = useCallback(async () => {
         try {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
@@ -87,9 +112,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error('Error signing in with Google:', error);
             throw error;
         }
-    };
+    }, [getOAuthRedirectUrl]);
 
-    const signOut = async () => {
+    const signOut = useCallback(async () => {
         try {
             const { error } = await supabase.auth.signOut();
             if (error) throw error;
@@ -97,16 +122,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error('Error signing out:', error);
             throw error;
         }
-    };
+    }, []);
 
-    const value = {
+    const value = useMemo(() => ({
         user,
         session,
         isLoading,
         signInWithFacebook,
         signInWithGoogle,
         signOut,
-    };
+    }), [user, session, isLoading, signInWithFacebook, signInWithGoogle, signOut]);
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

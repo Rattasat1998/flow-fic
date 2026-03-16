@@ -1,0 +1,2432 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "FlowFic API",
+    "version": "2026-03-16",
+    "description": "OpenAPI spec generated from route handlers in src/app/api and supabase/functions for import into Apidog."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local Next.js app"
+    },
+    {
+      "url": "https://your-domain.com",
+      "description": "Production Next.js app"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Analytics"
+    },
+    {
+      "name": "Discovery"
+    },
+    {
+      "name": "Notifications"
+    },
+    {
+      "name": "Media"
+    },
+    {
+      "name": "Payments"
+    },
+    {
+      "name": "Admin Payments"
+    },
+    {
+      "name": "Internal"
+    },
+    {
+      "name": "Edge Functions"
+    }
+  ],
+  "paths": {
+    "/api/analytics": {
+      "get": {
+        "tags": [
+          "Analytics"
+        ],
+        "operationId": "getAnalyticsOverview",
+        "summary": "Fetch analytics dashboard data",
+        "responses": {
+          "200": {
+            "description": "Analytics payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/api/discovery": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "operationId": "getDiscoveryRails",
+        "summary": "Fetch story discovery rails",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Free text query. Server trims to 120 chars.",
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "all"
+            }
+          },
+          {
+            "name": "subCategory",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "all"
+            }
+          },
+          {
+            "name": "completion",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "ongoing",
+                "completed"
+              ],
+              "default": "all"
+            }
+          },
+          {
+            "name": "length",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "short",
+                "medium",
+                "long"
+              ],
+              "default": "all"
+            }
+          },
+          {
+            "name": "focusCore",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 24,
+              "default": 12
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Discovery rails response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/api/notifications": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "operationId": "listNotifications",
+        "summary": "List current user's notifications",
+        "security": [
+          {
+            "SupabaseBearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          },
+          {
+            "name": "unread",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notification list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Notifications"
+        ],
+        "operationId": "markNotificationsRead",
+        "summary": "Mark one notification or all notifications as read",
+        "security": [
+          {
+            "SupabaseBearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/NotificationPatchByIdRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NotificationPatchMarkAllRequest"
+                  }
+                ]
+              },
+              "examples": {
+                "markOne": {
+                  "value": {
+                    "notificationId": "notif_123"
+                  }
+                },
+                "markAll": {
+                  "value": {
+                    "markAll": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Notification update result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPatchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/api/sounds": {
+      "get": {
+        "tags": [
+          "Media"
+        ],
+        "operationId": "listSounds",
+        "summary": "List available sound files from public/sound and public/sounds",
+        "responses": {
+          "200": {
+            "description": "Sound file list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SoundsResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to load sounds",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/SoundItem"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/unsplash/search": {
+      "get": {
+        "tags": [
+          "Media"
+        ],
+        "operationId": "searchUnsplash",
+        "summary": "Search images from Unsplash",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty query returns an empty result set."
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "perPage",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30,
+              "default": 18
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unsplash search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnsplashSearchResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/api/payments/checkout": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "operationId": "createCheckoutSession",
+        "summary": "Create Stripe checkout session from Next API",
+        "description": "Requires a Supabase access token. This Next.js route supports card checkout and VIP subscription. PromptPay is only available on the Supabase Edge Function /stripe-checkout.",
+        "security": [
+          {
+            "SupabaseBearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/CheckoutRequestCoins"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CheckoutRequestVip"
+                  }
+                ]
+              },
+              "examples": {
+                "coins": {
+                  "value": {
+                    "kind": "coins",
+                    "packageId": "3",
+                    "idempotencyKey": "checkout-coin-001"
+                  }
+                },
+                "vip": {
+                  "value": {
+                    "kind": "vip",
+                    "idempotencyKey": "checkout-vip-001"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Checkout session created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "423": {
+            "description": "Finance access temporarily restricted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error502"
+          }
+        }
+      }
+    },
+    "/api/payments/webhook": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "operationId": "handleStripeWebhook",
+        "summary": "Handle Stripe webhook on Next API",
+        "description": "Send the raw Stripe event body with the stripe-signature header intact. The handler rejects unsigned or mutated payloads.",
+        "security": [
+          {
+            "StripeSignature": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StripeEventPayload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookReceiptResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/api/admin/payments/access": {
+      "get": {
+        "tags": [
+          "Admin Payments"
+        ],
+        "operationId": "checkAdminPaymentsAccess",
+        "summary": "Check whether current user can use finance admin routes",
+        "security": [
+          {
+            "SupabaseBearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Access allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAccessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAccessDeniedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAccessDeniedResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAccessDeniedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/payments/history": {
+      "get": {
+        "tags": [
+          "Admin Payments"
+        ],
+        "operationId": "getAdminPaymentHistory",
+        "summary": "Fetch payment case history and related coin transactions",
+        "security": [
+          {
+            "SupabaseBearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.:-]{1,128}$"
+            }
+          },
+          {
+            "name": "paymentCaseId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.:-]{1,128}$"
+            }
+          },
+          {
+            "name": "sourceTransactionId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.:-]{1,128}$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentHistoryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/api/admin/payments/approve-refund": {
+      "post": {
+        "tags": [
+          "Admin Payments"
+        ],
+        "operationId": "approveRefund",
+        "summary": "Reverse a positive stripe top-up transaction as a refund",
+        "security": [
+          {
+            "SupabaseBearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveRefundRequest"
+              },
+              "example": {
+                "userId": "user_123",
+                "sourceTransactionId": "txn_123",
+                "reason": "Verified duplicate top-up issue",
+                "correlationId": "refund-case-001"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Refund approved and reversal posted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApproveRefundResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/api/admin/payments/apply-chargeback-hold": {
+      "post": {
+        "tags": [
+          "Admin Payments"
+        ],
+        "operationId": "applyChargebackHold",
+        "summary": "Apply a chargeback hold to a user's coin balance",
+        "security": [
+          {
+            "SupabaseBearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyChargebackHoldRequest"
+              },
+              "example": {
+                "userId": "user_123",
+                "amount": 120,
+                "reason": "Stripe chargeback case opened",
+                "externalReference": "chb_001",
+                "correlationId": "chargeback-case-001"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Hold applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplyChargebackHoldResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/api/admin/payments/release-hold": {
+      "post": {
+        "tags": [
+          "Admin Payments"
+        ],
+        "operationId": "releaseChargebackHold",
+        "summary": "Release a previously applied chargeback hold",
+        "security": [
+          {
+            "SupabaseBearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseHoldRequest"
+              },
+              "example": {
+                "paymentCaseId": "pcase_123",
+                "reason": "Chargeback dispute closed in our favor",
+                "correlationId": "release-case-001"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Hold released",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseHoldResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/api/admin/payments/reconcile": {
+      "post": {
+        "tags": [
+          "Admin Payments"
+        ],
+        "operationId": "runAdminReconciliation",
+        "summary": "Run payment reconciliation manually as an admin",
+        "security": [
+          {
+            "SupabaseBearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileRequest"
+              },
+              "example": {
+                "windowStart": "2026-03-15T00:00:00.000Z",
+                "windowEnd": "2026-03-16T00:00:00.000Z",
+                "mismatchThreshold": 0
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reconciliation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/api/internal/reconciliation/daily": {
+      "get": {
+        "tags": [
+          "Internal"
+        ],
+        "operationId": "runDailyReconciliationGet",
+        "summary": "Run scheduled daily reconciliation via GET",
+        "security": [
+          {
+            "CronBearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "windowStart",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "windowEnd",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "mismatchThreshold",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reconciliation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Internal"
+        ],
+        "operationId": "runDailyReconciliationPost",
+        "summary": "Run scheduled daily reconciliation via POST",
+        "security": [
+          {
+            "CronBearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "windowStart",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "windowEnd",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "mismatchThreshold",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reconciliation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/stripe-checkout": {
+      "post": {
+        "tags": [
+          "Edge Functions"
+        ],
+        "operationId": "createEdgeCheckoutSession",
+        "summary": "Create Stripe checkout session from Supabase Edge Function",
+        "description": "Supports card and PromptPay for coin top-up. VIP still uses card/subscription flow.",
+        "servers": [
+          {
+            "url": "https://vthbilvvchwgiiplvfxw.supabase.co/functions/v1",
+            "description": "Supabase Edge Functions base URL"
+          }
+        ],
+        "security": [
+          {
+            "SupabaseBearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/EdgeCheckoutRequestCoins"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EdgeCheckoutRequestVip"
+                  }
+                ]
+              },
+              "examples": {
+                "coinsCard": {
+                  "value": {
+                    "kind": "coins",
+                    "packageId": "3",
+                    "paymentMethod": "card",
+                    "idempotencyKey": "edge-card-001"
+                  }
+                },
+                "coinsPromptPay": {
+                  "value": {
+                    "kind": "coins",
+                    "packageId": "3",
+                    "paymentMethod": "promptpay",
+                    "idempotencyKey": "edge-pp-001"
+                  }
+                },
+                "vip": {
+                  "value": {
+                    "kind": "vip",
+                    "paymentMethod": "card",
+                    "idempotencyKey": "edge-vip-001"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Checkout session created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "423": {
+            "description": "Finance access temporarily restricted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error502"
+          }
+        }
+      }
+    },
+    "/stripe-webhook": {
+      "post": {
+        "tags": [
+          "Edge Functions"
+        ],
+        "operationId": "handleEdgeStripeWebhook",
+        "summary": "Handle Stripe webhook on Supabase Edge Function",
+        "servers": [
+          {
+            "url": "https://vthbilvvchwgiiplvfxw.supabase.co/functions/v1",
+            "description": "Supabase Edge Functions base URL"
+          }
+        ],
+        "security": [
+          {
+            "StripeSignature": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StripeEventPayload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookReceiptResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "SupabaseBearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Supabase access token in the Authorization header."
+      },
+      "CronBearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "Token",
+        "description": "CRON_SECRET in the Authorization header for internal reconciliation."
+      },
+      "StripeSignature": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "stripe-signature",
+        "description": "Stripe webhook signature over the raw request body."
+      }
+    },
+    "responses": {
+      "Error400": {
+        "description": "Bad request",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Error401": {
+        "description": "Unauthorized",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Error403": {
+        "description": "Forbidden",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Error404": {
+        "description": "Not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Error409": {
+        "description": "Conflict",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Error500": {
+        "description": "Internal server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Error502": {
+        "description": "Upstream payment provider failure",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "allowed": {
+            "type": "boolean"
+          },
+          "stripeStatus": {
+            "type": "integer"
+          },
+          "currentBalance": {
+            "type": "number"
+          },
+          "requiredBalance": {
+            "type": "number"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "duplicate": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "additionalProperties": true
+      },
+      "AnalyticsOverview": {
+        "type": "object",
+        "properties": {
+          "today": {
+            "type": "integer"
+          },
+          "last7d": {
+            "type": "integer"
+          },
+          "last30d": {
+            "type": "integer"
+          },
+          "uniqueUsers": {
+            "type": "integer"
+          },
+          "uniqueSessions": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "today",
+          "last7d",
+          "last30d",
+          "uniqueUsers",
+          "uniqueSessions"
+        ]
+      },
+      "RecentEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "page_path": {
+            "type": "string",
+            "nullable": true
+          },
+          "story_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "chapter_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "session_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "user_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "FunnelStep": {
+        "type": "object",
+        "properties": {
+          "step": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "step",
+          "count"
+        ],
+        "additionalProperties": false
+      },
+      "AnalyticsResponse": {
+        "type": "object",
+        "properties": {
+          "overview": {
+            "$ref": "#/components/schemas/AnalyticsOverview"
+          },
+          "eventBreakdown": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "topStories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "recentEvents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecentEvent"
+            }
+          },
+          "funnel": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FunnelStep"
+            }
+          }
+        },
+        "required": [
+          "overview",
+          "eventBreakdown",
+          "topStories",
+          "recentEvents",
+          "funnel"
+        ]
+      },
+      "DiscoveryStory": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "pen_name": {
+            "type": "string"
+          },
+          "cover_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "cover_wide_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "synopsis": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "type": "string"
+          },
+          "main_category": {
+            "type": "string",
+            "nullable": true
+          },
+          "sub_category": {
+            "type": "string",
+            "nullable": true
+          },
+          "path_mode": {
+            "type": "string",
+            "enum": [
+              "linear",
+              "branching"
+            ]
+          },
+          "completion_status": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "published_chapter_count": {
+            "type": "integer"
+          },
+          "total_view_count": {
+            "type": "integer"
+          },
+          "total_like_count": {
+            "type": "integer"
+          },
+          "score_7d": {
+            "type": "number"
+          },
+          "score_30d": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "pen_name",
+          "category",
+          "path_mode",
+          "published_chapter_count",
+          "total_view_count",
+          "total_like_count",
+          "score_7d",
+          "score_30d"
+        ]
+      },
+      "DiscoveryRailPayload": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiscoveryStory"
+            }
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "error"
+        ]
+      },
+      "DiscoveryResponse": {
+        "type": "object",
+        "properties": {
+          "filters": {
+            "type": "object",
+            "properties": {
+              "q": {
+                "type": "string"
+              },
+              "category": {
+                "type": "string"
+              },
+              "subCategory": {
+                "type": "string"
+              },
+              "completion": {
+                "type": "string",
+                "enum": [
+                  "all",
+                  "ongoing",
+                  "completed"
+                ]
+              },
+              "length": {
+                "type": "string",
+                "enum": [
+                  "all",
+                  "short",
+                  "medium",
+                  "long"
+                ]
+              },
+              "focusCore": {
+                "type": "boolean"
+              },
+              "limit": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "q",
+              "category",
+              "subCategory",
+              "completion",
+              "length",
+              "focusCore",
+              "limit"
+            ]
+          },
+          "rails": {
+            "type": "object",
+            "properties": {
+              "new": {
+                "$ref": "#/components/schemas/DiscoveryRailPayload"
+              },
+              "popular": {
+                "$ref": "#/components/schemas/DiscoveryRailPayload"
+              },
+              "trending": {
+                "$ref": "#/components/schemas/DiscoveryRailPayload"
+              }
+            },
+            "required": [
+              "new",
+              "popular",
+              "trending"
+            ]
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "filters",
+          "rails",
+          "generatedAt"
+        ]
+      },
+      "Notification": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "is_read": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true
+      },
+      "NotificationListResponse": {
+        "type": "object",
+        "properties": {
+          "notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Notification"
+            }
+          },
+          "unreadCount": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "notifications",
+          "unreadCount"
+        ]
+      },
+      "NotificationPatchByIdRequest": {
+        "type": "object",
+        "properties": {
+          "notificationId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "notificationId"
+        ],
+        "additionalProperties": false
+      },
+      "NotificationPatchMarkAllRequest": {
+        "type": "object",
+        "properties": {
+          "markAll": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "markAll"
+        ],
+        "additionalProperties": false
+      },
+      "NotificationPatchResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "success"
+        ],
+        "additionalProperties": false
+      },
+      "SoundItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "fileName",
+          "label",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "SoundsResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SoundItem"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "UnsplashResult": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "alt": {
+            "type": "string"
+          },
+          "thumb": {
+            "type": "string"
+          },
+          "regular": {
+            "type": "string"
+          },
+          "full": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string"
+          },
+          "authorUrl": {
+            "type": "string"
+          },
+          "unsplashUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "alt",
+          "thumb",
+          "regular",
+          "full",
+          "author",
+          "authorUrl",
+          "unsplashUrl"
+        ],
+        "additionalProperties": false
+      },
+      "UnsplashSearchResponse": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "totalPages": {
+            "type": "integer"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnsplashResult"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "totalPages",
+          "results"
+        ]
+      },
+      "CoinPackage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6"
+            ]
+          },
+          "coins": {
+            "type": "integer"
+          },
+          "priceThb": {
+            "type": "integer"
+          },
+          "bonus": {
+            "type": "integer"
+          },
+          "popular": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "coins",
+          "priceThb",
+          "bonus"
+        ],
+        "additionalProperties": false
+      },
+      "CheckoutRequestCoins": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "coins"
+            ]
+          },
+          "packageId": {
+            "type": "string",
+            "enum": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6"
+            ]
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9:_-]{8,128}$"
+          }
+        },
+        "required": [
+          "kind",
+          "packageId"
+        ],
+        "additionalProperties": false
+      },
+      "CheckoutRequestVip": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "vip"
+            ]
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9:_-]{8,128}$"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "additionalProperties": false
+      },
+      "EdgeCheckoutRequestCoins": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "coins"
+            ]
+          },
+          "packageId": {
+            "type": "string",
+            "enum": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6"
+            ]
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "card",
+              "promptpay"
+            ]
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9:_-]{8,128}$"
+          }
+        },
+        "required": [
+          "kind",
+          "packageId"
+        ],
+        "additionalProperties": false
+      },
+      "EdgeCheckoutRequestVip": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "vip"
+            ]
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "card"
+            ]
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9:_-]{8,128}$"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "additionalProperties": false
+      },
+      "CheckoutResponse": {
+        "type": "object",
+        "properties": {
+          "checkoutUrl": {
+            "type": "string"
+          },
+          "checkoutSessionId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "coins",
+              "vip"
+            ]
+          },
+          "policyVersion": {
+            "type": "string"
+          },
+          "pricingSnapshotId": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "deduped": {
+            "type": "boolean"
+          },
+          "availablePackages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CoinPackage"
+            }
+          }
+        },
+        "required": [
+          "checkoutUrl",
+          "checkoutSessionId",
+          "kind",
+          "policyVersion",
+          "pricingSnapshotId",
+          "requestId"
+        ]
+      },
+      "StripeEventPayload": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "object": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            "required": [
+              "object"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "data"
+        ],
+        "additionalProperties": true
+      },
+      "WebhookReceiptResponse": {
+        "type": "object",
+        "properties": {
+          "received": {
+            "type": "boolean"
+          },
+          "duplicate": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "received"
+        ]
+      },
+      "AdminAccessResponse": {
+        "type": "object",
+        "properties": {
+          "allowed": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "allowed",
+          "userId"
+        ],
+        "additionalProperties": false
+      },
+      "AdminAccessDeniedResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "allowed": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          }
+        },
+        "required": [
+          "error",
+          "allowed"
+        ],
+        "additionalProperties": false
+      },
+      "PaymentCase": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "case_type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "external_reference": {
+            "type": "string",
+            "nullable": true
+          },
+          "source_txn_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "hold_txn_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "resolution_txn_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "opened_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "resolved_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "resolved_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CoinTransaction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "txn_type": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "reference_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "reference_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "policy_version": {
+            "type": "string",
+            "nullable": true
+          },
+          "reversal_of_txn_id": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PaymentHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "string",
+                "nullable": true
+              },
+              "paymentCaseId": {
+                "type": "string",
+                "nullable": true
+              },
+              "sourceTransactionId": {
+                "type": "string",
+                "nullable": true
+              },
+              "limit": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "userId",
+              "paymentCaseId",
+              "sourceTransactionId",
+              "limit"
+            ]
+          },
+          "paymentCases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentCase"
+            }
+          },
+          "coinTransactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CoinTransaction"
+            }
+          }
+        },
+        "required": [
+          "success",
+          "filter",
+          "paymentCases",
+          "coinTransactions"
+        ]
+      },
+      "ApproveRefundRequest": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "sourceTransactionId": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 8
+          },
+          "correlationId": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "userId",
+          "sourceTransactionId",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "ApproveRefundResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "paymentCaseId": {
+            "type": "string"
+          },
+          "reversalTransactionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "newBalance": {
+            "type": "number"
+          },
+          "policyVersion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "paymentCaseId",
+          "reversalTransactionId",
+          "newBalance",
+          "policyVersion"
+        ]
+      },
+      "ApplyChargebackHoldRequest": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 8
+          },
+          "externalReference": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "userId",
+          "amount",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "ApplyChargebackHoldResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "paymentCaseId": {
+            "type": "string"
+          },
+          "holdTransactionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "newBalance": {
+            "type": "number"
+          },
+          "financeStatus": {
+            "type": "string",
+            "enum": [
+              "restricted_finance"
+            ]
+          },
+          "policyVersion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "paymentCaseId",
+          "holdTransactionId",
+          "newBalance",
+          "financeStatus",
+          "policyVersion"
+        ]
+      },
+      "ReleaseHoldRequest": {
+        "type": "object",
+        "properties": {
+          "paymentCaseId": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 8
+          },
+          "correlationId": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "paymentCaseId",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "ReleaseHoldResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "paymentCaseId": {
+            "type": "string"
+          },
+          "releaseTransactionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "newBalance": {
+            "type": "number"
+          },
+          "financeStatus": {
+            "type": "string",
+            "enum": [
+              "restricted_finance",
+              "normal"
+            ]
+          },
+          "policyVersion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "paymentCaseId",
+          "releaseTransactionId",
+          "newBalance",
+          "financeStatus",
+          "policyVersion"
+        ]
+      },
+      "ReconcileRequest": {
+        "type": "object",
+        "properties": {
+          "windowStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "windowEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "mismatchThreshold": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReconciliationRun": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "alert"
+            ]
+          },
+          "expectedSessions": {
+            "type": "integer"
+          },
+          "postedSessions": {
+            "type": "integer"
+          },
+          "missingSessions": {
+            "type": "integer"
+          },
+          "extraSessions": {
+            "type": "integer"
+          },
+          "expectedCoins": {
+            "type": "integer"
+          },
+          "postedCoins": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "runId",
+          "status",
+          "expectedSessions",
+          "postedSessions",
+          "missingSessions",
+          "extraSessions",
+          "expectedCoins",
+          "postedCoins"
+        ],
+        "additionalProperties": false
+      },
+      "ReconciliationResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "alert": {
+            "type": "boolean"
+          },
+          "run": {
+            "$ref": "#/components/schemas/ReconciliationRun"
+          }
+        },
+        "required": [
+          "success",
+          "alert",
+          "run"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

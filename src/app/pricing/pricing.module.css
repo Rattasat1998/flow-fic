@@ -404,3 +404,46 @@
     color: #1e3a8a;
     border-color: #93c5fd;
 }
+
+.checkoutDialogBackdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1200;
+    padding: 1rem;
+}
+
+.checkoutDialogCard {
+    width: min(92vw, 340px);
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 1.25rem 1rem 1rem;
+    box-shadow: 0 18px 38px rgba(15, 23, 42, 0.22);
+    border: 1px solid #e2e8f0;
+    text-align: center;
+}
+
+.checkoutDialogTitle {
+    margin: 0 0 0.9rem 0;
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.checkoutDialogButton {
+    width: 100%;
+    border: none;
+    background: #f59e0b;
+    color: #ffffff;
+    padding: 0.65rem 0.85rem;
+    border-radius: 10px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.checkoutDialogButton:hover {
+    background: #d97706;
+}
