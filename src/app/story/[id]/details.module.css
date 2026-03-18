@@ -13,7 +13,7 @@
 }
 
 .mastheadInner {
-    width: min(1040px, 100%);
+    width: min(980px, 100%);
     margin: 0 auto;
     display: grid;
     grid-template-columns: 240px minmax(0, 1fr);
@@ -84,8 +84,8 @@
 
 .storyTitle {
     margin: 0;
-    max-width: 12ch;
-    font-size: clamp(2rem, 4vw, 3.45rem);
+    max-width: 13ch;
+    font-size: clamp(1.85rem, 3.6vw, 3.1rem);
     line-height: 1.02;
     letter-spacing: -0.04em;
     color: #111926;
@@ -188,14 +188,14 @@
 
 .actionNote {
     margin: 0;
-    max-width: 60ch;
-    font-size: 0.95rem;
-    line-height: 1.7;
+    max-width: 56ch;
+    font-size: 0.92rem;
+    line-height: 1.62;
     color: #61594f;
 }
 
 .summaryStrip {
-    width: min(1040px, calc(100% - 3rem));
+    width: min(980px, calc(100% - 3rem));
     margin: 0 auto;
     display: grid;
     grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -231,12 +231,12 @@
 }
 
 .contentWrapper {
-    width: min(880px, 100%);
+    width: min(820px, 100%);
     margin: 0 auto;
-    padding: 2.5rem 1.5rem 4.5rem;
+    padding: 2.2rem 1.5rem 4rem;
     display: flex;
     flex-direction: column;
-    gap: 1.75rem;
+    gap: 1.45rem;
 }
 
 .section {
@@ -259,7 +259,7 @@
 
 .sectionTitle {
     margin: 0;
-    font-size: 1.45rem;
+    font-size: 1.32rem;
     font-weight: 800;
     letter-spacing: -0.03em;
     color: #111926;
@@ -274,11 +274,106 @@
 
 .synopsisText {
     margin: 0;
-    max-width: 68ch;
+    max-width: 62ch;
     color: #2f3a46;
-    font-size: 1.04rem;
-    line-height: 1.92;
+    font-size: 0.98rem;
+    line-height: 1.8;
     white-space: pre-wrap;
+}
+
+.characterShowcase {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    padding: 0 0 1.1rem;
+    margin-bottom: 1.1rem;
+    border-bottom: 1px dashed rgba(162, 147, 128, 0.35);
+}
+
+.characterShowcaseHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.characterShowcaseTitle {
+    margin: 0;
+    font-size: 1.02rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #18212b;
+}
+
+.characterCardGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.9rem;
+}
+
+.readerCharacterCard {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(162, 147, 128, 0.22);
+    border-radius: 18px;
+    padding: 0.95rem 0.85rem 0.9rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.7rem;
+    box-shadow: 0 8px 22px rgba(24, 33, 43, 0.04);
+}
+
+.readerCharacterPortrait {
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 3px solid #ffffff;
+    background: linear-gradient(180deg, #f4efe4 0%, #ebe4d7 100%);
+    box-shadow: 0 6px 18px rgba(24, 33, 43, 0.08);
+}
+
+.readerCharacterImage,
+.readerCharacterPlaceholder {
+    width: 100%;
+    height: 100%;
+}
+
+.readerCharacterImage {
+    display: block;
+    object-fit: cover;
+}
+
+.readerCharacterPlaceholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #7b6c59;
+    font-size: 1.35rem;
+    font-weight: 800;
+}
+
+.readerCharacterInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.22rem;
+    min-width: 0;
+}
+
+.readerCharacterName {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 800;
+    line-height: 1.42;
+    color: #18212b;
+    text-wrap: balance;
+}
+
+.readerCharacterMeta {
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: #6f655a;
 }
 
 .startCallout {
@@ -368,7 +463,7 @@
 
 .chapterTitle {
     min-width: 0;
-    font-size: 1rem;
+    font-size: 0.96rem;
     font-weight: 700;
     line-height: 1.45;
     color: #18212b;
@@ -510,6 +605,10 @@
         text-align: left;
     }
 
+    .characterCardGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .chapterItem {
         grid-template-columns: 2.6rem minmax(0, 1fr);
         gap: 0.8rem;
@@ -524,6 +623,12 @@
     .chapterAction {
         grid-column: 2;
         justify-self: start;
+    }
+}
+
+@media (max-width: 520px) {
+    .characterCardGrid {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -799,4 +904,258 @@
     font-weight: 600;
     color: #b45309;
     opacity: 0.8;
+}
+
+/* =========================================
+   Wave 1 Shared Visual System
+   ========================================= */
+
+.main {
+    background: transparent;
+    color: var(--foreground);
+}
+
+.topbar {
+    padding: 0;
+}
+
+.topbarContext {
+    min-width: 0;
+    flex: 1;
+}
+
+.topbarLogo {
+    flex-shrink: 0;
+}
+
+.topbarDivider {
+    color: rgba(148, 163, 184, 0.9);
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+.detailLayout {
+    padding: 1.5rem 0 4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.35rem;
+}
+
+.statePage {
+    min-height: 72vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.stateMessage {
+    width: min(560px, 100%);
+}
+
+.stateTitle {
+    margin: 0;
+    font-size: 1.25rem;
+    color: var(--foreground);
+}
+
+.masthead {
+    padding: 1.85rem;
+    margin: 0;
+}
+
+.mastheadInner {
+    width: 100%;
+    margin: 0;
+    gap: 2rem;
+}
+
+.coverFrame {
+    background: rgba(255, 255, 255, 0.88);
+    border: 1px solid var(--panel-border-strong);
+    box-shadow: var(--shadow-soft);
+}
+
+.mastheadBody {
+    gap: 0.9rem;
+}
+
+.storyEyebrow {
+    color: var(--text-muted);
+}
+
+.storyEyebrowDivider {
+    color: var(--text-soft);
+}
+
+.pathModePill {
+    border-color: rgba(249, 115, 22, 0.16);
+    background: rgba(255, 247, 237, 0.88);
+    color: #c2410c;
+}
+
+.storyTitle {
+    max-width: 14ch;
+    color: var(--foreground);
+}
+
+.storyState {
+    background: rgba(255, 255, 255, 0.78);
+    border-color: rgba(15, 23, 42, 0.08);
+    color: var(--foreground);
+}
+
+.storyStateMuted,
+.actionNote,
+.sectionMeta,
+.readerCharacterMeta,
+.chapterMeta,
+.startCalloutText {
+    color: var(--text-muted);
+}
+
+.primaryActionBtn {
+    background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
+    border-color: #0f172a;
+    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.14);
+}
+
+.primaryActionBtn:hover {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+}
+
+.followBtn {
+    background: rgba(255, 255, 255, 0.78);
+    border-color: rgba(15, 23, 42, 0.1);
+}
+
+.summaryStrip {
+    width: 100%;
+    margin: 0;
+    border: none;
+    background: var(--panel-bg-strong);
+}
+
+.summaryItem {
+    padding: 1rem 1.15rem 1.05rem;
+    border-right: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.summaryLabel {
+    color: var(--text-soft);
+}
+
+.summaryValue,
+.sectionTitle,
+.readerCharacterName,
+.chapterTitle,
+.startCalloutTitle {
+    color: var(--foreground);
+}
+
+.contentWrapper {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    gap: 1.25rem;
+}
+
+.section {
+    background: var(--panel-bg-strong);
+    border-color: var(--panel-border-strong);
+    box-shadow: none;
+    padding: 1.45rem 1.5rem;
+}
+
+.sectionHeader {
+    border-bottom-color: rgba(15, 23, 42, 0.08);
+}
+
+.synopsisText {
+    color: #334155;
+}
+
+.characterShowcase {
+    border-bottom-color: rgba(15, 23, 42, 0.12);
+    padding: 0;
+    margin-bottom: 0;
+    border-bottom: none;
+}
+
+.readerCharacterCard {
+    background: rgba(255, 255, 255, 0.88);
+    border-color: rgba(15, 23, 42, 0.08);
+    box-shadow: none;
+}
+
+.readerCharacterPortrait {
+    background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%);
+}
+
+.readerCharacterPlaceholder {
+    color: #c2410c;
+}
+
+.startCallout {
+    border-color: rgba(249, 115, 22, 0.16);
+    background: rgba(255, 247, 237, 0.78);
+}
+
+.startCalloutLabel {
+    color: #c2410c;
+}
+
+.chapterItem {
+    border-bottom-color: rgba(15, 23, 42, 0.08);
+}
+
+.chapterItem:first-child {
+    border-top-color: rgba(15, 23, 42, 0.08);
+}
+
+.chapterItem:hover {
+    background: rgba(255, 255, 255, 0.58);
+    border-color: rgba(15, 23, 42, 0.12);
+}
+
+.chapterNumber {
+    color: var(--text-soft);
+}
+
+.chapterStatusPremium {
+    background: rgba(255, 247, 237, 0.88);
+    border-color: rgba(249, 115, 22, 0.2);
+    color: #c2410c;
+}
+
+.chapterStatusAccessible {
+    background: rgba(240, 253, 244, 0.92);
+    border-color: rgba(34, 197, 94, 0.2);
+    color: #166534;
+}
+
+.chapterAction {
+    color: #334155;
+}
+
+.emptyState {
+    padding: 0;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+}
+
+@media (max-width: 720px) {
+    .detailLayout {
+        padding: 1rem 0 3rem;
+        gap: 1rem;
+    }
+
+    .masthead {
+        padding: 1.3rem;
+    }
+
+    .section {
+        padding: 1.25rem 1.15rem;
+    }
+
 }

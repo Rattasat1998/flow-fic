@@ -1,7 +1,6 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -39,7 +38,6 @@ function AuthCallbackContent() {
                 <h1>Login failed</h1>
                 <p style={{ color: '#b00020' }}>{errorMessage}</p>
                 <p>Please check your Facebook/Supabase OAuth settings and try again.</p>
-                <Link href="/">Back to home</Link>
             </main>
         );
     }

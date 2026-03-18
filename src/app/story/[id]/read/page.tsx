@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo, use, useCallback } from 'react';
+import { useState, useRef, useEffect, useMemo, use, useCallback, type PointerEvent as ReactPointerEvent } from 'react';
 
 import { ChatBubble } from '@/components/chat/ChatBubble';
 import { ChatActionBar } from '@/components/chat/ChatActionBar';
@@ -12,6 +12,7 @@ import { BranchChoiceOverlay, OverlayChoice } from '@/components/story/BranchCho
 import styles from './story.module.css';
 import { supabase } from '@/lib/supabase';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
+import { getOrCreateTrackingSessionId } from '@/lib/trackingSession';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTracking } from '@/hooks/useTracking';
 
@@ -87,6 +88,7 @@ type Block = {
   text: string;
   characterId: string | null;
   imageUrl?: string;
+  isFlashback: boolean;
 };
 
 type Character = {
@@ -127,6 +129,8 @@ type ReaderChatMessage = ChatMessage & {
   chapterIndex: number;
 };
 
+type ChapterNavigationMode = 'restore' | 'top';
+
 type CommentRow = {
   id: string;
   user_id: string;
@@ -159,9 +163,38 @@ type ReaderProgressRow = {
   updated_at: string | null;
 };
 
+type ReaderBootstrapCommentRow = {
+  id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  profiles: {
+    pen_name: string | null;
+    avatar_url: string | null;
+  } | null;
+};
+
+type ReaderBootstrapRpcRow = {
+  story: DBStory | null;
+  chapters: ReaderChapterRpcRow[] | null;
+  characters: Character[] | null;
+  coin_balance: number | null;
+  is_vip_active: boolean | null;
+  unlocked_chapter_ids: string[] | null;
+  reader_progress: ReaderProgressRow | null;
+  like_count: number | null;
+  liked_chapter_id: string | null;
+  favorited_chapter_id: string | null;
+  comments: ReaderBootstrapCommentRow[] | null;
+};
+
 type StoredChapterProgress = {
   scrollY?: number;
   chatNextIndex?: number;
+  anchorBlockId?: string | null;
+  manualBookmarkBlockId?: string | null;
+  manualBookmarkScrollY?: number;
+  manualBookmarkUpdatedAt?: string | null;
   updatedAt: string;
 };
 
@@ -173,9 +206,48 @@ type StoredStoryProgress = {
 };
 
 const READ_PROGRESS_STORAGE_PREFIX = 'flowfic:reader-progress';
+const CHAPTER_READ_SESSION_CACHE_PREFIX = 'flowfic:chapter-read-session';
+let readerBootstrapRpcAvailability: boolean | null = null;
+let readerChapterReadRpcAvailability: boolean | null = null;
 
 const getReadProgressStorageKey = (storyId: string, userId?: string | null) =>
   `${READ_PROGRESS_STORAGE_PREFIX}:${userId || 'guest'}:${storyId}`;
+
+const getChapterReadSessionCacheKey = (sessionId: string) =>
+  `${CHAPTER_READ_SESSION_CACHE_PREFIX}:${sessionId}`;
+
+const hasChapterReadSessionCacheEntry = (sessionId: string, chapterId: string): boolean => {
+  if (typeof window === 'undefined') return false;
+
+  try {
+    const raw = sessionStorage.getItem(getChapterReadSessionCacheKey(sessionId));
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as Record<string, boolean>;
+    return parsed?.[chapterId] === true;
+  } catch {
+    return false;
+  }
+};
+
+const markChapterReadSessionCacheEntry = (sessionId: string, chapterId: string) => {
+  if (typeof window === 'undefined') return;
+
+  try {
+    const raw = sessionStorage.getItem(getChapterReadSessionCacheKey(sessionId));
+    const parsed = raw ? JSON.parse(raw) as Record<string, boolean> : {};
+    if (parsed?.[chapterId] === true) return;
+
+    sessionStorage.setItem(
+      getChapterReadSessionCacheKey(sessionId),
+      JSON.stringify({
+        ...(parsed || {}),
+        [chapterId]: true,
+      })
+    );
+  } catch {
+    // Ignore sessionStorage failures
+  }
+};
 
 const readStoredStoryProgress = (storyId: string, userId?: string | null): StoredStoryProgress | null => {
   if (typeof window === 'undefined') return null;
@@ -216,6 +288,30 @@ const parseStoredChapterStates = (input: unknown): Record<string, StoredChapterP
     parsed[chapterId] = {
       scrollY: typeof raw.scrollY === 'number' ? raw.scrollY : undefined,
       chatNextIndex: typeof raw.chatNextIndex === 'number' ? raw.chatNextIndex : undefined,
+      anchorBlockId: typeof raw.anchorBlockId === 'string'
+        ? raw.anchorBlockId
+        : typeof raw.anchor_block_id === 'string'
+          ? raw.anchor_block_id
+          : undefined,
+      manualBookmarkBlockId: typeof raw.manualBookmarkBlockId === 'string'
+        ? raw.manualBookmarkBlockId
+        : typeof raw.manual_bookmark_block_id === 'string'
+          ? raw.manual_bookmark_block_id
+          : raw.manualBookmarkBlockId === null || raw.manual_bookmark_block_id === null
+            ? null
+            : undefined,
+      manualBookmarkScrollY: typeof raw.manualBookmarkScrollY === 'number'
+        ? raw.manualBookmarkScrollY
+        : typeof raw.manual_bookmark_scroll_y === 'number'
+          ? raw.manual_bookmark_scroll_y
+          : undefined,
+      manualBookmarkUpdatedAt: typeof raw.manualBookmarkUpdatedAt === 'string'
+        ? raw.manualBookmarkUpdatedAt
+        : typeof raw.manual_bookmark_updated_at === 'string'
+          ? raw.manual_bookmark_updated_at
+          : raw.manualBookmarkUpdatedAt === null || raw.manual_bookmark_updated_at === null
+            ? null
+            : undefined,
       updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : new Date(0).toISOString(),
     };
   });
@@ -238,12 +334,58 @@ const getProgressUpdatedAtMs = (progress: StoredStoryProgress | null): number =>
   return Number.isFinite(ms) ? ms : 0;
 };
 
+const isMissingReaderBootstrapRpcError = (error: unknown) => {
+  if (!error || typeof error !== 'object') return false;
+
+  const maybeError = error as {
+    code?: string;
+    message?: string;
+    details?: string;
+    hint?: string;
+  };
+
+  const message = typeof maybeError.message === 'string' ? maybeError.message : '';
+  const details = typeof maybeError.details === 'string' ? maybeError.details : '';
+  const hint = typeof maybeError.hint === 'string' ? maybeError.hint : '';
+  const combined = `${message} ${details} ${hint}`;
+
+  return maybeError.code === 'PGRST202' || combined.includes('get_reader_bootstrap');
+};
+
+const isMissingRecordChapterReadRpcError = (error: unknown) => {
+  if (!error || typeof error !== 'object') return false;
+
+  const maybeError = error as {
+    code?: string;
+    message?: string;
+    details?: string;
+    hint?: string;
+  };
+
+  const message = typeof maybeError.message === 'string' ? maybeError.message : '';
+  const details = typeof maybeError.details === 'string' ? maybeError.details : '';
+  const hint = typeof maybeError.hint === 'string' ? maybeError.hint : '';
+  const combined = `${message} ${details} ${hint}`;
+
+  return maybeError.code === 'PGRST202' || combined.includes('record_chapter_read');
+};
+
 const defaultStorySettings: StorySettings = {
   allowComments: true,
   hideHeartCount: false,
 };
 
 const MAX_BRANCH_TIMER_SECONDS = 300;
+const NARRATIVE_BOOKMARK_VIEWPORT_OFFSET = 128;
+const NARRATIVE_BOOKMARK_LONG_PRESS_MS = 400;
+const NARRATIVE_BOOKMARK_LONG_PRESS_MOVE_THRESHOLD = 12;
+
+type StoredManualNarrativeBookmark = {
+  chapterId: string;
+  blockId: string | null;
+  scrollY: number | null;
+  updatedAt: string;
+};
 
 const normalizeStorySettings = (settings: unknown): StorySettings => {
   if (!settings || typeof settings !== 'object') return defaultStorySettings;
@@ -253,6 +395,43 @@ const normalizeStorySettings = (settings: unknown): StorySettings => {
     allowComments: typeof raw.allowComments === 'boolean' ? raw.allowComments : defaultStorySettings.allowComments,
     hideHeartCount: typeof raw.hideHeartCount === 'boolean' ? raw.hideHeartCount : defaultStorySettings.hideHeartCount,
   };
+};
+
+const getNarrativeBlockRefKey = (chapterId: string, blockId: string) => `${chapterId}:${blockId}`;
+
+const getStoredManualNarrativeBookmark = (progress: StoredStoryProgress | null): StoredManualNarrativeBookmark | null => {
+  if (!progress) return null;
+
+  let latestBookmark: StoredManualNarrativeBookmark | null = null;
+  let latestBookmarkMs = 0;
+
+  Object.entries(progress.chapterStates || {}).forEach(([chapterId, chapterState]) => {
+    const blockId = typeof chapterState.manualBookmarkBlockId === 'string' && chapterState.manualBookmarkBlockId.trim().length > 0
+      ? chapterState.manualBookmarkBlockId
+      : null;
+    const scrollY = typeof chapterState.manualBookmarkScrollY === 'number'
+      ? Math.max(0, Math.floor(chapterState.manualBookmarkScrollY))
+      : null;
+    const hasBookmark = blockId !== null || scrollY !== null;
+
+    if (!hasBookmark) return;
+
+    const updatedAt = chapterState.manualBookmarkUpdatedAt || chapterState.updatedAt || progress.updatedAt;
+    const updatedAtMs = Date.parse(updatedAt);
+    const normalizedUpdatedAtMs = Number.isFinite(updatedAtMs) ? updatedAtMs : 0;
+
+    if (latestBookmark && normalizedUpdatedAtMs <= latestBookmarkMs) return;
+
+    latestBookmark = {
+      chapterId,
+      blockId,
+      scrollY,
+      updatedAt,
+    };
+    latestBookmarkMs = normalizedUpdatedAtMs;
+  });
+
+  return latestBookmark;
 };
 
 const normalizeChoiceTimerSeconds = (value: unknown): number => {
@@ -265,6 +444,28 @@ const normalizeChoiceTimerSeconds = (value: unknown): number => {
 const fallbackAvatar = 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=200&q=80';
 const BRANCHING_FEATURE_ENABLED = FEATURE_FLAGS.branching;
 
+const normalizeReaderBlocks = (rawBlocks: unknown): Block[] => {
+  if (!Array.isArray(rawBlocks)) return [];
+
+  const normalizedBlocks: Block[] = [];
+
+  rawBlocks.forEach((item, index) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return;
+    const block = item as Record<string, unknown>;
+
+    normalizedBlocks.push({
+      id: typeof block.id === 'string' && block.id ? block.id : `reader-block-${index}`,
+      type: block.type === 'image' ? 'image' : 'paragraph',
+      text: typeof block.text === 'string' ? block.text : '',
+      characterId: typeof block.characterId === 'string' ? block.characterId : null,
+      imageUrl: typeof block.imageUrl === 'string' ? block.imageUrl : undefined,
+      isFlashback: block.isFlashback === true || block.is_flashback === true,
+    });
+  });
+
+  return normalizedBlocks;
+};
+
 const parseChapterBlocks = (content: unknown): {
   povCharacterId: string | null;
   blocks: Block[];
@@ -276,7 +477,7 @@ const parseChapterBlocks = (content: unknown): {
 
   if (typeof content === 'object' && content !== null && 'blocks' in content) {
     const parsedContent = content as Record<string, unknown>;
-    const parsedBlocks = Array.isArray(parsedContent.blocks) ? (parsedContent.blocks as Block[]) : [];
+    const parsedBlocks = normalizeReaderBlocks(parsedContent.blocks);
     return {
       povCharacterId: typeof parsedContent.povCharacterId === 'string' ? parsedContent.povCharacterId : null,
       blocks: parsedBlocks,
@@ -308,7 +509,8 @@ const parseChapterBlocks = (content: unknown): {
       id: `legacy-${idx}`,
       type: 'paragraph',
       text: line,
-      characterId: null
+      characterId: null,
+      isFlashback: false,
     }))
   };
 };
@@ -360,6 +562,19 @@ const parseEmbeddedBranchChoices = (content: unknown): EmbeddedBranchChoice[] =>
     }));
 };
 
+const getReaderParagraphClassName = (hasCharacter: boolean, isFlashback: boolean): string => {
+  const baseClassName = hasCharacter ? styles.readerBlockParagraph : styles.readerPlainParagraph;
+  const modifierClassName = hasCharacter && isFlashback
+    ? styles.readerParagraphSpeechFlashback
+    : hasCharacter
+      ? styles.readerParagraphSpeech
+      : isFlashback
+        ? styles.readerParagraphFlashback
+        : '';
+
+  return [baseClassName, modifierClassName].filter(Boolean).join(' ');
+};
+
 export default function StoryPage({ params }: StoryPageProps) {
   const unwrappedParams = use(params);
   const storyId = unwrappedParams.id;
@@ -387,14 +602,27 @@ export default function StoryPage({ params }: StoryPageProps) {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedChapterIndex, setSelectedChapterIndex] = useState(initialChapterIndex);
   const [chapterChoices, setChapterChoices] = useState<ReaderChapterChoice[]>([]);
+  const [chapterChoicesStateChapterId, setChapterChoicesStateChapterId] = useState<string | null>(null);
+  const [loadingChoicesChapterId, setLoadingChoicesChapterId] = useState<string | null>(null);
   const [isLoadingChoices, setIsLoadingChoices] = useState(false);
   const [choicesError, setChoicesError] = useState<string | null>(null);
   const [showChoiceOverlay, setShowChoiceOverlay] = useState(false);
   const [isTocOpen, setIsTocOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const narrativeChoicePanelRef = useRef<HTMLDivElement>(null);
+  const narrativeBlockRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const chapterChoicesRequestRef = useRef(0);
   const lastRestoredChapterRef = useRef<string | null>(null);
+  const chapterNavigationModeRef = useRef<ChapterNavigationMode>('restore');
+  const longPressBookmarkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressBookmarkPointerRef = useRef<{
+    pointerId: number;
+    chapterId: string;
+    blockId: string;
+    startX: number;
+    startY: number;
+  } | null>(null);
+  const suppressBookmarkContextMenuRef = useRef(false);
   const pendingProgressRef = useRef<StoredStoryProgress | null>(null);
   const progressSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressSyncInFlightRef = useRef(false);
@@ -426,6 +654,46 @@ export default function StoryPage({ params }: StoryPageProps) {
   const [coinCollectedToast, setCoinCollectedToast] = useState<{ coins: number; balance: number } | null>(null);
   const [narrativeChoicePanelVisibleChapterId, setNarrativeChoicePanelVisibleChapterId] = useState<string | null>(null);
   const [choiceCountdownRemainingMs, setChoiceCountdownRemainingMs] = useState<number | null>(null);
+  const [visibleNarrativeBookmark, setVisibleNarrativeBookmark] = useState<{ chapterId: string; blockId: string } | null>(null);
+  const [hoveredBookmarkBlockId, setHoveredBookmarkBlockId] = useState<string | null>(null);
+
+  const setVisibleNarrativeBookmarkForChapter = useCallback((chapterId: string, blockId: string | null) => {
+    setVisibleNarrativeBookmark((prev) => {
+      if (!blockId) {
+        return prev?.chapterId === chapterId ? null : prev;
+      }
+
+      if (prev?.chapterId === chapterId && prev.blockId === blockId) {
+        return prev;
+      }
+
+      return { chapterId, blockId };
+    });
+  }, []);
+
+  const getNearestNarrativeAnchorBlockId = useCallback((chapter: ReaderChapter | null): string | null => {
+    if (!chapter) return null;
+
+    let nearestBlockId: string | null = null;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+
+    chapter.blocks.forEach((block) => {
+      const blockNode = narrativeBlockRefs.current[getNarrativeBlockRefKey(chapter.id, block.id)];
+      if (!blockNode) return;
+
+      const rect = blockNode.getBoundingClientRect();
+      const distance = rect.bottom < NARRATIVE_BOOKMARK_VIEWPORT_OFFSET
+        ? NARRATIVE_BOOKMARK_VIEWPORT_OFFSET - rect.bottom
+        : Math.abs(rect.top - NARRATIVE_BOOKMARK_VIEWPORT_OFFSET);
+
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestBlockId = block.id;
+      }
+    });
+
+    return nearestBlockId;
+  }, []);
 
   const flushPendingProgressToDatabase = useCallback(async () => {
     if (isPreviewMode || !userId) return;
@@ -470,6 +738,35 @@ export default function StoryPage({ params }: StoryPageProps) {
     }, 1000);
   }, [isPreviewMode, userId, flushPendingProgressToDatabase]);
 
+  const updateStoredStoryProgress = useCallback((
+    updater: (previous: StoredStoryProgress | null, nowIso: string) => StoredStoryProgress | null
+  ) => {
+    if (isPreviewMode) return null;
+
+    const previous = readStoredStoryProgress(storyId, userId);
+    const nowIso = new Date().toISOString();
+    const nextProgress = updater(previous, nowIso);
+    if (!nextProgress) return null;
+
+    writeStoredStoryProgress(storyId, userId, nextProgress);
+    scheduleProgressSync(nextProgress);
+    return nextProgress;
+  }, [isPreviewMode, scheduleProgressSync, storyId, userId]);
+
+  const clearManualBookmarkFields = useCallback((chapterState?: StoredChapterProgress): StoredChapterProgress | undefined => {
+    if (!chapterState) return chapterState;
+    const {
+      manualBookmarkBlockId,
+      manualBookmarkScrollY,
+      manualBookmarkUpdatedAt,
+      ...rest
+    } = chapterState;
+    void manualBookmarkBlockId;
+    void manualBookmarkScrollY;
+    void manualBookmarkUpdatedAt;
+    return rest;
+  }, []);
+
   useEffect(() => {
     return () => {
       if (progressSyncTimerRef.current) {
@@ -479,6 +776,27 @@ export default function StoryPage({ params }: StoryPageProps) {
       void flushPendingProgressToDatabase();
     };
   }, [flushPendingProgressToDatabase]);
+
+  const mapReaderChapterRows = useCallback((rows: ReaderChapterRpcRow[]) => {
+    return rows.map((row) => {
+      const parsedContent = row.can_read && row.content_payload
+        ? parseChapterBlocks(row.content_payload)
+        : { povCharacterId: null, blocks: [], chatTheme: 'white', isEnding: false, choiceTimerSeconds: 0 };
+
+      return {
+        id: row.id,
+        title: row.title || 'ไม่มีชื่อ',
+        povCharacterId: parsedContent.povCharacterId,
+        blocks: parsedContent.blocks,
+        chatTheme: parsedContent.chatTheme,
+        isEnding: parsedContent.isEnding,
+        choiceTimerSeconds: parsedContent.choiceTimerSeconds,
+        isPremium: !!row.is_premium,
+        coinPrice: Math.max(0, row.coin_price || 0),
+        rawContentPayload: row.content_payload,
+      } satisfies ReaderChapter;
+    });
+  }, []);
 
   const fetchReaderChapters = useCallback(
     async (chapterIdFilter?: string) => {
@@ -496,32 +814,21 @@ export default function StoryPage({ params }: StoryPageProps) {
         .slice()
         .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
 
-      return rows.map((row) => {
-        const parsedContent = row.can_read && row.content_payload
-          ? parseChapterBlocks(row.content_payload)
-          : { povCharacterId: null, blocks: [], chatTheme: 'white', isEnding: false, choiceTimerSeconds: 0 };
-
-        return {
-          id: row.id,
-          title: row.title || 'ไม่มีชื่อ',
-          povCharacterId: parsedContent.povCharacterId,
-          blocks: parsedContent.blocks,
-          chatTheme: parsedContent.chatTheme,
-          isEnding: parsedContent.isEnding,
-          choiceTimerSeconds: parsedContent.choiceTimerSeconds,
-          isPremium: !!row.is_premium,
-          coinPrice: Math.max(0, row.coin_price || 0),
-          rawContentPayload: row.content_payload,
-        } satisfies ReaderChapter;
-      });
+      return mapReaderChapterRows(rows);
     },
-    [storyId, isPreviewMode]
+    [storyId, isPreviewMode, mapReaderChapterRows]
   );
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchReaderStory = async () => {
       setIsLoading(true);
       setLoadError('');
+      setLikeCount(0);
+      setLikedChapterId(null);
+      setFavoritedChapterId(null);
+      setComments([]);
 
       // Fetch Story
       let storyQuery = supabase
@@ -534,6 +841,8 @@ export default function StoryPage({ params }: StoryPageProps) {
       }
 
       const { data: storyData, error: storyError } = await storyQuery.single();
+
+      if (cancelled) return;
 
       if (storyError || !storyData) {
         setLoadError(isPreviewMode ? 'ไม่พบเรื่องสำหรับพรีวิว' : 'ไม่พบเรื่องนี้ หรือยังไม่ได้เผยแพร่');
@@ -560,33 +869,96 @@ export default function StoryPage({ params }: StoryPageProps) {
 
       const normalizedStorySettings = normalizeStorySettings((storyData as DBStory).settings);
       setStorySettings(normalizedStorySettings);
+      if (!normalizedStorySettings.allowComments) {
+        setShowComments(false);
+      }
       const normalizedPathMode = BRANCHING_FEATURE_ENABLED && (storyData as DBStory).path_mode === 'branching'
         ? 'branching'
         : 'linear';
 
-      // Fetch Characters
-      const { data: charsData } = await supabase
+      const charactersPromise = supabase
         .from('characters')
         .select('id, name, image_url')
         .eq('story_id', storyId)
         .order('order_index', { ascending: true });
 
-      if (charsData) {
-        setCharacters(charsData);
-      }
-
       let parsedChapters: ReaderChapter[] = [];
-      try {
-        parsedChapters = await fetchReaderChapters();
-      } catch {
-        setLoadError('ไม่สามารถโหลดตอนของเรื่องนี้ได้');
-        setIsLoading(false);
-        return;
+      let remoteProgress: StoredStoryProgress | null = null;
+      let nextCharacters: Character[] = [];
+      let nextCoinBalance = 0;
+      let nextUnlockedChapterIds: string[] = [];
+      let nextIsVipAccessActive = false;
+      let preloadedLikeCount: number | null = null;
+      let preloadedLikedChapterId: string | null = null;
+      let preloadedFavoritedChapterId: string | null = null;
+      let preloadedComments: CommentRow[] | null = null;
+      let engagementPreloaded = false;
+
+      let bootstrapRow: ReaderBootstrapRpcRow | null = null;
+
+      if (readerBootstrapRpcAvailability !== false) {
+        const { data: bootstrapRows, error: bootstrapError } = await supabase.rpc('get_reader_bootstrap', {
+          p_story_id: storyId,
+          p_preview_mode: isPreviewMode,
+          p_preview_chapter_id: previewChapterId || null,
+        });
+
+        if (bootstrapError) {
+          if (isMissingReaderBootstrapRpcError(bootstrapError)) {
+            readerBootstrapRpcAvailability = false;
+          } else {
+            console.warn('get_reader_bootstrap failed, falling back to direct reader queries', bootstrapError);
+          }
+        } else {
+          readerBootstrapRpcAvailability = true;
+          bootstrapRow = Array.isArray(bootstrapRows) && bootstrapRows.length > 0
+            ? (bootstrapRows[0] as ReaderBootstrapRpcRow)
+            : null;
+        }
       }
 
-      let remoteProgress: StoredStoryProgress | null = null;
-      if (!isPreviewMode && user) {
-        const [{ data: walletData }, { data: vipData }, { data: unlockRows }, { data: progressRow }] = await Promise.all([
+      if (bootstrapRow) {
+        const chapterRows = (Array.isArray(bootstrapRow.chapters) ? bootstrapRow.chapters : [])
+          .slice()
+          .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+
+        parsedChapters = mapReaderChapterRows(chapterRows);
+        nextCharacters = Array.isArray(bootstrapRow.characters) ? bootstrapRow.characters : [];
+        nextCoinBalance = Math.max(0, Number(bootstrapRow.coin_balance || 0));
+        nextUnlockedChapterIds = Array.isArray(bootstrapRow.unlocked_chapter_ids)
+          ? bootstrapRow.unlocked_chapter_ids.map((chapterId) => String(chapterId))
+          : [];
+        nextIsVipAccessActive = !!bootstrapRow.is_vip_active;
+
+        if (bootstrapRow.reader_progress && typeof bootstrapRow.reader_progress === 'object') {
+          remoteProgress = normalizeStoredStoryProgress(bootstrapRow.reader_progress as ReaderProgressRow);
+        }
+
+        preloadedLikeCount = Math.max(0, Number(bootstrapRow.like_count || 0));
+        preloadedLikedChapterId = bootstrapRow.liked_chapter_id || null;
+        preloadedFavoritedChapterId = bootstrapRow.favorited_chapter_id || null;
+
+        if (normalizedStorySettings.allowComments) {
+          const bootstrapComments = Array.isArray(bootstrapRow.comments)
+            ? bootstrapRow.comments
+            : [];
+
+          preloadedComments = bootstrapComments.map((row) => ({
+            id: row.id,
+            user_id: row.user_id,
+            content: row.content,
+            created_at: row.created_at,
+            profiles: row.profiles || null,
+          }));
+        } else {
+          preloadedComments = [];
+        }
+
+        engagementPreloaded = true;
+      }
+
+      const accessPromise = !isPreviewMode && user
+        ? Promise.all([
           supabase
             .from('wallets')
             .select('coin_balance')
@@ -608,100 +980,48 @@ export default function StoryPage({ params }: StoryPageProps) {
             .eq('story_id', storyId)
             .eq('user_id', user.id)
             .maybeSingle(),
-        ]);
+        ])
+        : Promise.resolve(null);
 
-        setCoinBalance(walletData?.coin_balance || 0);
-        const unlockedIds = ((unlockRows as ChapterUnlockRow[] | null) || []).map((row) => row.chapter_id);
-        setUnlockedChapterIds(unlockedIds);
-        const vipActiveForRead = !!vipData
-          && vipData.status === 'active'
-          && (!vipData.current_period_end || new Date(vipData.current_period_end).getTime() > Date.now());
-        setIsVipAccessActive(vipActiveForRead);
+      if (!bootstrapRow) {
+        try {
+          const [charactersResult, parsedChaptersResult, accessResult] = await Promise.all([
+            charactersPromise,
+            fetchReaderChapters(),
+            accessPromise,
+          ]);
 
-        if (progressRow) {
-          remoteProgress = normalizeStoredStoryProgress(progressRow as ReaderProgressRow);
-        }
-      } else {
-        setCoinBalance(0);
-        setUnlockedChapterIds([]);
-        setIsVipAccessActive(false);
-      }
+          if (cancelled) return;
 
-      // Fetch like count + user like status
-      const { count: likesCount } = await supabase
-        .from('likes')
-        .select('*', { count: 'exact', head: true })
-        .eq('story_id', storyId);
-      setLikeCount(likesCount || 0);
+          nextCharacters = (charactersResult.data as Character[] | null) || [];
+          parsedChapters = parsedChaptersResult;
 
-      if (user) {
-        const { data: likeData } = await supabase
-          .from('likes')
-          .select('chapter_id')
-          .eq('story_id', storyId)
-          .eq('user_id', user.id)
-          .maybeSingle();
-        setLikedChapterId(likeData?.chapter_id || null);
+          if (accessResult) {
+            const [{ data: walletData }, { data: vipData }, { data: unlockRows }, { data: progressRow }] = accessResult;
+            nextCoinBalance = walletData?.coin_balance || 0;
+            nextUnlockedChapterIds = ((unlockRows as ChapterUnlockRow[] | null) || []).map((row) => row.chapter_id);
+            nextIsVipAccessActive = !!vipData
+              && vipData.status === 'active'
+              && (!vipData.current_period_end || new Date(vipData.current_period_end).getTime() > Date.now());
 
-        const { data: favData } = await supabase
-          .from('favorites')
-          .select('id, chapter_id, created_at')
-          .eq('story_id', storyId)
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
-
-        const favoriteRows = favData || [];
-        const latestFavorite = favoriteRows[0] || null;
-        setFavoritedChapterId(latestFavorite?.chapter_id || null);
-
-        // Legacy cleanup: keep only one favorite row per story/user (latest row).
-        if (favoriteRows.length > 1) {
-          const staleFavoriteIds = favoriteRows.slice(1).map(f => f.id);
-          await supabase
-            .from('favorites')
-            .delete()
-            .in('id', staleFavoriteIds);
-        }
-      } else {
-        setLikedChapterId(null);
-        setFavoritedChapterId(null);
-      }
-
-      if (normalizedStorySettings.allowComments) {
-        const { data: commentsData, error: commentsError } = await supabase
-          .from('comments')
-          .select('id, user_id, content, created_at')
-          .eq('story_id', storyId)
-          .order('created_at', { ascending: true })
-          .limit(100);
-
-        if (commentsError || !commentsData) {
-          setComments([]);
-        } else {
-          const rawComments = commentsData as CommentQueryRow[];
-          const commentUserIds = Array.from(new Set(rawComments.map((row) => row.user_id).filter(Boolean)));
-          const profileMap = new Map<string, { pen_name: string | null; avatar_url: string | null }>();
-
-          if (commentUserIds.length > 0) {
-            const { data: profileRows } = await supabase
-              .from('profiles')
-              .select('id, pen_name, avatar_url')
-              .in('id', commentUserIds);
-
-            ((profileRows as ProfileQueryRow[] | null) || []).forEach((row) => {
-              profileMap.set(row.id, { pen_name: row.pen_name, avatar_url: row.avatar_url });
-            });
+            if (progressRow) {
+              remoteProgress = normalizeStoredStoryProgress(progressRow as ReaderProgressRow);
+            }
           }
-
-          setComments(rawComments.map((row) => ({
-            ...row,
-            profiles: profileMap.get(row.user_id) || null,
-          })));
+        } catch {
+          if (cancelled) return;
+          setLoadError('ไม่สามารถโหลดตอนของเรื่องนี้ได้');
+          setIsLoading(false);
+          return;
         }
-      } else {
-        setComments([]);
-        setShowComments(false);
       }
+
+      if (cancelled) return;
+
+      setCharacters(nextCharacters);
+      setCoinBalance(nextCoinBalance);
+      setUnlockedChapterIds(nextUnlockedChapterIds);
+      setIsVipAccessActive(nextIsVipAccessActive);
 
       const normalizedStory: DBStory = {
         ...(storyData as DBStory),
@@ -715,6 +1035,8 @@ export default function StoryPage({ params }: StoryPageProps) {
       setIsUnlockingChapterId(null);
       setUnlockError(null);
       setUnlockNotice(null);
+      setVisibleNarrativeBookmark(null);
+      setHoveredBookmarkBlockId(null);
       lastRestoredChapterRef.current = null;
       const localStoredProgress = !isPreviewMode
         ? readStoredStoryProgress(storyId, userId)
@@ -727,14 +1049,22 @@ export default function StoryPage({ params }: StoryPageProps) {
         writeStoredStoryProgress(storyId, userId, storedProgress);
       }
 
+      const storyUsesChatStyle = normalizedStory.writing_style === 'chat';
+      const storedManualNarrativeBookmark = !storyUsesChatStyle
+        ? getStoredManualNarrativeBookmark(storedProgress)
+        : null;
+      const storedNarrativeBookmarkIndex = storedManualNarrativeBookmark
+        ? parsedChapters.findIndex((chapter) => chapter.id === storedManualNarrativeBookmark.chapterId)
+        : -1;
       const storedChapterId = storedProgress?.lastChapterId || null;
       const storedChapterIndex = storedChapterId
         ? parsedChapters.findIndex((chapter) => chapter.id === storedChapterId)
         : -1;
 
+      let nextSelectedChapterIndex = 0;
       if (previewChapterId) {
         const previewIndex = parsedChapters.findIndex((chapter) => chapter.id === previewChapterId);
-        setSelectedChapterIndex(previewIndex >= 0 ? previewIndex : 0);
+        nextSelectedChapterIndex = previewIndex >= 0 ? previewIndex : 0;
       } else if (normalizedPathMode === 'branching') {
         const requestedById = initialChapterIdParam
           ? parsedChapters.findIndex((chapter) => chapter.id === initialChapterIdParam)
@@ -744,30 +1074,132 @@ export default function StoryPage({ params }: StoryPageProps) {
           : -1;
 
         if (requestedById >= 0) {
-          setSelectedChapterIndex(requestedById);
-        } else if (!hasExplicitChapterParam && storedChapterIndex >= 0) {
-          setSelectedChapterIndex(storedChapterIndex);
+          nextSelectedChapterIndex = requestedById;
+        } else if (!hasExplicitChapterParam && storyUsesChatStyle && storedChapterIndex >= 0) {
+          nextSelectedChapterIndex = storedChapterIndex;
+        } else if (!hasExplicitChapterParam && !storyUsesChatStyle && storedNarrativeBookmarkIndex >= 0) {
+          nextSelectedChapterIndex = storedNarrativeBookmarkIndex;
         } else if (entryIndex >= 0) {
-          setSelectedChapterIndex(entryIndex);
+          nextSelectedChapterIndex = entryIndex;
         } else {
-          setSelectedChapterIndex(0);
+          nextSelectedChapterIndex = 0;
         }
       } else {
         const requestedById = initialChapterIdParam
           ? parsedChapters.findIndex((chapter) => chapter.id === initialChapterIdParam)
           : -1;
         if (requestedById >= 0) {
-          setSelectedChapterIndex(requestedById);
-        } else if (!hasExplicitChapterParam && storedChapterIndex >= 0) {
-          setSelectedChapterIndex(storedChapterIndex);
+          nextSelectedChapterIndex = requestedById;
+        } else if (!hasExplicitChapterParam && storyUsesChatStyle && storedChapterIndex >= 0) {
+          nextSelectedChapterIndex = storedChapterIndex;
+        } else if (!hasExplicitChapterParam && !storyUsesChatStyle && storedNarrativeBookmarkIndex >= 0) {
+          nextSelectedChapterIndex = storedNarrativeBookmarkIndex;
         } else {
-          setSelectedChapterIndex(Math.min(initialChapterIndex, Math.max(parsedChapters.length - 1, 0)));
+          nextSelectedChapterIndex = Math.min(initialChapterIndex, Math.max(parsedChapters.length - 1, 0));
         }
       }
+      const shouldRestoreInitialProgress = !isPreviewMode
+        && !hasExplicitChapterParam
+        && (
+          storyUsesChatStyle
+            ? storedChapterIndex >= 0 && nextSelectedChapterIndex === storedChapterIndex
+            : storedNarrativeBookmarkIndex >= 0 && nextSelectedChapterIndex === storedNarrativeBookmarkIndex
+        );
+      chapterNavigationModeRef.current = shouldRestoreInitialProgress ? 'restore' : 'top';
+      setSelectedChapterIndex(nextSelectedChapterIndex);
       setIsLoading(false);
+
+      if (engagementPreloaded) {
+        setLikeCount(preloadedLikeCount || 0);
+        setLikedChapterId(preloadedLikedChapterId);
+        setFavoritedChapterId(preloadedFavoritedChapterId);
+        setComments(preloadedComments || []);
+        return;
+      }
+
+      void (async () => {
+        const [likesCountResult, likeStatusResult, favoriteResult, commentsResult] = await Promise.all([
+          supabase
+            .from('likes')
+            .select('*', { count: 'exact', head: true })
+            .eq('story_id', storyId),
+          user
+            ? supabase
+              .from('likes')
+              .select('chapter_id')
+              .eq('story_id', storyId)
+              .eq('user_id', user.id)
+              .maybeSingle()
+            : Promise.resolve(null),
+          user
+            ? supabase
+              .from('favorites')
+              .select('chapter_id')
+              .eq('story_id', storyId)
+              .eq('user_id', user.id)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+            : Promise.resolve(null),
+          normalizedStorySettings.allowComments
+            ? supabase
+              .from('comments')
+              .select('id, user_id, content, created_at')
+              .eq('story_id', storyId)
+              .order('created_at', { ascending: true })
+              .limit(100)
+            : Promise.resolve(null),
+        ]);
+
+        if (cancelled) return;
+
+        setLikeCount(likesCountResult.count || 0);
+
+        if (user) {
+          setLikedChapterId(likeStatusResult?.data?.chapter_id || null);
+          setFavoritedChapterId(favoriteResult?.data?.chapter_id || null);
+        }
+
+        if (!normalizedStorySettings.allowComments) {
+          setComments([]);
+          return;
+        }
+
+        if (!commentsResult || commentsResult.error || !commentsResult.data) {
+          setComments([]);
+          return;
+        }
+
+        const rawComments = commentsResult.data as CommentQueryRow[];
+        const commentUserIds = Array.from(new Set(rawComments.map((row) => row.user_id).filter(Boolean)));
+        const profileMap = new Map<string, { pen_name: string | null; avatar_url: string | null }>();
+
+        if (commentUserIds.length > 0) {
+          const { data: profileRows } = await supabase
+            .from('profiles')
+            .select('id, pen_name, avatar_url')
+            .in('id', commentUserIds);
+
+          if (cancelled) return;
+
+          ((profileRows as ProfileQueryRow[] | null) || []).forEach((row) => {
+            profileMap.set(row.id, { pen_name: row.pen_name, avatar_url: row.avatar_url });
+          });
+        }
+
+        if (cancelled) return;
+
+        setComments(rawComments.map((row) => ({
+          ...row,
+          profiles: profileMap.get(row.user_id) || null,
+        })));
+      })();
     };
 
-    fetchReaderStory();
+    void fetchReaderStory();
+    return () => {
+      cancelled = true;
+    };
   }, [
     storyId,
     user,
@@ -778,6 +1210,7 @@ export default function StoryPage({ params }: StoryPageProps) {
     initialChapterIndex,
     initialChapterIdParam,
     fetchReaderChapters,
+    mapReaderChapterRows,
   ]);
 
   const scrollToBottom = () => {
@@ -808,6 +1241,8 @@ export default function StoryPage({ params }: StoryPageProps) {
 
     if (!fromChapterId || !isBranchingPath) {
       if (requestId !== chapterChoicesRequestRef.current) return;
+      setChapterChoicesStateChapterId(null);
+      setLoadingChoicesChapterId(null);
       setChapterChoices([]);
       setChoicesError(null);
       setIsLoadingChoices(false);
@@ -816,11 +1251,16 @@ export default function StoryPage({ params }: StoryPageProps) {
 
     const commitChoices = (choices: ReaderChapterChoice[], errorMessage: string | null) => {
       if (requestId !== chapterChoicesRequestRef.current) return false;
-      setChapterChoices(choices);
+      setChapterChoicesStateChapterId(fromChapterId);
+      setLoadingChoicesChapterId(null);
+      setChapterChoices(choices.filter((choice) => !!choice.toChapterId));
       setChoicesError(errorMessage);
       setIsLoadingChoices(false);
       return true;
     };
+
+    const getRenderableChoices = (choices: ReaderChapterChoice[]) =>
+      choices.filter((choice) => !!choice.toChapterId);
 
     const mapWithResolvedTarget = (
       base: {
@@ -857,20 +1297,24 @@ export default function StoryPage({ params }: StoryPageProps) {
       };
     };
 
+    setChapterChoicesStateChapterId(fromChapterId);
+    setLoadingChoicesChapterId(fromChapterId);
+    setChapterChoices([]);
     setIsLoadingChoices(true);
     setChoicesError(null);
     let fallbackUnresolvedChoices: ReaderChapterChoice[] = [];
 
     const registerUnresolvedChoices = (choices: ReaderChapterChoice[]) => {
-      if (choices.length === 0) return;
+      if (choices.length === 0 || getRenderableChoices(choices).length > 0) return;
       if (fallbackUnresolvedChoices.length < choices.length) {
         fallbackUnresolvedChoices = choices;
       }
     };
 
     const commitIfHasReadableTarget = (choices: ReaderChapterChoice[]) => {
-      if (choices.some((choice) => !!choice.toChapterId)) {
-        return commitChoices(choices, null);
+      const renderableChoices = getRenderableChoices(choices);
+      if (renderableChoices.length > 0) {
+        return commitChoices(renderableChoices, null);
       }
       registerUnresolvedChoices(choices);
       return false;
@@ -974,12 +1418,12 @@ export default function StoryPage({ params }: StoryPageProps) {
         return;
       }
 
-      commitChoices(mappedEmbeddedChoices, 'พบทางเลือก แต่ยังไม่เชื่อมปลายทางที่อ่านได้');
+      commitChoices([], null);
       return;
     }
 
     if (fallbackUnresolvedChoices.length > 0) {
-      commitChoices(fallbackUnresolvedChoices, 'พบทางเลือก แต่ยังไม่เชื่อมปลายทางที่อ่านได้');
+      commitChoices([], null);
       return;
     }
 
@@ -1011,30 +1455,17 @@ export default function StoryPage({ params }: StoryPageProps) {
   }, [user, isPreviewMode, dbChapters, selectedChapterIndex, canReadChapter]);
 
   useEffect(() => {
-    if (!isBranchingPath) {
-      chapterChoicesRequestRef.current += 1;
-      const timer = window.setTimeout(() => {
-        setChapterChoices([]);
-        setChoicesError(null);
-        setIsLoadingChoices(false);
-      }, 0);
-      return () => window.clearTimeout(timer);
-    }
+    const activeChapter = dbChapters[selectedChapterIndex] || null;
 
-    const currentChapterId = dbChapters[selectedChapterIndex]?.id;
-    if (!currentChapterId) {
+    if (!isBranchingPath || !activeChapter || activeChapter.isEnding) {
       chapterChoicesRequestRef.current += 1;
-      const timer = window.setTimeout(() => {
-        setChapterChoices([]);
-        setChoicesError(null);
-        setIsLoadingChoices(false);
-      }, 0);
-      return () => window.clearTimeout(timer);
+      return;
     }
 
     const timer = window.setTimeout(() => {
-      void fetchChapterChoices(currentChapterId);
+      void fetchChapterChoices(activeChapter.id);
     }, 0);
+
     return () => {
       window.clearTimeout(timer);
       chapterChoicesRequestRef.current += 1;
@@ -1058,8 +1489,25 @@ export default function StoryPage({ params }: StoryPageProps) {
     return 'light';
   }, [dbChapters, selectedChapterIndex]);
 
-  const chapterChoicesForRead = chapterChoices;
   const activeChapter = dbChapters[selectedChapterIndex] || null;
+  const activeChapterId = activeChapter?.id || null;
+  const chapterChoicesForRead = useMemo(
+    () => (
+      activeChapterId && chapterChoicesStateChapterId === activeChapterId
+        ? chapterChoices
+        : []
+    ),
+    [activeChapterId, chapterChoicesStateChapterId, chapterChoices]
+  );
+  const choicesErrorForRead = useMemo(
+    () => (
+      activeChapterId && chapterChoicesStateChapterId === activeChapterId
+        ? choicesError
+        : null
+    ),
+    [activeChapterId, chapterChoicesStateChapterId, choicesError]
+  );
+  const isLoadingChoicesForRead = activeChapterId !== null && loadingChoicesChapterId === activeChapterId && isLoadingChoices;
   const activeChapterChoiceTimerSeconds = normalizeChoiceTimerSeconds(activeChapter?.choiceTimerSeconds);
   const isNarrativeChoicePanelVisible = !!activeChapter && narrativeChoicePanelVisibleChapterId === activeChapter.id;
 
@@ -1071,6 +1519,15 @@ export default function StoryPage({ params }: StoryPageProps) {
       wideCoverUrl: dbStory.cover_wide_url || dbStory.cover_url || null,
     }
     : null;
+  const tocCharacters = useMemo(
+    () => characters.filter((character) => character.name.trim().length > 0),
+    [characters]
+  );
+  const normalizedNarrativeStoryTitle = activeStory?.title.trim().toLocaleLowerCase() || '';
+  const normalizedNarrativeChapterTitle = activeChapter?.title.trim().toLocaleLowerCase() || '';
+  const shouldShowNarrativeChapterTitle = !!activeChapter?.title.trim()
+    && normalizedNarrativeChapterTitle !== normalizedNarrativeStoryTitle;
+  const shouldShowNarrativeChapterMeta = shouldShowNarrativeChapterTitle || !!activeChapter?.isPremium;
 
   const chatScript = useMemo<ReaderChatMessage[]>(() => {
     if (!isChatStyle) return [];
@@ -1127,10 +1584,7 @@ export default function StoryPage({ params }: StoryPageProps) {
   }, []);
 
   const saveReadingProgress = useCallback((chapterId: string, chapterIndex: number, patch: Partial<StoredChapterProgress>) => {
-    if (isPreviewMode) return;
-    const previous = readStoredStoryProgress(storyId, userId);
-    const nowIso = new Date().toISOString();
-    const nextProgress: StoredStoryProgress = {
+    updateStoredStoryProgress((previous, nowIso) => ({
       lastChapterId: chapterId,
       lastChapterIndex: chapterIndex,
       updatedAt: nowIso,
@@ -1142,13 +1596,210 @@ export default function StoryPage({ params }: StoryPageProps) {
           updatedAt: nowIso,
         },
       },
+    }));
+  }, [updateStoredStoryProgress]);
+
+  const clearPendingLongPressBookmark = useCallback(() => {
+    if (longPressBookmarkTimerRef.current) {
+      clearTimeout(longPressBookmarkTimerRef.current);
+      longPressBookmarkTimerRef.current = null;
+    }
+    longPressBookmarkPointerRef.current = null;
+  }, []);
+
+  const setManualNarrativeBookmarkForBlock = useCallback((chapter: ReaderChapter, chapterIndex: number, blockId: string) => {
+    if (isPreviewMode || isChatStyle) return;
+    if (!chapter || !blockId || !canReadChapter(chapter)) return;
+
+    const bookmarkNode = narrativeBlockRefs.current[getNarrativeBlockRefKey(chapter.id, blockId)];
+    const bookmarkScrollY = bookmarkNode
+      ? Math.max(0, Math.floor(window.scrollY + bookmarkNode.getBoundingClientRect().top - NARRATIVE_BOOKMARK_VIEWPORT_OFFSET))
+      : Math.max(0, Math.floor(window.scrollY));
+
+    updateStoredStoryProgress((previous, nowIso) => {
+      const nextChapterStates: Record<string, StoredChapterProgress> = {};
+
+      Object.entries(previous?.chapterStates || {}).forEach(([existingChapterId, chapterState]) => {
+        nextChapterStates[existingChapterId] = clearManualBookmarkFields(chapterState) || { updatedAt: nowIso };
+      });
+
+      nextChapterStates[chapter.id] = {
+        ...(nextChapterStates[chapter.id] || previous?.chapterStates?.[chapter.id] || { updatedAt: nowIso }),
+        manualBookmarkBlockId: blockId,
+        manualBookmarkScrollY: bookmarkScrollY,
+        manualBookmarkUpdatedAt: nowIso,
+        updatedAt: nowIso,
+      };
+
+      return {
+        lastChapterId: chapter.id,
+        lastChapterIndex: chapterIndex,
+        updatedAt: nowIso,
+        chapterStates: nextChapterStates,
+      };
+    });
+
+    setVisibleNarrativeBookmarkForChapter(chapter.id, blockId);
+  }, [
+    isPreviewMode,
+    isChatStyle,
+    canReadChapter,
+    updateStoredStoryProgress,
+    clearManualBookmarkFields,
+    setVisibleNarrativeBookmarkForChapter,
+  ]);
+
+  const handleClearManualNarrativeBookmark = useCallback((nextHoveredBlockId: string | null = null) => {
+    if (isPreviewMode || isChatStyle) return;
+
+    updateStoredStoryProgress((previous, nowIso) => {
+      if (!previous) return null;
+
+      const nextChapterStates: Record<string, StoredChapterProgress> = {};
+      Object.entries(previous.chapterStates || {}).forEach(([chapterId, chapterState]) => {
+        nextChapterStates[chapterId] = clearManualBookmarkFields(chapterState) || { updatedAt: nowIso };
+      });
+
+      return {
+        ...previous,
+        updatedAt: nowIso,
+        chapterStates: nextChapterStates,
+      };
+    });
+
+    setVisibleNarrativeBookmark(null);
+    setHoveredBookmarkBlockId(nextHoveredBlockId);
+  }, [isPreviewMode, isChatStyle, updateStoredStoryProgress, clearManualBookmarkFields]);
+
+  const handleNarrativeBookmarkPointerDown = useCallback((
+    event: ReactPointerEvent<HTMLDivElement>,
+    chapter: ReaderChapter,
+    chapterIndex: number,
+    blockId: string,
+  ) => {
+    if (event.pointerType === 'mouse') return;
+    if (!chapter || !blockId || isPreviewMode || isChatStyle || !canReadChapter(chapter)) return;
+
+    const target = event.target;
+    if (target instanceof Element && target.closest('[data-bookmark-control="true"]')) {
+      return;
+    }
+
+    clearPendingLongPressBookmark();
+
+    longPressBookmarkPointerRef.current = {
+      pointerId: event.pointerId,
+      chapterId: chapter.id,
+      blockId,
+      startX: event.clientX,
+      startY: event.clientY,
     };
-    writeStoredStoryProgress(storyId, userId, nextProgress);
-    scheduleProgressSync(nextProgress);
-  }, [storyId, userId, isPreviewMode, scheduleProgressSync]);
+
+    longPressBookmarkTimerRef.current = setTimeout(() => {
+      const activePointer = longPressBookmarkPointerRef.current;
+      if (!activePointer || activePointer.pointerId !== event.pointerId) return;
+
+      suppressBookmarkContextMenuRef.current = true;
+      clearPendingLongPressBookmark();
+      setManualNarrativeBookmarkForBlock(chapter, chapterIndex, blockId);
+      window.getSelection?.()?.removeAllRanges();
+    }, NARRATIVE_BOOKMARK_LONG_PRESS_MS);
+  }, [
+    isPreviewMode,
+    isChatStyle,
+    canReadChapter,
+    clearPendingLongPressBookmark,
+    setManualNarrativeBookmarkForBlock,
+  ]);
+
+  const handleNarrativeBookmarkPointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const activePointer = longPressBookmarkPointerRef.current;
+    if (!activePointer || activePointer.pointerId !== event.pointerId) return;
+
+    const deltaX = Math.abs(event.clientX - activePointer.startX);
+    const deltaY = Math.abs(event.clientY - activePointer.startY);
+    if (deltaX > NARRATIVE_BOOKMARK_LONG_PRESS_MOVE_THRESHOLD || deltaY > NARRATIVE_BOOKMARK_LONG_PRESS_MOVE_THRESHOLD) {
+      clearPendingLongPressBookmark();
+    }
+  }, [clearPendingLongPressBookmark]);
+
+  const handleNarrativeBookmarkPointerEnd = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const activePointer = longPressBookmarkPointerRef.current;
+    if (!activePointer || activePointer.pointerId !== event.pointerId) return;
+    clearPendingLongPressBookmark();
+  }, [clearPendingLongPressBookmark]);
+
+  const navigateToChapter = useCallback((
+    nextIndex: number,
+    options?: { mode?: ChapterNavigationMode; closeToc?: boolean },
+  ) => {
+    if (dbChapters.length === 0) return;
+
+    const targetIndex = Math.max(0, Math.min(nextIndex, dbChapters.length - 1));
+    const mode = options?.mode || 'top';
+
+    setChoicesError(null);
+    setUnlockError(null);
+    setUnlockNotice(null);
+    setShowChoiceOverlay(false);
+    setHoveredBookmarkBlockId(null);
+    clearPendingLongPressBookmark();
+
+    if (mode === 'top') {
+      setMessages([]);
+      setCurrentIndex(0);
+    }
+
+    if (options?.closeToc) {
+      setIsTocOpen(false);
+    }
+
+    if (targetIndex === selectedChapterIndex) {
+      chapterNavigationModeRef.current = 'restore';
+
+      if (mode === 'top') {
+        const targetChapter = dbChapters[targetIndex];
+        if (targetChapter && canReadChapter(targetChapter)) {
+          if (isChatStyle) {
+            saveReadingProgress(targetChapter.id, targetIndex, { chatNextIndex: 0 });
+          } else {
+            const stored = readStoredStoryProgress(storyId, userId);
+            const storedTargetChapterState = stored?.chapterStates?.[targetChapter.id];
+            const storedManualBookmarkBlockId = typeof storedTargetChapterState?.manualBookmarkBlockId === 'string'
+              ? storedTargetChapterState.manualBookmarkBlockId || null
+              : null;
+            setVisibleNarrativeBookmarkForChapter(targetChapter.id, storedManualBookmarkBlockId);
+          }
+        }
+        window.scrollTo({ top: 0, behavior: 'auto' });
+      }
+      return;
+    }
+
+    chapterNavigationModeRef.current = mode;
+    lastRestoredChapterRef.current = null;
+    setSelectedChapterIndex(targetIndex);
+  }, [
+    dbChapters,
+    selectedChapterIndex,
+    canReadChapter,
+    isChatStyle,
+    saveReadingProgress,
+    setVisibleNarrativeBookmarkForChapter,
+    storyId,
+    userId,
+    clearPendingLongPressBookmark,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      clearPendingLongPressBookmark();
+    };
+  }, [clearPendingLongPressBookmark]);
 
   useEffect(() => {
     lastRestoredChapterRef.current = null;
+    chapterNavigationModeRef.current = 'restore';
   }, [storyId]);
 
   useEffect(() => {
@@ -1159,7 +1810,40 @@ export default function StoryPage({ params }: StoryPageProps) {
 
     const stored = readStoredStoryProgress(storyId, userId);
     const chapterState = stored?.chapterStates?.[chapter.id];
+    const navigationMode = chapterNavigationModeRef.current;
+    chapterNavigationModeRef.current = 'restore';
     lastRestoredChapterRef.current = chapter.id;
+    const savedManualBookmarkBlockId = typeof chapterState?.manualBookmarkBlockId === 'string' && chapterState.manualBookmarkBlockId
+      ? chapterState.manualBookmarkBlockId
+      : null;
+    const savedManualBookmarkScrollY = typeof chapterState?.manualBookmarkScrollY === 'number'
+      ? Math.max(0, Math.floor(chapterState.manualBookmarkScrollY))
+      : null;
+
+    if (navigationMode === 'top') {
+      const scrollToTop = () => {
+        window.scrollTo({ top: 0, behavior: 'auto' });
+      };
+      let bookmarkFrame: number | null = null;
+
+      if (isChatStyle) {
+        saveReadingProgress(chapter.id, selectedChapterIndex, { chatNextIndex: 0 });
+      } else {
+        bookmarkFrame = window.requestAnimationFrame(() => {
+          setVisibleNarrativeBookmarkForChapter(chapter.id, savedManualBookmarkBlockId);
+        });
+      }
+
+      const firstTimer = window.setTimeout(scrollToTop, 0);
+      const secondTimer = window.setTimeout(scrollToTop, 120);
+      return () => {
+        if (bookmarkFrame !== null) {
+          window.cancelAnimationFrame(bookmarkFrame);
+        }
+        window.clearTimeout(firstTimer);
+        window.clearTimeout(secondTimer);
+      };
+    }
 
     if (!chapterState) return;
 
@@ -1178,15 +1862,41 @@ export default function StoryPage({ params }: StoryPageProps) {
       return;
     }
 
-    const savedScrollY = Math.max(0, Math.floor(Number(chapterState.scrollY || 0)));
-    if (!savedScrollY) return;
+    if (!savedManualBookmarkBlockId && savedManualBookmarkScrollY === null) {
+      const clearBookmarkFrame = window.requestAnimationFrame(() => {
+        setVisibleNarrativeBookmarkForChapter(chapter.id, null);
+      });
+      return () => window.cancelAnimationFrame(clearBookmarkFrame);
+    }
+
+    const restoreNarrativePosition = () => {
+      if (savedManualBookmarkBlockId) {
+        const anchorNode = narrativeBlockRefs.current[getNarrativeBlockRefKey(chapter.id, savedManualBookmarkBlockId)];
+        if (anchorNode) {
+          const anchorTop = window.scrollY + anchorNode.getBoundingClientRect().top - NARRATIVE_BOOKMARK_VIEWPORT_OFFSET;
+          window.scrollTo({ top: Math.max(0, Math.floor(anchorTop)), behavior: 'auto' });
+          setVisibleNarrativeBookmarkForChapter(chapter.id, savedManualBookmarkBlockId);
+          return true;
+        }
+      }
+
+      if (savedManualBookmarkScrollY !== null) {
+        window.scrollTo({ top: savedManualBookmarkScrollY, behavior: 'auto' });
+        window.requestAnimationFrame(() => {
+          setVisibleNarrativeBookmarkForChapter(chapter.id, getNearestNarrativeAnchorBlockId(chapter));
+        });
+        return true;
+      }
+
+      return false;
+    };
 
     const firstTimer = window.setTimeout(() => {
-      window.scrollTo({ top: savedScrollY, behavior: 'auto' });
+      restoreNarrativePosition();
     }, 60);
     const secondTimer = window.setTimeout(() => {
-      window.scrollTo({ top: savedScrollY, behavior: 'auto' });
-    }, 320);
+      restoreNarrativePosition();
+    }, 260);
     return () => {
       window.clearTimeout(firstTimer);
       window.clearTimeout(secondTimer);
@@ -1201,6 +1911,9 @@ export default function StoryPage({ params }: StoryPageProps) {
     userId,
     isChatStyle,
     chatScript,
+    saveReadingProgress,
+    getNearestNarrativeAnchorBlockId,
+    setVisibleNarrativeBookmarkForChapter,
   ]);
 
   useEffect(() => {
@@ -1209,6 +1922,57 @@ export default function StoryPage({ params }: StoryPageProps) {
     if (!chapter || !canReadChapter(chapter)) return;
     saveReadingProgress(chapter.id, selectedChapterIndex, {});
   }, [isPreviewMode, dbChapters, selectedChapterIndex, canReadChapter, saveReadingProgress]);
+
+  useEffect(() => {
+    if (isLoading || isPreviewMode || isStoryOwner) return;
+    if (readerChapterReadRpcAvailability === false) return;
+
+    const chapter = dbChapters[selectedChapterIndex];
+    if (!chapter || !canReadChapter(chapter)) return;
+
+    const sessionId = getOrCreateTrackingSessionId();
+    if (sessionId === 'ssr') return;
+    if (hasChapterReadSessionCacheEntry(sessionId, chapter.id)) return;
+
+    let cancelled = false;
+
+    const recordChapterRead = async () => {
+      const { error } = await supabase.rpc('record_chapter_read', {
+        p_story_id: storyId,
+        p_chapter_id: chapter.id,
+        p_session_id: sessionId,
+      });
+
+      if (cancelled) return;
+
+      if (error) {
+        if (isMissingRecordChapterReadRpcError(error)) {
+          readerChapterReadRpcAvailability = false;
+          console.warn('record_chapter_read is unavailable. Chapter view counts will not increment until the migration is applied.', error);
+        } else {
+          console.warn('Failed to record chapter read count.', error);
+        }
+        return;
+      }
+
+      readerChapterReadRpcAvailability = true;
+      markChapterReadSessionCacheEntry(sessionId, chapter.id);
+    };
+
+    void recordChapterRead();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isLoading,
+    isPreviewMode,
+    isStoryOwner,
+    dbChapters,
+    selectedChapterIndex,
+    canReadChapter,
+    storyId,
+  ]);
 
   useEffect(() => {
     if (!isChatStyle || isPreviewMode) return;
@@ -1222,38 +1986,6 @@ export default function StoryPage({ params }: StoryPageProps) {
     selectedChapterIndex,
     canReadChapter,
     currentIndex,
-    saveReadingProgress,
-  ]);
-
-  useEffect(() => {
-    if (isChatStyle || isPreviewMode) return;
-    const chapter = dbChapters[selectedChapterIndex];
-    if (!chapter || !canReadChapter(chapter)) return;
-
-    let throttleTimer: number | null = null;
-    const handleScroll = () => {
-      if (throttleTimer) return;
-      throttleTimer = window.setTimeout(() => {
-        throttleTimer = null;
-        saveReadingProgress(chapter.id, selectedChapterIndex, {
-          scrollY: Math.max(0, Math.floor(window.scrollY)),
-        });
-      }, 200);
-    };
-
-    handleScroll();
-    window.addEventListener('scroll', handleScroll, { passive: true });
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      if (throttleTimer) window.clearTimeout(throttleTimer);
-    };
-  }, [
-    isChatStyle,
-    isPreviewMode,
-    dbChapters,
-    selectedChapterIndex,
-    canReadChapter,
     saveReadingProgress,
   ]);
 
@@ -1534,15 +2266,7 @@ export default function StoryPage({ params }: StoryPageProps) {
       // Automatically navigate to the chapter after successful unlock
       const index = dbChapters.findIndex(c => c.id === chapterIdToUnlock);
       if (index >= 0) {
-        setChoicesError(null);
-        setUnlockError(null);
-        setShowChoiceOverlay(false);
-        setSelectedChapterIndex(index);
-        setMessages([]);
-        setCurrentIndex(0);
-        setTimeout(() => {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }, 10);
+        navigateToChapter(index);
       }
     }
   };
@@ -1588,19 +2312,8 @@ export default function StoryPage({ params }: StoryPageProps) {
       return;
     }
 
-    setChoicesError(null);
-    setUnlockError(null);
-    setUnlockNotice(null);
-    setShowChoiceOverlay(false);
-    setSelectedChapterIndex(targetIndex);
-    setMessages([]);
-    setCurrentIndex(0);
-    
-    // Use a small delay to ensure state updates before scrolling
-    setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 10);
-  }, [dbChapters, selectedChapterIndex, storyId, trackEvent, canReadChapter, promptUnlockChapter, resetChoiceCountdown]);
+    navigateToChapter(targetIndex);
+  }, [dbChapters, selectedChapterIndex, storyId, trackEvent, canReadChapter, promptUnlockChapter, resetChoiceCountdown, navigateToChapter]);
 
   const startChoiceCountdown = useCallback((chapterId: string, durationSeconds: number) => {
     const sanitizedDurationSeconds = normalizeChoiceTimerSeconds(durationSeconds);
@@ -1675,12 +2388,12 @@ export default function StoryPage({ params }: StoryPageProps) {
 
     observer.observe(panel);
     return () => observer.disconnect();
-  }, [isChatStyle, isBranchingPath, activeChapter?.id, chapterChoicesForRead.length, isLoadingChoices]);
+  }, [isChatStyle, isBranchingPath, activeChapter?.id, chapterChoicesForRead.length, isLoadingChoicesForRead]);
 
   useEffect(() => {
     if (isChatStyle) return;
     if (!isBranchingPath || !activeChapter || activeChapter.isEnding) return;
-    if (activeChapterChoiceTimerSeconds <= 0 || isLoadingChoices) return;
+    if (activeChapterChoiceTimerSeconds <= 0 || isLoadingChoicesForRead) return;
     if (!isNarrativeChoicePanelVisible || chapterChoicesForRead.length === 0) return;
     if (!canReadChapter(activeChapter)) return;
 
@@ -1693,7 +2406,7 @@ export default function StoryPage({ params }: StoryPageProps) {
     isBranchingPath,
     activeChapter,
     activeChapterChoiceTimerSeconds,
-    isLoadingChoices,
+    isLoadingChoicesForRead,
     isNarrativeChoicePanelVisible,
     chapterChoicesForRead,
     canReadChapter,
@@ -1703,7 +2416,7 @@ export default function StoryPage({ params }: StoryPageProps) {
   useEffect(() => {
     if (!isChatStyle) return;
     if (!isBranchingPath || !activeChapter || activeChapter.isEnding) return;
-    if (activeChapterChoiceTimerSeconds <= 0 || isLoadingChoices) return;
+    if (activeChapterChoiceTimerSeconds <= 0 || isLoadingChoicesForRead) return;
     if (chapterChoicesForRead.length === 0 || !canReadChapter(activeChapter)) return;
     if (currentIndex < chatScript.length) return;
 
@@ -1719,7 +2432,7 @@ export default function StoryPage({ params }: StoryPageProps) {
     isBranchingPath,
     activeChapter,
     activeChapterChoiceTimerSeconds,
-    isLoadingChoices,
+    isLoadingChoicesForRead,
     chapterChoicesForRead,
     canReadChapter,
     currentIndex,
@@ -1774,9 +2487,26 @@ export default function StoryPage({ params }: StoryPageProps) {
   const isCurrentChapterLiked = !!currentChapterId && likedChapterId === currentChapterId;
   const isCurrentChapterFavorited = !!currentChapterId && favoritedChapterId === currentChapterId;
   const isCurrentChapterLocked = currentChapter ? !canReadChapter(currentChapter) : false;
+  const canUseInlineNarrativeBookmark = !isPreviewMode && !isChatStyle && !isCurrentChapterLocked;
   const isLastChapter = selectedChapterIndex === Math.max(dbChapters.length - 1, 0);
   const showPremiumGate = !!currentChapter && !canReadChapter(currentChapter);
   const showNarrativeIntroMeta = selectedChapterIndex === 0;
+  const showNarrativeCompactChapterHeading = !isChatStyle && !showNarrativeIntroMeta && !!currentChapter;
+  const narrativeChapterHeadingText = currentChapter
+    ? currentChapter.title.trim()
+      ? `ตอนที่ ${selectedChapterIndex + 1}: ${currentChapter.title}`
+      : `ตอนที่ ${selectedChapterIndex + 1}`
+    : '';
+  const hasChapterChoices = chapterChoicesForRead.length > 0;
+  const showEndingNotice =
+    !!currentChapter?.isEnding && !hasChapterChoices && !choicesErrorForRead;
+  const showNarrativeChoiceSection =
+    isBranchingPath && (hasChapterChoices || !!choicesErrorForRead);
+  const showChatBranchSection =
+    isBranchingPath &&
+    !isCurrentChapterLocked &&
+    currentIndex >= chatScript.length &&
+    (showNarrativeChoiceSection || showEndingNotice);
 
   const premiumGateJSX = showPremiumGate && currentChapter ? (
     <div className={`${styles.premiumGate} ${isChatStyle ? styles.premiumGateChat : ''}`}>
@@ -1941,26 +2671,30 @@ export default function StoryPage({ params }: StoryPageProps) {
               )}
               <div ref={messagesEndRef} className={styles.scrollAnchor} />
               {premiumGateJSX}
-              {isBranchingPath && !isCurrentChapterLocked && currentIndex >= chatScript.length && (
+              {showChatBranchSection && (
                 <>
-                  {isLoadingChoices ? (
+                  {isLoadingChoicesForRead ? (
                     <div className={styles.chatBranchPanel}>
                       <p className={styles.branchChoiceInfo}>กำลังโหลดตัวเลือก...</p>
                     </div>
-                  ) : chapterChoicesForRead.length === 0 ? (
-                    <div className={styles.chatBranchPanel}>
-                      {choicesError ? (
-                        <p className={styles.branchChoiceError}>{choicesError}</p>
-                      ) : currentChapter?.isEnding ? (
-                        <p className={styles.branchChoiceInfo}>ตอนนี้เป็นตอนจบของเส้นทางนี้</p>
-                      ) : (
-                        <p className={styles.branchChoiceInfo}>ตอนนี้ยังไม่มีทางเลือกท้ายตอน</p>
-                      )}
+                  ) : showEndingNotice ? (
+                    <div className={`${styles.chatBranchPanel} ${styles.branchEndingPanel}`}>
+                      <div className={styles.branchChoiceHeader}>
+                        <h3>จบเส้นทางแล้ว</h3>
+                        <span className={styles.branchEndingTag}>Ending</span>
+                      </div>
+                      <p className={styles.branchChoiceInfo}>ตอนนี้เป็นตอนจบของเส้นทางนี้</p>
                     </div>
+                  ) : chapterChoicesForRead.length === 0 ? (
+                    choicesErrorForRead ? (
+                      <div className={styles.chatBranchPanel}>
+                        <p className={styles.branchChoiceError}>{choicesErrorForRead}</p>
+                      </div>
+                    ) : null
                   ) : !showChoiceOverlay ? (
                     <div className={styles.chatBranchPanel}>
-                      {choicesError && (
-                        <p className={styles.branchChoiceError}>{choicesError}</p>
+                      {choicesErrorForRead && (
+                        <p className={styles.branchChoiceError}>{choicesErrorForRead}</p>
                       )}
                       <button
                         type="button"
@@ -1994,11 +2728,6 @@ export default function StoryPage({ params }: StoryPageProps) {
           <>
             {/* Reader Top Navbar */}
             <nav className={styles.readerNavbar}>
-              <div className={styles.readerNavLeft}>
-                <div className={styles.readerNavTitle} title={dbChapters[selectedChapterIndex]?.title || activeStory.title}>
-                  {dbChapters[selectedChapterIndex]?.title || activeStory.title}
-                </div>
-              </div>
               <div className={styles.readerNavRight}>
                 {allowTocInReader && (
                   <button
@@ -2048,68 +2777,164 @@ export default function StoryPage({ params }: StoryPageProps) {
                         <img src={dbStory.cover_url} alt="Story Typography/Cover" className={styles.readerCover} />
                       )}
 
-                      <div className={styles.readerChapterLabel}>
-                        {dbChapters[selectedChapterIndex].title}
-                        {currentChapter?.isPremium && (
-                          <span className={`${styles.readerPremiumTag} ${isCurrentChapterLocked ? styles.readerPremiumTagLocked : ''}`}>
-                            <Lock size={13} />
-                            {isCurrentChapterLocked
-                              ? `${currentChapter.coinPrice.toLocaleString('th-TH')} เหรียญ`
-                              : 'ตอนพิเศษ'}
-                          </span>
-                        )}
-                        <MoreVertical size={16} color="#cbd5e1" />
-                      </div>
+                      {shouldShowNarrativeChapterMeta && (
+                        <div
+                          className={[
+                            styles.readerChapterLabel,
+                            !shouldShowNarrativeChapterTitle ? styles.readerChapterLabelCompact : '',
+                          ].filter(Boolean).join(' ')}
+                        >
+                          {shouldShowNarrativeChapterTitle && dbChapters[selectedChapterIndex].title}
+                          {currentChapter?.isPremium && (
+                            <span className={`${styles.readerPremiumTag} ${isCurrentChapterLocked ? styles.readerPremiumTagLocked : ''}`}>
+                              <Lock size={13} />
+                              {isCurrentChapterLocked
+                                ? `${currentChapter.coinPrice.toLocaleString('th-TH')} เหรียญ`
+                                : 'ตอนพิเศษ'}
+                            </span>
+                          )}
+                          {shouldShowNarrativeChapterTitle && <MoreVertical size={16} color="#cbd5e1" />}
+                        </div>
+                      )}
                     </>
+                  )}
+
+                  {showNarrativeCompactChapterHeading && currentChapter && (
+                    <div className={styles.readerChapterHeadingCompact}>
+                      <span className={styles.readerChapterHeadingCompactTitle}>{narrativeChapterHeadingText}</span>
+                      {currentChapter.isPremium && (
+                        <span className={`${styles.readerPremiumTag} ${isCurrentChapterLocked ? styles.readerPremiumTagLocked : ''}`}>
+                          <Lock size={13} />
+                          {isCurrentChapterLocked
+                            ? `${currentChapter.coinPrice.toLocaleString('th-TH')} เหรียญ`
+                            : 'ตอนพิเศษ'}
+                        </span>
+                      )}
+                    </div>
                   )}
 
                   {isCurrentChapterLocked ? (
                     premiumGateJSX
                   ) : (
                     <article className={styles.readerContent}>
-                      {dbChapters[selectedChapterIndex].blocks.length > 0 ? (
-                        dbChapters[selectedChapterIndex].blocks.map((block: Block, idx: number) => {
-                          const char = block.characterId ? characters.find(c => c.id === block.characterId) : null;
+                      {currentChapter && currentChapter.blocks.length > 0 ? (
+                        currentChapter.blocks.map((block: Block, idx: number) => {
+                          const paragraphClassName = getReaderParagraphClassName(block.characterId !== null, block.isFlashback);
+                          const blockRefKey = getNarrativeBlockRefKey(currentChapter.id, block.id);
+                          const shouldShowBookmarkRibbon = visibleNarrativeBookmark?.chapterId === currentChapter.id
+                            && visibleNarrativeBookmark.blockId === block.id;
+                          const shouldShowBookmarkGuide = canUseInlineNarrativeBookmark && !shouldShowBookmarkRibbon;
+                          const isBookmarkGuideHovered = hoveredBookmarkBlockId === block.id && shouldShowBookmarkGuide;
+                          const blockAnchorClassName = [
+                            styles.readerBlockAnchor,
+                            isBookmarkGuideHovered ? styles.readerBlockAnchorHovered : '',
+                          ].filter(Boolean).join(' ');
 
-                          if (char) {
+                          if (block.type === 'image' && block.imageUrl) {
                             return (
-                              <div key={block.id || idx} className={styles.readerBlock}>
-                                {char.image_url ? (
-                                  <img src={char.image_url} alt={char.name} className={styles.readerBlockAvatar} />
-                                ) : (
-                                  <div className={styles.readerBlockFallbackAvatar}>
-                                    {char.name.charAt(0)}
-                                  </div>
+                              <div
+                                key={block.id || idx}
+                                ref={(node) => {
+                                  narrativeBlockRefs.current[blockRefKey] = node;
+                                }}
+                                className={blockAnchorClassName}
+                                onMouseEnter={() => setHoveredBookmarkBlockId(block.id)}
+                                onMouseLeave={() => setHoveredBookmarkBlockId((prev) => (prev === block.id ? null : prev))}
+                                onPointerDown={(event) => handleNarrativeBookmarkPointerDown(event, currentChapter, selectedChapterIndex, block.id)}
+                                onPointerMove={handleNarrativeBookmarkPointerMove}
+                                onPointerUp={handleNarrativeBookmarkPointerEnd}
+                                onPointerCancel={handleNarrativeBookmarkPointerEnd}
+                                onPointerLeave={handleNarrativeBookmarkPointerEnd}
+                                onContextMenu={(event) => {
+                                  if (suppressBookmarkContextMenuRef.current) {
+                                    event.preventDefault();
+                                    suppressBookmarkContextMenuRef.current = false;
+                                  }
+                                }}
+                              >
+                                {shouldShowBookmarkRibbon && (
+                                  <button
+                                    type="button"
+                                    className={styles.readerBookmarkRibbon}
+                                    onClick={() => handleClearManualNarrativeBookmark(block.id)}
+                                    aria-label="ลบที่คั่นหน้า"
+                                    title="ลบที่คั่นหน้า"
+                                    data-bookmark-control="true"
+                                  >
+                                    <BookmarkCheck size={13} />
+                                  </button>
                                 )}
-                                <div className={styles.readerBlockTextWrapper}>
-                                  <div className={styles.readerBlockCharName}>{char.name}</div>
-                                  {block.type === 'image' && block.imageUrl ? (
-                                    <img
-                                      src={block.imageUrl}
-                                      alt={`Image by ${char.name}`}
-                                      className={styles.readerBlockImage}
-                                    />
-                                  ) : (
-                                    <p className={styles.readerBlockParagraph}>{block.text}</p>
-                                  )}
+                                {shouldShowBookmarkGuide && (
+                                  <button
+                                    type="button"
+                                    className={styles.readerBookmarkGuide}
+                                    onClick={() => setManualNarrativeBookmarkForBlock(currentChapter, selectedChapterIndex, block.id)}
+                                    onFocus={() => setHoveredBookmarkBlockId(block.id)}
+                                    onBlur={() => setHoveredBookmarkBlockId((prev) => (prev === block.id ? null : prev))}
+                                    aria-label="คั่นหน้าตรงนี้"
+                                    title="คั่นหน้าตรงนี้"
+                                    data-bookmark-control="true"
+                                  />
+                                )}
+                                <div className={styles.readerImageOnlyWrap}>
+                                  <img
+                                    src={block.imageUrl}
+                                    alt="Story image"
+                                    className={styles.readerImageOnly}
+                                  />
                                 </div>
                               </div>
                             );
                           }
 
-                          if (block.type === 'image' && block.imageUrl) {
-                            return (
-                              <div key={block.id || idx} className={styles.readerImageOnlyWrap}>
-                                <img
-                                  src={block.imageUrl}
-                                  alt="Story image"
-                                  className={styles.readerImageOnly}
+                          return (
+                            <div
+                              key={block.id || idx}
+                              ref={(node) => {
+                                narrativeBlockRefs.current[blockRefKey] = node;
+                              }}
+                              className={blockAnchorClassName}
+                              onMouseEnter={() => setHoveredBookmarkBlockId(block.id)}
+                              onMouseLeave={() => setHoveredBookmarkBlockId((prev) => (prev === block.id ? null : prev))}
+                              onPointerDown={(event) => handleNarrativeBookmarkPointerDown(event, currentChapter, selectedChapterIndex, block.id)}
+                              onPointerMove={handleNarrativeBookmarkPointerMove}
+                              onPointerUp={handleNarrativeBookmarkPointerEnd}
+                              onPointerCancel={handleNarrativeBookmarkPointerEnd}
+                              onPointerLeave={handleNarrativeBookmarkPointerEnd}
+                              onContextMenu={(event) => {
+                                if (suppressBookmarkContextMenuRef.current) {
+                                  event.preventDefault();
+                                  suppressBookmarkContextMenuRef.current = false;
+                                }
+                              }}
+                            >
+                              {shouldShowBookmarkRibbon && (
+                                <button
+                                  type="button"
+                                  className={styles.readerBookmarkRibbon}
+                                  onClick={() => handleClearManualNarrativeBookmark(block.id)}
+                                  aria-label="ลบที่คั่นหน้า"
+                                  title="ลบที่คั่นหน้า"
+                                  data-bookmark-control="true"
+                                >
+                                  <BookmarkCheck size={13} />
+                                </button>
+                              )}
+                              {shouldShowBookmarkGuide && (
+                                <button
+                                  type="button"
+                                  className={styles.readerBookmarkGuide}
+                                  onClick={() => setManualNarrativeBookmarkForBlock(currentChapter, selectedChapterIndex, block.id)}
+                                  onFocus={() => setHoveredBookmarkBlockId(block.id)}
+                                  onBlur={() => setHoveredBookmarkBlockId((prev) => (prev === block.id ? null : prev))}
+                                  aria-label="คั่นหน้าตรงนี้"
+                                  title="คั่นหน้าตรงนี้"
+                                  data-bookmark-control="true"
                                 />
-                              </div>
-                            );
-                          }
-
-                          return <p key={block.id || idx} className={styles.readerPlainParagraph}>{block.text}</p>;
+                              )}
+                              <p className={paragraphClassName}>{block.text}</p>
+                            </div>
+                          );
                         })
                       ) : (
                         <p>ตอนนี้ยังไม่มีเนื้อหา</p>
@@ -2118,6 +2943,7 @@ export default function StoryPage({ params }: StoryPageProps) {
                 )}
 
                 {isBranchingPath ? (
+                  showNarrativeChoiceSection ? (
                     <div ref={narrativeChoicePanelRef} className={styles.branchChoicePanel}>
                       <div className={styles.branchChoiceHeader}>
                         <h3>ทางเลือกเส้นทางถัดไป</h3>
@@ -2136,23 +2962,18 @@ export default function StoryPage({ params }: StoryPageProps) {
                           </div>
                         </div>
                       )}
-                      {isLoadingChoices ? (
+                      {isLoadingChoicesForRead ? (
                         <p className={styles.branchChoiceInfo}>กำลังโหลดตัวเลือก...</p>
                       ) : chapterChoicesForRead.length === 0 ? (
-                        choicesError ? (
-                          <p className={styles.branchChoiceError}>{choicesError}</p>
-                        ) : currentChapter?.isEnding ? (
-                          <p className={styles.branchChoiceInfo}>ตอนนี้เป็นตอนจบของเส้นทางนี้</p>
-                        ) : (
-                          <p className={styles.branchChoiceInfo}>ตอนนี้ยังไม่มีทางเลือกท้ายตอน</p>
-                        )
+                        choicesErrorForRead ? (
+                          <p className={styles.branchChoiceError}>{choicesErrorForRead}</p>
+                        ) : null
                       ) : (
                         <>
-                          {choicesError && <p className={styles.branchChoiceError}>{choicesError}</p>}
+                          {choicesErrorForRead && <p className={styles.branchChoiceError}>{choicesErrorForRead}</p>}
                           <div className={styles.branchChoiceList}>
                             {chapterChoicesForRead.map((choice, index) => {
-                              const isMissingDestination = !choice.toChapterId;
-                              const isLockedChoice = !isMissingDestination && !choice.canRead;
+                              const isLockedChoice = !choice.canRead;
                               return (
                                 <button
                                   key={choice.id}
@@ -2160,18 +2981,14 @@ export default function StoryPage({ params }: StoryPageProps) {
                                   className={[
                                     styles.branchChoiceBtn,
                                     isLockedChoice ? styles.branchChoiceBtnLocked : '',
-                                    isMissingDestination ? styles.branchChoiceBtnDisabled : '',
                                   ].filter(Boolean).join(' ')}
                                   onClick={() => handleSelectBranchChoice(choice)}
-                                  disabled={isMissingDestination}
                                 >
                                   <span>{index + 1}. {choice.choiceText}</span>
                                   <small className={styles.branchChoiceMeta}>
-                                    {isMissingDestination
-                                      ? 'ทางเลือกนี้ยังไม่มีตอนปลายทาง'
-                                      : isLockedChoice
-                                        ? `🔒 ล็อก ${choice.coinPrice.toLocaleString('th-TH')} เหรียญ • ไปตอน ${choice.toOrderIndex + 1}`
-                                        : `ไปตอน ${choice.toOrderIndex + 1}: ${choice.toTitle}`}
+                                    {isLockedChoice
+                                      ? `🔒 ล็อก ${choice.coinPrice.toLocaleString('th-TH')} เหรียญ • ไปตอน ${choice.toOrderIndex + 1}`
+                                      : `ไปตอน ${choice.toOrderIndex + 1}: ${choice.toTitle}`}
                                   </small>
                                   {choice.outcomeText && (
                                     <p className={styles.branchChoiceOutcome}>{choice.outcomeText}</p>
@@ -2183,16 +3000,22 @@ export default function StoryPage({ params }: StoryPageProps) {
                         </>
                       )}
                     </div>
-                  ) : (
+                  ) : showEndingNotice ? (
+                    <div className={`${styles.branchChoicePanel} ${styles.branchEndingPanel}`}>
+                      <div className={styles.branchChoiceHeader}>
+                        <h3>จบเส้นทางแล้ว</h3>
+                        <span className={styles.branchEndingTag}>Ending</span>
+                      </div>
+                      <p className={styles.branchChoiceInfo}>ตอนนี้เป็นตอนจบของเส้นทางนี้</p>
+                    </div>
+                  ) : null
+                ) : (
                     <div className={styles.chapterNav} style={{ marginTop: '3rem', width: '100%', maxWidth: '400px' }}>
                       <button
                         type="button"
                         className={styles.chapterNavBtn}
                         onClick={() => {
-                          setUnlockError(null);
-                          setUnlockNotice(null);
-                          setShowChoiceOverlay(false);
-                          setSelectedChapterIndex((prev: number) => Math.max(prev - 1, 0));
+                          navigateToChapter(selectedChapterIndex - 1);
                         }}
                         disabled={selectedChapterIndex === 0}
                       >
@@ -2202,10 +3025,7 @@ export default function StoryPage({ params }: StoryPageProps) {
                         type="button"
                         className={styles.chapterNavBtn}
                         onClick={() => {
-                          setUnlockError(null);
-                          setUnlockNotice(null);
-                          setShowChoiceOverlay(false);
-                          setSelectedChapterIndex((prev: number) => Math.min(prev + 1, dbChapters.length - 1));
+                          navigateToChapter(selectedChapterIndex + 1);
                         }}
                         disabled={selectedChapterIndex === dbChapters.length - 1}
                       >
@@ -2234,23 +3054,28 @@ export default function StoryPage({ params }: StoryPageProps) {
               <div className={styles.tocContent}>
                 <div className={styles.tocStoryTitle}>{dbChapters[selectedChapterIndex]?.title || activeStory.title}</div>
                 <div className={styles.tocTotalInfo}>ตอนทั้งหมด ({dbChapters.length})</div>
+                {tocCharacters.length > 0 && (
+                  <div className={styles.tocCharactersSection}>
+                    <div className={styles.tocCharactersLabel}>ตัวละคร</div>
+                    <div className={styles.tocCharactersList}>
+                      {tocCharacters.map((character) => (
+                        <span key={character.id} className={styles.tocCharacterChip}>
+                          {character.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className={styles.tocList}>
                   {dbChapters.map((ch, idx) => (
                     <button
                       key={ch.id}
                       className={`${styles.tocItem} ${idx === selectedChapterIndex ? styles.tocItemActive : ''}`}
                       onClick={() => {
-                        setUnlockError(null);
-                        setUnlockNotice(null);
-                        setShowChoiceOverlay(false);
-                        setSelectedChapterIndex(idx);
-                        setMessages([]);
-                        setCurrentIndex(0);
-                        setIsTocOpen(false);
+                        navigateToChapter(idx, { closeToc: true });
                         if (!canReadChapter(ch) && !isPreviewMode && user) {
                           promptUnlockChapter(ch);
                         }
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
                     >
                       <span className={styles.tocItemIndex}>#{idx + 1}</span>

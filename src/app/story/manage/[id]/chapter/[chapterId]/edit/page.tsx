@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { Save, Loader2, Plus, X, Trash2, Image as ImageIcon, Search, CheckCircle2, AlertCircle, RotateCcw, Clock, History, Maximize2, Minimize2, ExternalLink } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Save, Loader2, Plus, X, Trash2, Image as ImageIcon, Search, CheckCircle2, AlertCircle, RotateCcw, Clock, History, Maximize2, Minimize2, ExternalLink, ChevronUp, ChevronDown } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { useAuth } from '@/contexts/AuthContext';
@@ -39,6 +40,13 @@ type Block = {
     text: string;
     characterId: string | null;
     imageUrl?: string;
+    isFlashback: boolean;
+};
+
+type CharSelectorViewportPosition = {
+    top: number;
+    left: number;
+    maxHeight: number;
 };
 
 type UnsplashImage = {
@@ -149,6 +157,34 @@ const normalizeDraftChoices = (rawChoices: unknown): BranchChoiceDraft[] => {
     }));
 };
 
+const normalizeBlocks = (rawBlocks: unknown, fallbackPrefix: string): Block[] => {
+    if (!Array.isArray(rawBlocks)) return [];
+
+    return rawBlocks
+        .map((item, index) => {
+            if (!item || typeof item !== 'object') return null;
+            const blockObject = item as Record<string, unknown>;
+            const type = blockObject.type === 'image' ? 'image' : 'paragraph';
+            const text = typeof blockObject.text === 'string' ? blockObject.text : '';
+            const characterId = typeof blockObject.characterId === 'string' ? blockObject.characterId : null;
+            const imageUrl = typeof blockObject.imageUrl === 'string' ? blockObject.imageUrl : undefined;
+            const isFlashback = blockObject.isFlashback === true || blockObject.is_flashback === true;
+            const id = typeof blockObject.id === 'string' && blockObject.id
+                ? blockObject.id
+                : `${fallbackPrefix}-${Date.now()}-${index}`;
+
+            return {
+                id,
+                type,
+                text,
+                characterId,
+                imageUrl,
+                isFlashback,
+            } as Block;
+        })
+        .filter((item): item is Block => item !== null);
+};
+
 const parseStoredChapterContent = (rawContent: unknown): ChapterContentPayload => {
     let parsedBlocks: Block[] = [];
     let parsedPov: string | null = null;
@@ -160,27 +196,7 @@ const parseStoredChapterContent = (rawContent: unknown): ChapterContentPayload =
     if (rawContent && typeof rawContent === 'object') {
         const contentObject = rawContent as Record<string, unknown>;
         if (Array.isArray(contentObject.blocks)) {
-            parsedBlocks = contentObject.blocks
-                .map((item, index) => {
-                    if (!item || typeof item !== 'object') return null;
-                    const blockObject = item as Record<string, unknown>;
-                    const type = blockObject.type === 'image' ? 'image' : 'paragraph';
-                    const text = typeof blockObject.text === 'string' ? blockObject.text : '';
-                    const characterId = typeof blockObject.characterId === 'string' ? blockObject.characterId : null;
-                    const imageUrl = typeof blockObject.imageUrl === 'string' ? blockObject.imageUrl : undefined;
-                    const id = typeof blockObject.id === 'string' && blockObject.id
-                        ? blockObject.id
-                        : `block-${Date.now()}-${index}`;
-
-                    return {
-                        id,
-                        type,
-                        text,
-                        characterId,
-                        imageUrl,
-                    } as Block;
-                })
-                .filter((item): item is Block => item !== null);
+            parsedBlocks = normalizeBlocks(contentObject.blocks, 'block');
         } else if (typeof contentObject.text === 'string') {
             parsedBlocks = contentObject.text
                 .split('\n')
@@ -190,6 +206,7 @@ const parseStoredChapterContent = (rawContent: unknown): ChapterContentPayload =
                     type: 'paragraph' as const,
                     text: line,
                     characterId: null,
+                    isFlashback: false,
                 }));
         }
 
@@ -214,11 +231,12 @@ const parseStoredChapterContent = (rawContent: unknown): ChapterContentPayload =
                 type: 'paragraph' as const,
                 text: line,
                 characterId: null,
+                isFlashback: false,
             }));
     }
 
     if (parsedBlocks.length === 0) {
-        parsedBlocks = [{ id: `block-${Date.now()}`, type: 'paragraph', text: '', characterId: null }];
+        parsedBlocks = [{ id: `block-${Date.now()}`, type: 'paragraph', text: '', characterId: null, isFlashback: false }];
     }
 
     const parsedContent: ChapterContentPayload = {
@@ -278,6 +296,8 @@ export default function EditChapterPage() {
     // Track which block has its character selector open (narrative mode)
     const [openCharSelectorId, setOpenCharSelectorId] = useState<string | null>(null);
     const charSelectorRef = useRef<HTMLDivElement>(null);
+    const charSelectorAnchorRefs = useRef<Record<string, HTMLDivElement | null>>({});
+    const [charSelectorViewportPosition, setCharSelectorViewportPosition] = useState<CharSelectorViewportPosition | null>(null);
 
     // Quick Add Character Modal State
     const [showQuickAddChar, setShowQuickAddChar] = useState(false);
@@ -395,7 +415,7 @@ export default function EditChapterPage() {
         const draft = acceptRecovery();
         if (!draft) return;
         setTitle(draft.title);
-        setBlocks(draft.blocks);
+        setBlocks(normalizeBlocks(draft.blocks, 'recovered-block'));
         setPovCharacterId(draft.povCharacterId);
         setChatTheme(draft.chatTheme);
         setIsPremium(draft.isPremium);
@@ -524,7 +544,7 @@ export default function EditChapterPage() {
     const buildDraftSnapshot = useCallback(() => {
         const draftBlocks = blocks.length > 0
             ? blocks
-            : [{ id: 'block-empty', type: 'paragraph' as const, text: '', characterId: null }];
+            : [{ id: 'block-empty', type: 'paragraph' as const, text: '', characterId: null, isFlashback: false }];
         const draftChoices = isBranchingStory && !isEndingChapter
             ? chapterChoices.map((choice, index) => ({
                 id: choice.id || `choice-${index}`,
@@ -1234,16 +1254,86 @@ export default function EditChapterPage() {
         saveRevisionSnapshot,
     ]);
 
+    const updateCharSelectorViewportPosition = useCallback((blockId: string | null) => {
+        if (!blockId || typeof window === 'undefined') {
+            setCharSelectorViewportPosition(null);
+            return;
+        }
+
+        const anchor = charSelectorAnchorRefs.current[blockId];
+        if (!anchor) {
+            setCharSelectorViewportPosition(null);
+            return;
+        }
+
+        const rect = anchor.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const dropdownWidth = 260;
+        const dropdownMaxHeight = 320;
+        const gutter = 8;
+
+        const left = Math.min(
+            Math.max(gutter, rect.left),
+            Math.max(gutter, viewportWidth - dropdownWidth - gutter)
+        );
+
+        let top = rect.bottom + gutter;
+        if (top + dropdownMaxHeight > viewportHeight - gutter) {
+            top = Math.max(gutter, rect.top - dropdownMaxHeight - gutter);
+        }
+
+        const maxHeight = Math.max(
+            120,
+            Math.min(dropdownMaxHeight, viewportHeight - top - gutter)
+        );
+
+        setCharSelectorViewportPosition({ top, left, maxHeight });
+    }, []);
+
     // Close popups when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (charSelectorRef.current && !charSelectorRef.current.contains(event.target as Node)) {
                 setOpenCharSelectorId(null);
+                setCharSelectorViewportPosition(null);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    useEffect(() => {
+        if (!openCharSelectorId) {
+            setCharSelectorViewportPosition(null);
+            return;
+        }
+
+        const handleResize = () => updateCharSelectorViewportPosition(openCharSelectorId);
+        
+        const handleAnyScroll = (e: Event) => {
+            // Prevent closing if the scroll event originated from the char selector itself
+            if (charSelectorRef.current && (e.target as Node) && charSelectorRef.current.contains(e.target as Node)) {
+                return;
+            }
+            setOpenCharSelectorId(null);
+            setCharSelectorViewportPosition(null);
+        };
+
+        handleResize();
+
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+
+        window.addEventListener('resize', handleResize);
+        window.addEventListener('scroll', handleAnyScroll, true);
+        
+        return () => {
+            document.body.style.overflow = previousOverflow;
+            window.removeEventListener('resize', handleResize);
+            window.removeEventListener('scroll', handleAnyScroll, true);
+        };
+    }, [openCharSelectorId, updateCharSelectorViewportPosition, blocks.length]);
 
     useEffect(() => {
         if (!notice) return;
@@ -1369,14 +1459,14 @@ export default function EditChapterPage() {
                 setChapterChoices(effectiveCachedChoices);
                 updateSavedChoicesSignature(buildChoicesSignature(effectiveCachedChoices));
                 setStoryPathMode(normalizePathMode(parsed.storyPathMode));
-                const parsedBlocks = Array.isArray(parsed.blocks) ? (parsed.blocks as Block[]) : [];
+                const parsedBlocks = normalizeBlocks(parsed.blocks, 'cached-block');
                 const cachedDraftContent: ChapterContentPayload = {
                     povCharacterId: parsed.povCharacterId || null,
                     chatTheme: typeof parsed.chatTheme === 'string' ? parsed.chatTheme : 'white',
                     backgroundSound: null,
                     blocks: parsedBlocks.length > 0
                         ? parsedBlocks
-                        : [{ id: 'block-empty', type: 'paragraph' as const, text: '', characterId: null }],
+                        : [{ id: 'block-empty', type: 'paragraph' as const, text: '', characterId: null, isFlashback: false }],
                     branchChoices: effectiveCachedChoices,
                     isEnding: parsed.isEndingChapter === true,
                     choiceTimerSeconds: normalizeChoiceTimerSeconds(parsed.choiceTimerSeconds),
@@ -1562,7 +1652,7 @@ export default function EditChapterPage() {
                     backgroundSound: null,
                     blocks: parsedBlocks.length > 0
                         ? parsedBlocks
-                        : [{ id: 'block-empty', type: 'paragraph' as const, text: '', characterId: null }],
+                        : [{ id: 'block-empty', type: 'paragraph' as const, text: '', characterId: null, isFlashback: false }],
                     branchChoices: effectiveChoices,
                     isEnding: parsedIsEnding,
                     choiceTimerSeconds: parsedChoiceTimerSeconds,
@@ -1794,7 +1884,7 @@ export default function EditChapterPage() {
         const cleanBlocks = blocks.filter(b => b.text.trim() !== '' || b.characterId !== null || b.type === 'image');
         const normalizedBlocks = cleanBlocks.length > 0
             ? cleanBlocks
-            : [{ id: `block-${Date.now()}`, type: 'paragraph' as const, text: '', characterId: null }];
+            : [{ id: `block-${Date.now()}`, type: 'paragraph' as const, text: '', characterId: null, isFlashback: false }];
         const contentPayload: ChapterContentPayload = {
             povCharacterId: isChatStyle ? povCharacterId : null,
             chatTheme: isChatStyle ? chatTheme : undefined,
@@ -1934,6 +2024,7 @@ export default function EditChapterPage() {
     };
 
     const addBlock = (afterId?: string) => {
+        const newId = `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         setBlocks(prev => {
             let inheritedCharId: string | null = null;
             if (afterId && isChatStyle) {
@@ -1943,8 +2034,7 @@ export default function EditChapterPage() {
                 }
             }
 
-            const newId = `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            const newBlock: Block = { id: newId, type: 'paragraph', text: '', characterId: inheritedCharId };
+            const newBlock: Block = { id: newId, type: 'paragraph', text: '', characterId: inheritedCharId, isFlashback: false };
 
             if (!afterId) return [...prev, newBlock];
             const index = prev.findIndex(b => b.id === afterId);
@@ -1956,8 +2046,7 @@ export default function EditChapterPage() {
 
         // Focus the new block after a short delay to allow React to render it
         setTimeout(() => {
-            // After state update, the last block will be focused or finding the newly injected ID
-            const el = document.querySelector(`textarea:last-of-type`) as HTMLTextAreaElement;
+            const el = document.getElementById(`textarea-${newId}`) as HTMLTextAreaElement;
             if (el) el.focus();
         }, 50);
     };
@@ -1970,7 +2059,8 @@ export default function EditChapterPage() {
             id: newId,
             type: 'paragraph',
             text: chatInputValue.trim(),
-            characterId: activeCharacterId
+            characterId: activeCharacterId,
+            isFlashback: false,
         };
 
         setBlocks(prev => {
@@ -2017,7 +2107,8 @@ export default function EditChapterPage() {
                 type: 'image',
                 text: '',
                 characterId: activeCharacterId,
-                imageUrl: publicUrl
+                imageUrl: publicUrl,
+                isFlashback: false,
             };
 
             setBlocks(prev => {
@@ -2103,7 +2194,8 @@ export default function EditChapterPage() {
                 type: 'image',
                 text: '',
                 characterId: activeCharacterId,
-                imageUrl: image.regular
+                imageUrl: image.regular,
+                isFlashback: false,
             };
 
             setBlocks(prev => {
@@ -2123,7 +2215,8 @@ export default function EditChapterPage() {
                 type: 'image',
                 text: '',
                 characterId: null,
-                imageUrl: image.regular
+                imageUrl: image.regular,
+                isFlashback: false,
             };
 
             setBlocks(prev => {
@@ -2145,7 +2238,7 @@ export default function EditChapterPage() {
         const blockToRemove = blocks.find(b => b.id === id);
 
         setBlocks(prev => {
-            if (prev.length <= 1) return [{ id: `block-${Date.now()}`, type: 'paragraph', text: '', characterId: null }];
+            if (prev.length <= 1) return [{ id: `block-${Date.now()}`, type: 'paragraph', text: '', characterId: null, isFlashback: false }];
 
             const index = prev.findIndex(b => b.id === id);
             if (index > 0) {
@@ -2181,6 +2274,30 @@ export default function EditChapterPage() {
             }
         }
     };
+
+    const moveBlockUp = useCallback((id: string) => {
+        setBlocks(prev => {
+            const index = prev.findIndex(b => b.id === id);
+            if (index <= 0) return prev;
+            const newBlocks = [...prev];
+            const temp = newBlocks[index - 1];
+            newBlocks[index - 1] = newBlocks[index];
+            newBlocks[index] = temp;
+            return newBlocks;
+        });
+    }, []);
+
+    const moveBlockDown = useCallback((id: string) => {
+        setBlocks(prev => {
+            const index = prev.findIndex(b => b.id === id);
+            if (index < 0 || index >= prev.length - 1) return prev;
+            const newBlocks = [...prev];
+            const temp = newBlocks[index + 1];
+            newBlocks[index + 1] = newBlocks[index];
+            newBlocks[index] = temp;
+            return newBlocks;
+        });
+    }, []);
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, id: string) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -2623,7 +2740,9 @@ export default function EditChapterPage() {
 
             <div className={`${styles.editorWorkspace} ${isBranchingStory && !isChatStyle ? styles.editorWorkspaceWithBranching : ''}`}>
                 <div className={styles.editorMainColumn}>
-                    <div className={`${styles.content} ${!isChatStyle ? styles.contentNarrative : ''} ${isChatStyle ? styles.contentChat : ''}`}>
+                    <div
+                        className={`${styles.content} ${!isChatStyle ? styles.contentNarrative : ''} ${isChatStyle ? styles.contentChat : ''}`}
+                    >
                 <div className={styles.titleArea}>
                     {isChatStyle && (
                         <div className={styles.chatSetupStack}>
@@ -2724,6 +2843,12 @@ export default function EditChapterPage() {
                                                     />
                                                 )}
                                                 <div className={blockStyles.blockActions} style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', right: isPOV ? 'calc(100% + 8px)' : 'auto', left: !isPOV ? 'calc(100% + 8px)' : 'auto', paddingTop: 0, minWidth: 'max-content' }}>
+                                                    <button className={blockStyles.actionBtn} onClick={() => moveBlockUp(block.id)} title="เลื่อนขึ้น">
+                                                        <ChevronUp size={14} />
+                                                    </button>
+                                                    <button className={blockStyles.actionBtn} onClick={() => moveBlockDown(block.id)} title="เลื่อนลง">
+                                                        <ChevronDown size={14} />
+                                                    </button>
                                                     <button className={`${blockStyles.actionBtn} ${blockStyles.destructive}`} onClick={() => removeBlock(block.id)} title="ลบข้อความ">
                                                         <Trash2 size={14} />
                                                     </button>
@@ -2843,15 +2968,41 @@ export default function EditChapterPage() {
                                 const assignedChar = characters.find(c => c.id === block.characterId);
                                 const isSelectorOpen = openCharSelectorId === block.id;
                                 const isImageBlock = block.type === 'image' && !!block.imageUrl;
+                                const isFlashbackBlock = !isImageBlock && block.isFlashback;
+                                const blockRowClassName = [
+                                    blockStyles.blockRow,
+                                    blockStyles.alignLeft,
+                                    isFlashbackBlock ? blockStyles.blockRowFlashback : '',
+                                ].filter(Boolean).join(' ');
+                                const textareaClassName = [
+                                    blockStyles.blockTextarea,
+                                    isFlashbackBlock ? blockStyles.blockTextareaFlashback : '',
+                                ].filter(Boolean).join(' ');
 
                                 return (
-                                    <div key={block.id} className={`${blockStyles.blockRow} ${blockStyles.alignLeft}`}>
+                                    <div key={block.id} className={blockRowClassName}>
                                         {/* Character Avatar Wrapper */}
                                         {!isImageBlock && (
-                                            <div style={{ position: 'relative' }}>
+                                            <div
+                                                style={{ position: 'relative' }}
+                                                ref={(node) => {
+                                                    charSelectorAnchorRefs.current[block.id] = node;
+                                                }}
+                                            >
                                                 <div
                                                     className={blockStyles.blockAvatar}
-                                                    onClick={() => setOpenCharSelectorId(isSelectorOpen ? null : block.id)}
+                                                    onClick={() => {
+                                                        if (isSelectorOpen) {
+                                                            setOpenCharSelectorId(null);
+                                                            setCharSelectorViewportPosition(null);
+                                                            return;
+                                                        }
+
+                                                        setOpenCharSelectorId(block.id);
+                                                        requestAnimationFrame(() => {
+                                                            updateCharSelectorViewportPosition(block.id);
+                                                        });
+                                                    }}
                                                     title={assignedChar ? assignedChar.name : "คลิกเพื่อเลือกตัวละคร"}
                                                 >
                                                     {assignedChar?.image_url ? (
@@ -2862,31 +3013,50 @@ export default function EditChapterPage() {
                                                 </div>
 
                                                 {/* Character Selection Dropdown */}
-                                                {isSelectorOpen && (
-                                                    <div className={blockStyles.charSelector} ref={charSelectorRef}>
+                                                {isSelectorOpen && charSelectorViewportPosition && typeof window !== 'undefined'
+                                                    ? createPortal(
                                                         <div
-                                                            className={`${blockStyles.charOption} ${!block.characterId ? blockStyles.active : ''}`}
-                                                            onClick={() => { updateBlock(block.id, { characterId: null }); setOpenCharSelectorId(null); }}
+                                                            className={blockStyles.charSelector}
+                                                            ref={charSelectorRef}
+                                                            style={{
+                                                                top: `${charSelectorViewportPosition.top}px`,
+                                                                left: `${charSelectorViewportPosition.left}px`,
+                                                                maxHeight: `${charSelectorViewportPosition.maxHeight}px`,
+                                                            }}
                                                         >
-                                                            <div className={blockStyles.charOptionAvatar}>?</div>
-                                                            <div className={blockStyles.charOptionName}>ไม่มีตัวละคร (บทบรรยาย)</div>
-                                                        </div>
-                                                        {characters.map(char => (
                                                             <div
-                                                                key={char.id}
-                                                                className={`${blockStyles.charOption} ${block.characterId === char.id ? blockStyles.active : ''}`}
-                                                                onClick={() => { updateBlock(block.id, { characterId: char.id }); setOpenCharSelectorId(null); }}
+                                                                className={`${blockStyles.charOption} ${!block.characterId ? blockStyles.active : ''}`}
+                                                                onClick={() => {
+                                                                    updateBlock(block.id, { characterId: null });
+                                                                    setOpenCharSelectorId(null);
+                                                                    setCharSelectorViewportPosition(null);
+                                                                }}
                                                             >
-                                                                {char.image_url ? (
-                                                                    <img src={char.image_url} className={blockStyles.charOptionAvatar} alt="" />
-                                                                ) : (
-                                                                    <div className={blockStyles.charOptionAvatar}>{char.name.substring(0, 1)}</div>
-                                                                )}
-                                                                <div className={blockStyles.charOptionName}>{char.name}</div>
+                                                                <div className={blockStyles.charOptionAvatar}>?</div>
+                                                                <div className={blockStyles.charOptionName}>ไม่มีตัวละคร (บทบรรยาย)</div>
                                                             </div>
-                                                        ))}
-                                                    </div>
-                                                )}
+                                                            {characters.map(char => (
+                                                                <div
+                                                                    key={char.id}
+                                                                    className={`${blockStyles.charOption} ${block.characterId === char.id ? blockStyles.active : ''}`}
+                                                                    onClick={() => {
+                                                                        updateBlock(block.id, { characterId: char.id });
+                                                                        setOpenCharSelectorId(null);
+                                                                        setCharSelectorViewportPosition(null);
+                                                                    }}
+                                                                >
+                                                                    {char.image_url ? (
+                                                                        <img src={char.image_url} className={blockStyles.charOptionAvatar} alt="" />
+                                                                    ) : (
+                                                                        <div className={blockStyles.charOptionAvatar}>{char.name.substring(0, 1)}</div>
+                                                                    )}
+                                                                    <div className={blockStyles.charOptionName}>{char.name}</div>
+                                                                </div>
+                                                            ))}
+                                                        </div>,
+                                                        document.body
+                                                    )
+                                                    : null}
                                             </div>
                                         )}
 
@@ -2899,6 +3069,12 @@ export default function EditChapterPage() {
                                                         <img src={block.imageUrl} alt="Narrative image" className={blockStyles.blockImage} />
                                                     </div>
                                                     <div className={blockStyles.blockActions} style={{ opacity: 1 }}>
+                                                        <button className={blockStyles.actionBtn} onClick={() => moveBlockUp(block.id)} title="เลื่อนขึ้น">
+                                                            <ChevronUp size={16} />
+                                                        </button>
+                                                        <button className={blockStyles.actionBtn} onClick={() => moveBlockDown(block.id)} title="เลื่อนลง">
+                                                            <ChevronDown size={16} />
+                                                        </button>
                                                         <button className={blockStyles.actionBtn} onClick={() => addBlock(block.id)} title="เพิ่มย่อหน้าใหม่ด้านล่าง">
                                                             <Plus size={16} />
                                                         </button>
@@ -2909,10 +3085,17 @@ export default function EditChapterPage() {
                                                 </>
                                             ) : (
                                                 <>
-                                                    {assignedChar && <div className={blockStyles.blockSpeakerName}>{assignedChar.name}</div>}
+                                                    {(assignedChar || isFlashbackBlock) && (
+                                                        <div className={blockStyles.blockMeta}>
+                                                            {assignedChar && <div className={blockStyles.blockSpeakerName}>{assignedChar.name}</div>}
+                                                            {isFlashbackBlock && (
+                                                                <span className={blockStyles.blockToneTag}>เล่าความหลัง</span>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                     <textarea
                                                         id={`textarea-${block.id}`}
-                                                        className={blockStyles.blockTextarea}
+                                                        className={textareaClassName}
                                                         value={block.text}
                                                         onChange={(e) => {
                                                             updateBlock(block.id, { text: e.target.value });
@@ -2920,10 +3103,30 @@ export default function EditChapterPage() {
                                                             e.target.style.height = e.target.scrollHeight + 'px';
                                                         }}
                                                         onKeyDown={(e) => handleKeyDown(e, block.id)}
-                                                        placeholder={assignedChar ? `พิมพ์บทพูดของ ${assignedChar.name}...` : 'พิมพ์บทบรรยาย...'}
+                                                        placeholder={
+                                                            isFlashbackBlock
+                                                                ? 'พิมพ์ฉากเล่าความหลัง...'
+                                                                : assignedChar
+                                                                    ? `พิมพ์บทพูดของ ${assignedChar.name}...`
+                                                                    : 'พิมพ์บทบรรยาย...'
+                                                        }
                                                         rows={1}
                                                     />
                                                     <div className={blockStyles.blockActions}>
+                                                        <button
+                                                            className={`${blockStyles.actionBtn} ${isFlashbackBlock ? blockStyles.actionBtnActive : ''}`}
+                                                            onClick={() => updateBlock(block.id, { isFlashback: !block.isFlashback })}
+                                                            title={isFlashbackBlock ? 'ปิดเล่าความหลัง' : 'ตั้งเป็นเล่าความหลัง'}
+                                                            aria-pressed={isFlashbackBlock}
+                                                        >
+                                                            <History size={16} />
+                                                        </button>
+                                                        <button className={blockStyles.actionBtn} onClick={() => moveBlockUp(block.id)} title="เลื่อนขึ้น">
+                                                            <ChevronUp size={16} />
+                                                        </button>
+                                                        <button className={blockStyles.actionBtn} onClick={() => moveBlockDown(block.id)} title="เลื่อนลง">
+                                                            <ChevronDown size={16} />
+                                                        </button>
                                                         <button className={blockStyles.actionBtn} onClick={() => addBlock(block.id)} title="เพิ่มย่อหน้าใหม่ด้านล่าง">
                                                             <Plus size={16} />
                                                         </button>

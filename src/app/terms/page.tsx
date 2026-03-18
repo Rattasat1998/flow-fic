@@ -196,7 +196,6 @@ export default function TermsPage() {
       <p style={{ marginBottom: "0.75rem" }}>
         <Link href="/data-deletion">คำแนะนำการลบข้อมูล (Data Deletion)</Link>
       </p>
-      <Link href="/">กลับหน้าแรก</Link>
     </main>
   );
 }

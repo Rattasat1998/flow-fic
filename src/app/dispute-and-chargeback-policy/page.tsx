@@ -55,7 +55,6 @@ export default function DisputeAndChargebackPolicyPage() {
       <p style={{ marginBottom: "0.75rem" }}>
         <Link href="/billing-policies">นโยบายการเงินทั้งหมด</Link>
       </p>
-      <Link href="/terms">กลับไปข้อกำหนดและเงื่อนไขหลัก</Link>
     </main>
   );
 }

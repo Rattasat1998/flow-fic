@@ -10,6 +10,7 @@ import styles from './details.module.css';
 import { useTracking } from '@/hooks/useTracking';
 import { useFollow } from '@/hooks/useFollow';
 import { useAuth } from '@/contexts/AuthContext';
+import { BrandLogo } from '@/components/brand/BrandLogo';
 
 interface StoryDetailsProps {
     params: Promise<{ id: string }>;
@@ -53,6 +54,14 @@ type ReaderChapterRow = {
     coin_price: number;
     can_read: boolean;
     access_source: string;
+};
+
+type StoryCharacter = {
+    id: string;
+    name: string;
+    age: string | null;
+    occupation: string | null;
+    image_url: string | null;
 };
 
 type StoryDetailCacheEntry = {
@@ -127,6 +136,7 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
     const [isLoading, setIsLoading] = useState(true);
     const [dbStory, setDbStory] = useState<DBStory | null>(null);
     const [dbChapters, setDbChapters] = useState<DBChapter[]>([]);
+    const [storyCharacters, setStoryCharacters] = useState<StoryCharacter[]>([]);
     const [likeCount, setLikeCount] = useState(0);
     const [loadError, setLoadError] = useState('');
     const [hydratedCache, setHydratedCache] = useState<StoryDetailCacheEntry | null>(null);
@@ -162,6 +172,7 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
     useClientLayoutEffect(() => {
         hasRestoredScrollRef.current = false;
         setLoadError('');
+        setStoryCharacters([]);
 
         const cached = readStoryDetailCache(storyId, userId);
         setHydratedCache(cached);
@@ -169,6 +180,7 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
         if (!cached) {
             setDbStory(null);
             setDbChapters([]);
+            setStoryCharacters([]);
             setLikeCount(0);
             setCoinBalance(0);
             setIsLoading(true);
@@ -285,6 +297,7 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
                 if (!hasCachedSnapshot) {
                     setDbStory(null);
                     setDbChapters([]);
+                    setStoryCharacters([]);
                     setLikeCount(0);
                     setCoinBalance(0);
                     setLoadError('ไม่พบข้อมูลเรื่อง');
@@ -308,6 +321,12 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
                 }
                 return;
             }
+
+            const { data: characterRows } = await supabase
+                .from('characters')
+                .select('id, name, age, occupation, image_url')
+                .eq('story_id', storyId)
+                .order('order_index', { ascending: true });
 
             const chapterData = ((chapterRows as ReaderChapterRow[] | null) || []).map((chapter) => ({
                 id: chapter.id,
@@ -359,6 +378,7 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
 
             setDbStory(storyData as DBStory);
             setDbChapters(chapterData as DBChapter[] || []);
+            setStoryCharacters(((characterRows as StoryCharacter[] | null) || []).filter((character) => character.name.trim().length > 0));
             setLikeCount(likesCount || 0);
             setIsLoading(false);
         };
@@ -487,16 +507,24 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
 
     if (isLoading) {
         return (
-            <main className={styles.main} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <p>กำลังโหลดข้อมูล...</p>
+            <main className={`${styles.main} ffStudioShell`}>
+                <div className={`ffStudioPage ${styles.statePage}`}>
+                    <div className={`ffStudioEmpty ${styles.stateMessage}`}>
+                        <p>กำลังโหลดข้อมูล...</p>
+                    </div>
+                </div>
             </main>
         );
     }
 
     if (!dbStory) {
         return (
-            <main className={styles.main} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
-                <h2>{loadError || 'ไม่พบข้อมูลเรื่อง'}</h2>
+            <main className={`${styles.main} ffStudioShell`}>
+                <div className={`ffStudioPage ${styles.statePage}`}>
+                    <div className={`ffStudioEmpty ${styles.stateMessage}`}>
+                        <h2 className={styles.stateTitle}>{loadError || 'ไม่พบข้อมูลเรื่อง'}</h2>
+                    </div>
+                </div>
             </main>
         );
     }
@@ -506,9 +534,7 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
     const cover = dbStory.cover_url || fallbackCover;
     const isBranchingStory = BRANCHING_FEATURE_ENABLED && dbStory.path_mode === 'branching';
     const entryChapterId = dbStory.entry_chapter_id || dbChapters[0]?.id || null;
-    const readHref = isBranchingStory && entryChapterId
-        ? `/story/${storyId}/read?chapterId=${entryChapterId}`
-        : `/story/${storyId}/read`;
+    const readHref = `/story/${storyId}/read`;
     const storyTypeLabel = dbStory.category === 'fanfic' ? 'แฟนฟิค' : 'ออริจินัล';
     const completionLabel = dbStory.completion_status === 'completed' ? 'จบแล้ว' : 'ยังไม่จบ';
     const publicationLabel = dbStory.status === 'published' ? 'เผยแพร่แล้ว' : 'แบบร่าง';
@@ -529,10 +555,13 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
     const chapterSectionMeta = isBranchingStory
         ? 'เริ่มจาก entry chapter ของเรื่อง แล้วเลือกเส้นทางระหว่างอ่าน'
         : 'แสดงเฉพาะตอนที่เผยแพร่แล้ว';
+    const readActionLabel = dbChapters.length > 0
+        ? (isBranchingStory ? 'เริ่มจากจุดเริ่มต้น' : 'เริ่มอ่านตอนแรก')
+        : 'อ่านเลย';
     const actionNote = dbChapters.length > 0
         ? isBranchingStory && startChapter
-            ? `เริ่มที่ตอน ${String(startChapter.order_index + 1).padStart(2, '0')} แล้วเลือกเส้นทางต่อระหว่างอ่าน`
-            : `เผยแพร่แล้ว ${totalChapters} ตอน`
+            ? `เริ่มที่ตอน ${String(startChapter.order_index + 1).padStart(2, '0')} และใช้ปุ่มคั่นหน้าในหน้าอ่านเพื่อกลับมาตรงจุดเดิม`
+            : `เผยแพร่แล้ว ${totalChapters} ตอน · ใช้ปุ่มคั่นหน้าในหน้าอ่านเพื่อกลับมาอ่านต่อ`
         : 'เรื่องนี้ยังไม่มีตอนที่เผยแพร่';
 
     const renderChapterItem = (chapter: DBChapter) => {
@@ -591,97 +620,151 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
     };
 
     return (
-        <main className={styles.main}>
-            <section className={styles.masthead}>
-                <div className={styles.mastheadInner}>
-                    <div className={styles.coverColumn}>
-                        <div className={styles.coverFrame}>
-                            <img src={cover} alt={dbStory.title} className={styles.coverImage} />
+        <main className={`${styles.main} ffStudioShell`}>
+            <nav className={`ffStudioTopbar ${styles.topbar}`}>
+                <div className="ffStudioTopbarInner">
+                    <div className={`ffStudioTopbarContext ${styles.topbarContext}`}>
+                        <BrandLogo href="/" size="md" className={styles.topbarLogo} withStudioLabel />
+                        <span className={styles.topbarDivider}>/</span>
+                        <div className="ffStudioTopbarCopy">
+                            <span className="ffStudioTopbarEyebrow">{storyTypeLabel} · โดย {dbStory.pen_name}</span>
+                            <span className="ffStudioTopbarTitle">{dbStory.title}</span>
+                            <span className="ffStudioTopbarMeta">{totalChapters} ตอน · {publicationLabel}</span>
                         </div>
-                    </div>
-                    <div className={styles.mastheadBody}>
-                        <div className={styles.storyEyebrow}>
-                            <span>{storyTypeLabel}</span>
-                            <span className={styles.storyEyebrowDivider}>โดย</span>
-                            <span>{dbStory.pen_name}</span>
-                            {isBranchingStory && (
-                                <span className={styles.pathModePill}>เลือกเส้นทาง</span>
-                            )}
-                        </div>
-                        <h1 className={styles.storyTitle}>{dbStory.title}</h1>
-                        <div className={styles.storyStateRow}>
-                            <span className={styles.storyState}>{completionLabel}</span>
-                            <span className={styles.storyStateMuted}>{publicationLabel}</span>
-                        </div>
-                        <div className={styles.actionRow}>
-                            <Link
-                                href={readHref}
-                                className={styles.primaryActionBtn}
-                                onClick={persistStoryDetailReturnState}
-                            >
-                                <PlaySquare size={18} fill="currentColor" />
-                                {dbChapters.length > 0 ? (isBranchingStory ? 'เริ่มจากจุดเริ่มต้น' : 'เริ่มอ่านตอนแรก') : 'อ่านเลย'}
-                            </Link>
-                            {showFollowButton && (
-                                <button
-                                    className={`${styles.followBtn} ${effectiveIsFollowing ? styles.followBtnActive : ''}`}
-                                    onClick={toggleFollow}
-                                    disabled={isFollowLoading}
-                                >
-                                    {effectiveIsFollowing ? <UserCheck size={18} /> : <UserPlus size={18} />}
-                                    {effectiveIsFollowing ? 'กำลังติดตาม' : 'ติดตามเรื่องนี้'}
-                                </button>
-                            )}
-                        </div>
-                        <p className={styles.actionNote}>{actionNote}</p>
                     </div>
                 </div>
-            </section>
+            </nav>
 
-            <section className={styles.summaryStrip}>
-                {summaryItems.map((item) => (
-                    <div key={item.label} className={styles.summaryItem}>
-                        <span className={styles.summaryLabel}>{item.label}</span>
-                        <strong className={styles.summaryValue}>{item.value}</strong>
-                    </div>
-                ))}
-            </section>
-
-            <div className={styles.contentWrapper}>
-                <section className={styles.section}>
-                    <div className={styles.sectionHeader}>
-                        <h2 className={styles.sectionTitle}>เรื่องย่อ</h2>
-                    </div>
-                    <p className={styles.synopsisText}>{dbStory.synopsis || 'ไม่มีคำโปรยสำหรับเรื่องนี้'}</p>
-                </section>
-
-                <section className={styles.section}>
-                    <div className={styles.sectionHeader}>
-                        <h2 className={styles.sectionTitle}>{chapterSectionTitle}</h2>
-                        <span className={styles.sectionMeta}>{chapterSectionMeta}</span>
-                    </div>
-                    {displayChapters.length === 0 ? (
-                        <div className={styles.emptyState}>เรื่องนี้ยังไม่มีตอนที่เผยแพร่</div>
-                    ) : (
-                        <>
-                            {isBranchingStory && startChapter && (
-                                <div className={styles.startCallout}>
-                                    <span className={styles.startCalloutLabel}>เริ่มจากตอนนี้</span>
-                                    <strong className={styles.startCalloutTitle}>
-                                        ตอน {String(startChapter.order_index + 1).padStart(2, '0')} · {startChapter.title}
-                                    </strong>
-                                    <p className={styles.startCalloutText}>
-                                        เมื่อเข้าไปอ่าน ผู้อ่านจะเลือกเส้นทางต่อจากตอนนี้ระหว่างเรื่อง
-                                    </p>
-                                </div>
-                            )}
-
-                            <div className={styles.chapterList}>
-                                {displayChapters.map((chapter) => renderChapterItem(chapter))}
+            <div className={`ffStudioPage ${styles.detailLayout}`}>
+                <section className={`${styles.masthead} ffStudioMasthead`}>
+                    <div className={styles.mastheadInner}>
+                        <div className={styles.coverColumn}>
+                            <div className={styles.coverFrame}>
+                                <img src={cover} alt={dbStory.title} className={styles.coverImage} />
                             </div>
-                        </>
-                    )}
+                        </div>
+                        <div className={styles.mastheadBody}>
+                            <div className={styles.storyEyebrow}>
+                                <span>{storyTypeLabel}</span>
+                                <span className={styles.storyEyebrowDivider}>โดย</span>
+                                <span>{dbStory.pen_name}</span>
+                                {isBranchingStory && (
+                                    <span className={styles.pathModePill}>เลือกเส้นทาง</span>
+                                )}
+                            </div>
+                            <h1 className={styles.storyTitle}>{dbStory.title}</h1>
+                            <div className={styles.storyStateRow}>
+                                <span className={styles.storyState}>{completionLabel}</span>
+                                <span className={styles.storyStateMuted}>{publicationLabel}</span>
+                            </div>
+                            <div className={styles.actionRow}>
+                                <Link
+                                    href={readHref}
+                                    className={styles.primaryActionBtn}
+                                    onClick={persistStoryDetailReturnState}
+                                >
+                                    <PlaySquare size={18} fill="currentColor" />
+                                    {readActionLabel}
+                                </Link>
+                                {showFollowButton && (
+                                    <button
+                                        className={`${styles.followBtn} ${effectiveIsFollowing ? styles.followBtnActive : ''}`}
+                                        onClick={toggleFollow}
+                                        disabled={isFollowLoading}
+                                    >
+                                        {effectiveIsFollowing ? <UserCheck size={18} /> : <UserPlus size={18} />}
+                                        {effectiveIsFollowing ? 'กำลังติดตาม' : 'ติดตามเรื่องนี้'}
+                                    </button>
+                                )}
+                            </div>
+                            <p className={styles.actionNote}>{actionNote}</p>
+                        </div>
+                    </div>
                 </section>
+
+                <section className={`${styles.summaryStrip} ffStudioPanel`}>
+                    {summaryItems.map((item) => (
+                        <div key={item.label} className={styles.summaryItem}>
+                            <span className={styles.summaryLabel}>{item.label}</span>
+                            <strong className={styles.summaryValue}>{item.value}</strong>
+                        </div>
+                    ))}
+                </section>
+
+                <div className={styles.contentWrapper}>
+                    <section className={`${styles.section} ffStudioPanel`}>
+                        <div className={styles.sectionHeader}>
+                            <h2 className={styles.sectionTitle}>คำโปรย</h2>
+                        </div>
+                        <p className={styles.synopsisText}>{dbStory.synopsis || 'ไม่มีคำโปรยสำหรับเรื่องนี้'}</p>
+                    </section>
+
+                    <section className={`${styles.section} ffStudioPanel`}>
+                        <div className={styles.sectionHeader}>
+                            <h2 className={styles.sectionTitle}>{chapterSectionTitle}</h2>
+                            <span className={styles.sectionMeta}>{chapterSectionMeta}</span>
+                        </div>
+                        {displayChapters.length === 0 ? (
+                            <div className={`ffStudioEmpty ${styles.emptyState}`}>เรื่องนี้ยังไม่มีตอนที่เผยแพร่</div>
+                        ) : (
+                            <>
+                                {isBranchingStory && startChapter && (
+                                    <div className={styles.startCallout}>
+                                        <span className={styles.startCalloutLabel}>เริ่มจากตอนนี้</span>
+                                        <strong className={styles.startCalloutTitle}>
+                                            ตอน {String(startChapter.order_index + 1).padStart(2, '0')} · {startChapter.title}
+                                        </strong>
+                                        <p className={styles.startCalloutText}>
+                                            เมื่อเข้าไปอ่าน ผู้อ่านจะเลือกเส้นทางต่อจากตอนนี้ระหว่างเรื่อง
+                                        </p>
+                                    </div>
+                                )}
+
+                                <div className={styles.chapterList}>
+                                    {displayChapters.map((chapter) => renderChapterItem(chapter))}
+                                </div>
+                            </>
+                        )}
+                    </section>
+
+                    {storyCharacters.length > 0 && (
+                        <section className={`${styles.section} ffStudioPanel`}>
+                            <div className={styles.sectionHeader}>
+                                <h2 className={styles.sectionTitle}>แนะนำตัวละคร ({storyCharacters.length})</h2>
+                            </div>
+                            <div className={styles.characterShowcase}>
+                                <div className={styles.characterCardGrid}>
+                                    {storyCharacters.map((character) => (
+                                        <article key={character.id} className={styles.readerCharacterCard}>
+                                            <div className={styles.readerCharacterPortrait}>
+                                                {character.image_url ? (
+                                                    <img
+                                                        src={character.image_url}
+                                                        alt={character.name}
+                                                        className={styles.readerCharacterImage}
+                                                    />
+                                                ) : (
+                                                    <div className={styles.readerCharacterPlaceholder}>
+                                                        {character.name.trim().charAt(0)}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className={styles.readerCharacterInfo}>
+                                                <h3 className={styles.readerCharacterName}>{character.name}</h3>
+                                                {character.age && (
+                                                    <div className={styles.readerCharacterMeta}>อายุ: {character.age}</div>
+                                                )}
+                                                {character.occupation && (
+                                                    <div className={styles.readerCharacterMeta}>อาชีพ: {character.occupation}</div>
+                                                )}
+                                            </div>
+                                        </article>
+                                    ))}
+                                </div>
+                            </div>
+                        </section>
+                    )}
+                </div>
             </div>
 
             {/* Coin Spending Dialog */}

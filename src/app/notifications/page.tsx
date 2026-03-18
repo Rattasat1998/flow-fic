@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Bell, CheckCheck, Loader2 } from 'lucide-react';
+import { Bell, CheckCheck, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import styles from './notifications.module.css';
@@ -124,9 +124,6 @@ export default function NotificationsPage() {
             <main className={styles.main}>
                 <header className={styles.header}>
                     <div className={styles.headerLeft}>
-                        <Link href="/" className={styles.backBtn}>
-                            <ArrowLeft size={16} /> กลับ
-                        </Link>
                         <h1 className={styles.title}>
                             <Bell size={20} /> การแจ้งเตือน
                         </h1>
@@ -146,9 +143,6 @@ export default function NotificationsPage() {
             {/* Header */}
             <header className={styles.header}>
                 <div className={styles.headerLeft}>
-                    <Link href="/" className={styles.backBtn}>
-                        <ArrowLeft size={16} /> กลับ
-                    </Link>
                     <h1 className={styles.title}>
                         <Bell size={20} /> การแจ้งเตือน
                         {unreadCount > 0 && (

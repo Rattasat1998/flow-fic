@@ -58,7 +58,6 @@ export default function LegalContactAndVersioningPage() {
       <p style={{ marginBottom: "0.75rem" }}>
         <Link href="/privacy">นโยบายความเป็นส่วนตัว</Link>
       </p>
-      <Link href="/billing-policies">กลับไปหน้ารวมนโยบาย</Link>
     </main>
   );
 }

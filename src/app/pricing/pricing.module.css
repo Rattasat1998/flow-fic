@@ -21,20 +21,6 @@
     align-items: center;
 }
 
-.backBtn {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: #64748b;
-    font-weight: 500;
-    font-size: 0.95rem;
-    transition: color 0.2s;
-}
-
-.backBtn:hover {
-    color: var(--foreground);
-}
-
 .balanceBadge {
     display: flex;
     align-items: center;

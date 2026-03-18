@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
-import { BarChart3, ArrowLeft, RefreshCw, TrendingUp, Activity, Eye, Zap } from 'lucide-react';
+import { BarChart3, RefreshCw, TrendingUp, Activity, Eye, Zap } from 'lucide-react';
 import styles from './analytics.module.css';
 
 // ─── Types ──────────────────────────────────────
@@ -147,9 +146,6 @@ export default function AnalyticsDashboard() {
             {/* Header */}
             <div className={styles.header}>
                 <div className={styles.headerLeft}>
-                    <Link href="/dashboard" className={styles.backBtn}>
-                        <ArrowLeft size={16} /> กลับ
-                    </Link>
                     <h1 className={styles.title}>
                         <BarChart3 size={22} style={{ verticalAlign: 'text-bottom' }} /> Analytics Dashboard
                     </h1>

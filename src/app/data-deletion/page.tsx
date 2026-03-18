@@ -62,9 +62,6 @@ export default function DataDeletionPage() {
       <p>
         <Link href="/privacy">Privacy Policy</Link>
       </p>
-      <p>
-        <Link href="/">Back to home</Link>
-      </p>
     </main>
   );
 }

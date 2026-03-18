@@ -1670,6 +1670,7 @@
 }
 
 .heroPosterCard {
+    position: relative;
     width: clamp(116px, 15vw, 168px);
     aspect-ratio: 3 / 4;
     border-radius: 14px;
@@ -3192,5 +3193,470 @@
     .filterToggleBtn {
         font-size: 0.78rem;
         padding: 0 0.75rem;
+    }
+}
+
+/* Story detail inspired home theme */
+.main {
+    background:
+        radial-gradient(circle at top, rgba(185, 162, 123, 0.08), transparent 32%),
+        linear-gradient(180deg, #f4f0e7 0%, #faf8f2 18rem, #f7f4ed 100%);
+    color: #18212b;
+}
+
+.navbar {
+    background: rgba(250, 248, 242, 0.88);
+    border-bottom: 1px solid rgba(162, 147, 128, 0.34);
+    box-shadow: 0 10px 24px rgba(24, 33, 43, 0.04);
+}
+
+.logo {
+    --brand-logo-ink: #18212b;
+    --brand-logo-accent: #305c45;
+    --brand-logo-glow: #e9dcc1;
+}
+
+.navLinks a,
+.pricingLink,
+.dashboardLink,
+.mobileMenuBtn,
+.authLoading {
+    color: #6d655c;
+}
+
+.navLinks a:hover,
+.pricingLink:hover,
+.dashboardLink:hover,
+.activeLink {
+    color: #18212b !important;
+}
+
+.navSearchWrap {
+    border: 1px solid rgba(162, 147, 128, 0.28);
+    background: rgba(255, 255, 255, 0.78);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.navSearchWrap:focus-within {
+    border-color: rgba(48, 92, 69, 0.26);
+    box-shadow:
+        0 0 0 3px rgba(48, 92, 69, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+.navSearchIcon,
+.searchInputIcon {
+    color: #a39380;
+}
+
+.navSearchInput,
+.searchInput,
+.inputField,
+.textareaField {
+    color: #18212b;
+}
+
+.navSearchInput::placeholder,
+.searchInput::placeholder {
+    color: #a39380;
+}
+
+.navSearchHint {
+    border-color: rgba(162, 147, 128, 0.3);
+    background: rgba(255, 255, 255, 0.78);
+    color: #7b7267;
+}
+
+.iconBtn,
+.notifBellBtn,
+.profileAvatarBtn {
+    border: 1px solid rgba(162, 147, 128, 0.24);
+    background: rgba(255, 255, 255, 0.74);
+    color: #61594f;
+}
+
+.iconBtn:hover,
+.notifBellBtn:hover,
+.profileAvatarBtn:hover {
+    background: rgba(255, 255, 255, 0.92);
+    border-color: rgba(130, 117, 99, 0.28);
+    color: #18212b;
+}
+
+.coinBalancePill {
+    color: #8a5a00;
+    background: rgba(252, 243, 221, 0.95);
+    border-color: rgba(201, 153, 43, 0.22);
+}
+
+.coinBalancePill:hover {
+    background: #fff8ea;
+    border-color: rgba(201, 153, 43, 0.32);
+}
+
+.googleBtn,
+.facebookBtn {
+    border-radius: 999px;
+}
+
+.googleBtn {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(162, 147, 128, 0.28);
+    color: #18212b;
+    box-shadow: 0 8px 18px rgba(24, 33, 43, 0.04);
+}
+
+.googleBtn:hover {
+    background: #ffffff;
+    border-color: rgba(130, 117, 99, 0.28);
+}
+
+.facebookBtn {
+    background: #18212b;
+    border: 1px solid #18212b;
+    color: #fcfcfa;
+    box-shadow: 0 10px 24px rgba(24, 33, 43, 0.1);
+}
+
+.facebookBtn:hover {
+    background: #0f1720;
+}
+
+.userAvatarPlaceholder,
+.profileDropdownAvatar {
+    background: #18212b;
+    color: #fcfcfa;
+}
+
+.profileDropdown {
+    background: rgba(252, 250, 245, 0.98);
+    border: 1px solid rgba(162, 147, 128, 0.32);
+    box-shadow: 0 18px 34px rgba(24, 33, 43, 0.12);
+}
+
+.profileDropdownHeader {
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(246, 240, 229, 0.72));
+}
+
+.profileDropdownName {
+    color: #18212b;
+}
+
+.profileDropdownEmail {
+    color: #85796a;
+}
+
+.profileDropdownDivider {
+    background: rgba(162, 147, 128, 0.24);
+}
+
+.profileDropdownItem {
+    color: #314154;
+}
+
+.profileDropdownItem:hover {
+    background: rgba(255, 255, 255, 0.86);
+    color: #18212b;
+}
+
+.profileDropdownLogout {
+    color: #a13e24;
+}
+
+.profileDropdownLogout:hover {
+    background: #fff4ef;
+    color: #8f331a;
+}
+
+.content {
+    width: min(1120px, calc(100% - 2rem));
+    margin: 0 auto;
+    padding: 1.4rem 0 4rem;
+    gap: 1.75rem;
+}
+
+.emptyMyNovels {
+    border: 1px dashed rgba(176, 83, 53, 0.36);
+    background: #fff5f3;
+    color: #9f3c24;
+}
+
+.heroFrame {
+    border-radius: 28px;
+    border: 1px solid rgba(24, 33, 43, 0.1);
+    box-shadow:
+        0 18px 38px rgba(24, 33, 43, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.72);
+    background: rgba(255, 255, 255, 0.78);
+}
+
+.heroOverlay {
+    background:
+        linear-gradient(90deg, rgba(250, 248, 242, 0.96) 0%, rgba(250, 248, 242, 0.82) 38%, rgba(250, 248, 242, 0.24) 74%, rgba(24, 33, 43, 0.12) 100%),
+        linear-gradient(180deg, rgba(250, 248, 242, 0.08) 24%, rgba(247, 244, 237, 0.76) 100%);
+}
+
+.heroBackdropFallback {
+    color: #18212b;
+    background:
+        radial-gradient(circle at top, rgba(48, 92, 69, 0.2), transparent 44%),
+        linear-gradient(145deg, #f5efe1 0%, #ebe3d4 44%, #d8ccb7 100%);
+}
+
+.heroPosterCard {
+    border: 1px solid rgba(24, 33, 43, 0.1);
+    background: rgba(255, 255, 255, 0.84);
+    box-shadow: 0 18px 34px rgba(24, 33, 43, 0.14);
+}
+
+.heroStoryInfo {
+    color: #18212b;
+}
+
+.heroStoryTitle {
+    color: #111926;
+    letter-spacing: -0.04em;
+}
+
+.heroStoryPen {
+    color: #6b6257;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.heroStoryMeta {
+    color: #746b61;
+}
+
+.heroStorySynopsis {
+    color: #2f3a46;
+    line-height: 1.7;
+}
+
+.heroInfoPill {
+    border-color: rgba(48, 92, 69, 0.18);
+    background: rgba(237, 245, 239, 0.85);
+    color: #305c45;
+}
+
+.heroDot {
+    background: rgba(138, 124, 107, 0.34);
+}
+
+.activeHeroDot,
+.heroDot:hover {
+    background: #18212b;
+}
+
+.heroEmpty {
+    border: 1px dashed rgba(130, 117, 99, 0.36);
+    background: rgba(255, 255, 255, 0.55);
+    color: #70675d;
+}
+
+.discoveryPanel,
+.railSection {
+    border: 1px solid rgba(162, 147, 128, 0.24);
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.6);
+    box-shadow: 0 10px 30px rgba(24, 33, 43, 0.03);
+}
+
+.discoveryMeta,
+.railCountBadge {
+    border: 1px solid rgba(24, 33, 43, 0.08);
+    background: rgba(255, 255, 255, 0.82);
+    color: #6d655c;
+}
+
+.filterGroupLabel,
+.railEyebrow {
+    color: #6b6257;
+}
+
+.sectionTitle {
+    color: #111926;
+    letter-spacing: -0.03em;
+}
+
+.searchInput,
+.filterToggleBtn,
+.filterBtn,
+.resetFiltersBtn,
+.closeBtn,
+.cancelBtn {
+    border-color: rgba(162, 147, 128, 0.28);
+    background: rgba(255, 255, 255, 0.82);
+    color: #314154;
+}
+
+.searchInput:focus,
+.inputField:focus,
+.textareaField:focus {
+    border-color: rgba(48, 92, 69, 0.26);
+    box-shadow: 0 0 0 3px rgba(48, 92, 69, 0.08);
+}
+
+.filterToggleBtn:hover,
+.filterBtn:hover,
+.resetFiltersBtn:hover,
+.closeBtn:hover,
+.cancelBtn:hover {
+    background: #ffffff;
+    border-color: rgba(130, 117, 99, 0.28);
+    color: #18212b;
+}
+
+.activeFilter {
+    background: #18212b;
+    border-color: #18212b;
+    color: #fcfcfa;
+    box-shadow: 0 10px 24px rgba(24, 33, 43, 0.1);
+}
+
+.activeFilterPill {
+    border: 1px solid rgba(48, 92, 69, 0.2);
+    background: rgba(237, 245, 239, 0.92);
+    color: #305c45;
+}
+
+.railStateCard {
+    border: 1px dashed rgba(130, 117, 99, 0.32);
+    background: rgba(255, 255, 255, 0.55);
+    color: #70675d;
+}
+
+.railStateTitle {
+    color: #18212b;
+}
+
+.railStateText {
+    color: #70675d;
+}
+
+.railStateError {
+    border-color: rgba(176, 83, 53, 0.36);
+    background: #fff5f3;
+    color: #9f3c24;
+}
+
+.railStateError .railStateTitle,
+.railStateError .railStateText {
+    color: #9f3c24;
+}
+
+.storySkeleton {
+    border-color: rgba(162, 147, 128, 0.22);
+    background: linear-gradient(105deg, #efe8da 12%, #fbf8f1 28%, #efe8da 42%);
+}
+
+.posterCard {
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(162, 147, 128, 0.22);
+    border-radius: 18px;
+    box-shadow: 0 10px 20px rgba(24, 33, 43, 0.06);
+}
+
+.posterCard:hover {
+    border-color: rgba(130, 117, 99, 0.28);
+    box-shadow: 0 16px 28px rgba(24, 33, 43, 0.1);
+}
+
+.posterCoverWrap {
+    border-color: rgba(24, 33, 43, 0.08);
+    background: #ece4d6;
+}
+
+.posterCoverFallback {
+    background: linear-gradient(150deg, #223241 0%, #305c45 100%);
+}
+
+.posterRankBadge {
+    color: #fcf3dd;
+    border-color: rgba(201, 153, 43, 0.22);
+    background: rgba(138, 90, 0, 0.82);
+}
+
+.posterCompletedBadge {
+    color: #305c45;
+    border-color: rgba(48, 92, 69, 0.18);
+    background: rgba(237, 245, 239, 0.92);
+}
+
+.posterTitle {
+    color: #18212b;
+}
+
+.posterAuthor,
+.posterMetaRow {
+    color: #72685d;
+}
+
+.posterMetricIcon {
+    color: #a39380;
+}
+
+.modalOverlay {
+    background: rgba(24, 33, 43, 0.34);
+}
+
+.modalContent {
+    border: 1px solid rgba(162, 147, 128, 0.28);
+    background: #faf8f2;
+    box-shadow: 0 20px 44px rgba(24, 33, 43, 0.14);
+}
+
+.modalHeader,
+.modalFooter {
+    border-color: rgba(162, 147, 128, 0.22);
+    background: rgba(255, 255, 255, 0.7);
+}
+
+.modalHeader h2,
+.formGroup label {
+    color: #18212b;
+}
+
+.uploadLabel {
+    border: 1px solid rgba(48, 92, 69, 0.18);
+    background: rgba(237, 245, 239, 0.92);
+    color: #305c45;
+}
+
+.uploadLabel:hover {
+    background: rgba(232, 242, 234, 0.96);
+}
+
+.avatarPreview,
+.avatarPlaceholder {
+    border-color: rgba(162, 147, 128, 0.28);
+    box-shadow: 0 10px 24px rgba(24, 33, 43, 0.08);
+}
+
+.saveBtn {
+    border-color: #18212b;
+    background: #18212b;
+    color: #fcfcfa;
+    box-shadow: 0 10px 24px rgba(24, 33, 43, 0.1);
+}
+
+.saveBtn:hover:not(:disabled) {
+    background: #0f1720;
+}
+
+@media (max-width: 720px) {
+    .content {
+        width: calc(100% - 1rem);
+        padding-top: 1rem;
+        gap: 1.25rem;
+    }
+
+    .heroFrame,
+    .discoveryPanel,
+    .railSection {
+        border-radius: 18px;
     }
 }

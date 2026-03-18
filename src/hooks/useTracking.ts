@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { getOrCreateTrackingSessionId } from '@/lib/trackingSession';
 
 // ─── Types ────────────────────────────────────────────
 export interface TrackingMetadata {
@@ -28,6 +29,7 @@ export interface TrackingMetadata {
 
 export type EventType =
     | 'page_view'
+    | 'page_leave'
     | 'story_view'
     | 'chapter_read'
     | 'pricing_view'
@@ -35,40 +37,9 @@ export type EventType =
     | 'choice_select'
     | 'like'
     | 'favorite'
-    | 'comment';
-
-// ─── Session management ────────────────────────────────
-const SESSION_KEY = 'ff_session_id';
-const SESSION_TS_KEY = 'ff_session_ts';
-const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
-
-function generateSessionId(): string {
-    return 'sess_' + crypto.randomUUID();
-}
-
-function getOrCreateSessionId(): string {
-    if (typeof window === 'undefined') return 'ssr';
-
-    const now = Date.now();
-    const existingId = localStorage.getItem(SESSION_KEY);
-    const existingTs = localStorage.getItem(SESSION_TS_KEY);
-
-    // Reuse session if within TTL
-    if (existingId && existingTs) {
-        const elapsed = now - parseInt(existingTs, 10);
-        if (elapsed < SESSION_TTL_MS) {
-            // Refresh timestamp on activity
-            localStorage.setItem(SESSION_TS_KEY, String(now));
-            return existingId;
-        }
-    }
-
-    // Create new session
-    const newId = generateSessionId();
-    localStorage.setItem(SESSION_KEY, newId);
-    localStorage.setItem(SESSION_TS_KEY, String(now));
-    return newId;
-}
+    | 'comment'
+    | 'filter_change'
+    | 'web_vitals';
 
 // ─── Device metadata helper ────────────────────────────
 function getDeviceMeta(): Pick<TrackingMetadata, 'device' | 'viewport_width' | 'referrer'> {
@@ -109,7 +80,7 @@ export function useTracking(options: UseTrackingOptions = {}) {
     // Initialize session id on client
     useEffect(() => {
         mountTimeRef.current = Date.now();
-        sessionIdRef.current = getOrCreateSessionId();
+        sessionIdRef.current = getOrCreateTrackingSessionId();
     }, []);
 
     // Core tracking function — fire-and-forget
@@ -123,7 +94,8 @@ export function useTracking(options: UseTrackingOptions = {}) {
                 metadata?: TrackingMetadata;
             }
         ) => {
-            const sessionId = sessionIdRef.current;
+            const sessionId = getOrCreateTrackingSessionId();
+            sessionIdRef.current = sessionId;
             if (sessionId === 'ssr') return; // skip SSR
 
             const deviceMeta = getDeviceMeta();

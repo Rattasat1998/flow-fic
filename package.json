@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "perf:budgets": "node scripts/perf/check-route-budgets.mjs",
+    "perf:ci": "npm run build && npm run perf:budgets"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",

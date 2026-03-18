@@ -11,6 +11,9 @@ type SoundItem = {
 
 const SOUND_DIRS = ['sound', 'sounds'];
 const SUPPORTED_EXTENSIONS = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.aac']);
+const SOUND_CACHE_TTL_MS = 5 * 60 * 1000;
+
+let inMemoryCache: { expiresAt: number; items: SoundItem[] } | null = null;
 
 async function readSoundDir(publicDir: string, dirName: string): Promise<SoundItem[]> {
   const absoluteDir = path.join(publicDir, dirName);
@@ -40,6 +43,17 @@ async function readSoundDir(publicDir: string, dirName: string): Promise<SoundIt
 
 export async function GET() {
   try {
+    if (inMemoryCache && inMemoryCache.expiresAt > Date.now()) {
+      return NextResponse.json(
+        { items: inMemoryCache.items },
+        {
+          headers: {
+            'Cache-Control': 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400',
+          },
+        }
+      );
+    }
+
     const publicDir = path.join(process.cwd(), 'public');
     const soundsByDir = await Promise.all(
       SOUND_DIRS.map((dirName) => readSoundDir(publicDir, dirName))
@@ -56,11 +70,16 @@ export async function GET() {
       label: `เสียงที่ ${index + 1}`,
     }));
 
+    inMemoryCache = {
+      expiresAt: Date.now() + SOUND_CACHE_TTL_MS,
+      items,
+    };
+
     return NextResponse.json(
       { items },
       {
         headers: {
-          'Cache-Control': 'no-store',
+          'Cache-Control': 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400',
         },
       }
     );

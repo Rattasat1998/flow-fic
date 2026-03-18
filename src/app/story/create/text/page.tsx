@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, Suspense, useRef, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Save, ImagePlus, Upload, Loader2, Search, X } from 'lucide-react';
+import { Save, ImagePlus, Loader2, Search, X } from 'lucide-react';
 import styles from './text.module.css';
 import { supabase } from '@/lib/supabase';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
@@ -47,7 +46,7 @@ function CreateTextForm() {
     const isBranchingFeatureEnabled = FEATURE_FLAGS.branching;
 
     const writingStyle = initialStyle;
-    const [storyFormat, setStoryFormat] = useState<CreateStoryFormat>(initialFormat);
+    const storyFormat = initialFormat;
     const [pathMode, setPathMode] = useState<StoryPathMode>(
         initialFormat === 'single' || !isBranchingFeatureEnabled ? 'linear' : 'branching'
     );
@@ -254,7 +253,7 @@ function CreateTextForm() {
                 .filter(t => t.length > 0);
 
             // 3. Insert story into Supabase
-            const { data, error } = await supabase
+            const { error } = await supabase
                 .from('stories')
                 .insert({
                     user_id: user.id,

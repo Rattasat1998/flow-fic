@@ -23,20 +23,6 @@
     margin: 0;
 }
 
-.backBtn {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: #6b7280;
-    font-size: 0.9rem;
-    font-weight: 500;
-    transition: color 0.2s ease;
-}
-
-.backBtn:hover {
-    color: var(--foreground);
-}
-
 .container {
     max-width: 600px;
     margin: 0 auto;

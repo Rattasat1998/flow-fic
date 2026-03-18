@@ -182,24 +182,15 @@
   height: 60px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
 }
 
-.readerNavLeft,
 .readerNavRight {
   display: flex;
   align-items: center;
-  gap: 1rem;
-}
-
-.readerNavLeft {
-  min-width: 0;
-  flex: 1;
-}
-
-.readerNavRight {
   gap: 1.5rem;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .readerNavHome {
@@ -218,17 +209,6 @@
   color: var(--primary);
 }
 
-.readerNavTitle {
-  font-size: 1rem;
-  font-weight: 500;
-  color: #334155;
-  width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 300px;
-}
-
 .readerNavAction {
   display: flex;
   flex-direction: column;
@@ -245,33 +225,41 @@
   color: var(--primary);
 }
 
+.readerNavAction:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .readerLayout {
   background-color: white;
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .readerContainer {
   flex: 1;
   width: 100%;
-  max-width: 800px;
+  max-width: 720px;
   margin: 0 auto;
-  padding: 3rem 1.5rem;
+  padding: 2.6rem 1.5rem 3rem;
   display: flex;
   flex-direction: column;
   align-items: center;
+  overflow: visible;
 }
 
 .readerMeta {
   color: #94a3b8;
-  font-size: 0.95rem;
-  margin-bottom: 1.5rem;
+  font-size: 0.88rem;
+  margin-bottom: 1.2rem;
   text-align: center;
 }
 
 .readerAuthor {
-  font-size: 1rem;
+  font-size: 0.95rem;
   color: #0f172a;
-  margin-bottom: 1.2rem;
+  margin-bottom: 1rem;
   text-align: center;
 }
 
@@ -287,20 +275,44 @@
 }
 
 .readerCover {
-  max-width: 300px;
+  max-width: 270px;
   width: 100%;
   border-radius: 8px;
-  margin-bottom: 2.1rem;
+  margin-bottom: 1.75rem;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 }
 
 .readerChapterLabel {
   display: flex;
   align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
-  font-size: 1.1rem;
+  font-size: 1rem;
   color: #334155;
-  margin-bottom: 2rem;
+  margin-bottom: 1.6rem;
+}
+
+.readerChapterLabelCompact {
+  margin-top: -0.25rem;
+}
+
+.readerChapterHeadingCompact {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0 0 1.35rem;
+  color: #1e293b;
+  text-align: center;
+}
+
+.readerChapterHeadingCompactTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.45;
 }
 
 .readerPremiumTag {
@@ -324,92 +336,136 @@
 
 .readerContent {
   width: 100%;
-  font-size: 1.15rem;
-  line-height: 2;
+  max-width: 640px;
+  font-size: 1.04rem;
+  line-height: 1.86;
   color: #334155;
-  text-align: justify;
+  text-align: left;
 }
 
 .readerContent p {
-  margin-bottom: 1.5rem;
-  text-indent: 2rem;
+  margin-bottom: 1.3rem;
+  text-indent: 1.75rem;
 }
 
-.readerBlock {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+.readerBlockAnchor {
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  padding-right: 2.35rem;
+  overflow: visible;
+  scroll-margin-top: calc(var(--reader-bookmark-offset, 128px) + 0.75rem);
+  touch-action: pan-y;
+  -webkit-touch-callout: none;
 }
 
-.readerBlockAvatar,
-.readerBlockFallbackAvatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  flex-shrink: 0;
+.readerBlockAnchorHovered .readerBookmarkGuide,
+.readerBookmarkGuide:focus-visible {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
 }
 
-.readerBlockAvatar {
-  object-fit: cover;
-}
-
-.readerBlockFallbackAvatar {
-  background-color: #e2e8f0;
-  display: flex;
+.readerBookmarkRibbon {
+  position: absolute;
+  top: 0.1rem;
+  right: 0.2rem;
+  width: 1.85rem;
+  height: 4.3rem;
+  z-index: 2;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  color: #64748b;
+  padding: 0.55rem 0 1rem;
+  border: none;
+  border-radius: 0.7rem 0.7rem 0 0;
+  background: linear-gradient(180deg, #fb923c 0%, #f97316 100%);
+  color: #fff7ed;
+  cursor: pointer;
+  clip-path: polygon(0 0, 100% 0, 100% 80%, 50% 100%, 0 80%);
+  box-shadow: 0 12px 24px rgba(249, 115, 22, 0.24);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
 
-.readerBlockTextWrapper {
-  flex: 1;
-  min-width: 0;
-  background-color: #f8fafc;
-  padding: 0.75rem 1rem;
-  border-radius: 0 12px 12px 12px;
+.readerBookmarkGuide {
+  position: absolute;
+  top: 0.35rem;
+  bottom: 0.35rem;
+  right: 0.15rem;
+  width: 1.4rem;
+  z-index: 1;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(4px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
-.readerBlockCharName {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #3b82f6;
-  margin-bottom: 0.25rem;
+.readerBookmarkGuide::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 3px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(251, 146, 60, 0.18) 0%, rgba(249, 115, 22, 0.82) 100%);
+  box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.08);
+}
+
+.readerBookmarkGuide:focus-visible {
+  outline: none;
+}
+
+.readerBookmarkRibbon:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(249, 115, 22, 0.3);
+  filter: saturate(1.04);
 }
 
 .readerBlockParagraph,
 .readerPlainParagraph {
   margin: 0 0 1rem;
-  line-height: 1.8;
+  line-height: 1.75;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
 .readerBlockParagraph {
   margin: 0;
-  line-height: 1.6;
+  line-height: 1.68;
   text-indent: 0;
 }
 
+.readerParagraphSpeech {
+  font-style: italic;
+}
+
+.readerParagraphFlashback {
+  font-weight: 700;
+}
+
+.readerParagraphSpeechFlashback {
+  font-style: italic;
+  font-weight: 700;
+}
+
 .readerImageOnlyWrap {
-  margin-bottom: 1.2rem;
+  margin-bottom: 1rem;
   display: flex;
   justify-content: center;
 }
 
-.readerBlockImage,
 .readerImageOnly {
   width: 100%;
   object-fit: contain;
   border-radius: 10px;
   border: 1px solid #e2e8f0;
   background: #fff;
-}
-
-.readerBlockImage {
-  max-width: 560px;
-  max-height: 460px;
 }
 
 .readerImageOnly {
@@ -458,20 +514,30 @@
 }
 
 @media (max-width: 768px) {
+  .readerChapterHeadingCompact {
+    margin-bottom: 1.2rem;
+  }
+
+  .readerChapterHeadingCompactTitle {
+    font-size: 0.9rem;
+  }
+
   .readerNavRight {
     gap: 0.75rem;
   }
 
+  .readerContainer {
+    max-width: 680px;
+    padding-top: 2rem;
+  }
+
+  .readerContent {
+    font-size: 1rem;
+    line-height: 1.8;
+  }
+
   .readerNavAction span {
     display: none;
-  }
-
-  .readerNavTitle {
-    max-width: 150px;
-  }
-
-  .readerBlock {
-    gap: 0.75rem;
   }
 }
 
@@ -484,19 +550,38 @@
     gap: 0.5rem;
   }
 
-  .readerNavTitle {
-    max-width: 120px;
-    font-size: 0.92rem;
+  .readerContainer {
+    padding: 1.6rem 1rem 2.2rem;
   }
 
-  .readerBlock {
-    flex-direction: column;
-    gap: 0.55rem;
-    margin-bottom: 1.2rem;
+  .readerContent {
+    font-size: 0.98rem;
   }
 
-  .readerBlockTextWrapper {
-    width: 100%;
+  .readerContent p {
+    text-indent: 1.35rem;
+  }
+
+  .readerBookmarkRibbon {
+    right: 0.05rem;
+    width: 1.5rem;
+    height: 3.65rem;
+    padding-top: 0.45rem;
+  }
+
+  .readerBlockAnchor {
+    padding-right: 1.85rem;
+  }
+
+  .readerBookmarkGuide {
+    right: 0;
+    width: 1.15rem;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .readerBookmarkGuide {
+    display: none;
   }
 }
 
@@ -592,6 +677,41 @@
   margin-bottom: 1.5rem;
   padding-bottom: 1rem;
   border-bottom: 1px dashed #e2e8f0;
+}
+
+.tocCharactersSection {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px dashed #e2e8f0;
+}
+
+.tocCharactersLabel {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tocCharactersList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tocCharacterChip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid #dbeafe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
 .tocList {
@@ -1399,6 +1519,20 @@
   font-size: 0.72rem;
   font-weight: 800;
   padding: 0.2rem 0.55rem;
+}
+
+.branchEndingPanel {
+  border-color: #fed7aa;
+  background: linear-gradient(180deg, #fff7ed 0%, #ffffff 100%);
+}
+
+.branchEndingPanel .branchChoiceHeader h3 {
+  color: #9a3412;
+}
+
+.branchEndingPanel .branchChoiceInfo {
+  color: #9a3412;
+  font-weight: 700;
 }
 
 .branchBackBtn {

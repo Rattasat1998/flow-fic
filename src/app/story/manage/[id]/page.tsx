@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { MAIN_CATEGORIES, SUB_CATEGORIES } from '@/lib/categories';
 import { useAuth } from '@/contexts/AuthContext';
+import { BrandLogo } from '@/components/brand/BrandLogo';
 
 type StoryCompletionStatus = 'ongoing' | 'completed';
 type StoryPublicationStatus = 'draft' | 'published';
@@ -47,6 +48,7 @@ type ManageChapter = {
     isPremium: boolean;
     coinPrice: number;
     hasUnpublishedChanges: boolean;
+    characterIds: string[];
 };
 
 type ChapterBranchLink = {
@@ -124,12 +126,66 @@ type CharacterUpdatePayload = {
 };
 
 type MutableChapterContentBlock = Record<string, unknown> & {
+    type?: string | null;
+    text?: string | null;
     characterId?: string | null;
+    imageUrl?: string | null;
+    isFlashback?: boolean | null;
+    is_flashback?: boolean | null;
 };
 
 type MutableChapterContent = Record<string, unknown> & {
     povCharacterId?: string | null;
+    chatTheme?: string | null;
+    isEnding?: boolean | null;
+    is_ending?: boolean | null;
+    choiceTimerSeconds?: number | string | null;
+    choice_timer_seconds?: number | string | null;
+    branchChoices?: unknown;
+    chapterChoices?: unknown;
     blocks?: MutableChapterContentBlock[];
+};
+
+type MutableChapterChoice = Record<string, unknown> & {
+    choiceText?: string | null;
+    choice_text?: string | null;
+    toChapterId?: string | null;
+    to_chapter_id?: string | null;
+    outcomeText?: string | null;
+    outcome_text?: string | null;
+    orderIndex?: number | null;
+    order_index?: number | null;
+};
+
+type ComparableChapterBlock = {
+    type: 'paragraph' | 'image';
+    text: string;
+    characterId: string | null;
+    imageUrl: string | null;
+    isFlashback: boolean;
+};
+
+type ComparableChapterChoice = {
+    choiceText: string;
+    toChapterId: string | null;
+    outcomeText: string;
+    orderIndex: number;
+};
+
+type ComparableChapterContent = {
+    povCharacterId: string | null;
+    chatTheme: string | null;
+    isEnding: boolean;
+    choiceTimerSeconds: number;
+    blocks: ComparableChapterBlock[];
+};
+
+type ChapterChoiceRow = {
+    from_chapter_id: string | null;
+    to_chapter_id: string | null;
+    choice_text: string | null;
+    outcome_text?: string | null;
+    order_index: number | null;
 };
 
 const toComparableJson = (value: unknown): string => {
@@ -138,6 +194,214 @@ const toComparableJson = (value: unknown): string => {
     } catch {
         return String(value ?? '');
     }
+};
+
+const isMissingOutcomeTextColumnError = (error: { code?: string; message?: string } | null): boolean => {
+    if (!error) return false;
+    if (error.code === '42703' || error.code === 'PGRST204') return true;
+    return typeof error.message === 'string' && error.message.toLowerCase().includes('outcome_text');
+};
+
+const normalizeChoiceTimerSeconds = (value: unknown): number => {
+    if (typeof value === 'string' && value.trim() === '') return 0;
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) return 0;
+    return Math.max(0, Math.floor(numericValue));
+};
+
+const normalizeComparableChoices = (rawChoices: unknown): ComparableChapterChoice[] => {
+    if (!Array.isArray(rawChoices)) return [];
+
+    const normalizedChoices = rawChoices
+        .map((choice, index) => {
+            if (!choice || typeof choice !== 'object') return null;
+
+            const choiceObject = choice as MutableChapterChoice;
+            const rawChoiceText = typeof choiceObject.choiceText === 'string'
+                ? choiceObject.choiceText
+                : typeof choiceObject.choice_text === 'string'
+                    ? choiceObject.choice_text
+                    : '';
+            const toChapterRaw = choiceObject.toChapterId ?? choiceObject.to_chapter_id;
+            const rawOutcomeText = typeof choiceObject.outcomeText === 'string'
+                ? choiceObject.outcomeText
+                : typeof choiceObject.outcome_text === 'string'
+                    ? choiceObject.outcome_text
+                    : '';
+            const orderRaw = choiceObject.orderIndex ?? choiceObject.order_index;
+
+            return {
+                choiceText: rawChoiceText.trim(),
+                toChapterId: typeof toChapterRaw === 'string' && toChapterRaw ? toChapterRaw : null,
+                outcomeText: rawOutcomeText.trim(),
+                orderIndex: Number.isFinite(Number(orderRaw)) ? Number(orderRaw) : index,
+            } as ComparableChapterChoice;
+        })
+        .filter((choice): choice is ComparableChapterChoice => choice !== null)
+        .sort((a, b) => a.orderIndex - b.orderIndex);
+
+    return normalizedChoices.map((choice, index) => ({
+        ...choice,
+        orderIndex: index,
+    }));
+};
+
+const readEmbeddedBranchChoices = (rawContent: unknown): ComparableChapterChoice[] | null => {
+    if (!rawContent || typeof rawContent !== 'object') return null;
+
+    const contentObject = rawContent as MutableChapterContent;
+    if (Object.prototype.hasOwnProperty.call(contentObject, 'branchChoices')) {
+        return normalizeComparableChoices(contentObject.branchChoices);
+    }
+    if (Object.prototype.hasOwnProperty.call(contentObject, 'chapterChoices')) {
+        return normalizeComparableChoices(contentObject.chapterChoices);
+    }
+    return null;
+};
+
+const normalizeComparableContent = (rawContent: unknown): ComparableChapterContent => {
+    let parsedBlocks: ComparableChapterBlock[] = [];
+    let parsedPov: string | null = null;
+    let parsedChatTheme: string | null = null;
+    let parsedIsEnding = false;
+    let parsedChoiceTimerSeconds = 0;
+
+    if (rawContent && typeof rawContent === 'object') {
+        const contentObject = rawContent as MutableChapterContent;
+
+        if (Array.isArray(contentObject.blocks)) {
+            parsedBlocks = contentObject.blocks
+                .map((item) => {
+                    if (!item || typeof item !== 'object') return null;
+                    const blockObject = item as MutableChapterContentBlock;
+                    return {
+                        type: blockObject.type === 'image' ? 'image' : 'paragraph',
+                        text: typeof blockObject.text === 'string' ? blockObject.text : '',
+                        characterId: typeof blockObject.characterId === 'string' ? blockObject.characterId : null,
+                        imageUrl: typeof blockObject.imageUrl === 'string' ? blockObject.imageUrl : null,
+                        isFlashback: blockObject.isFlashback === true || blockObject.is_flashback === true,
+                    } as ComparableChapterBlock;
+                })
+                .filter((block): block is ComparableChapterBlock => block !== null);
+        } else if (typeof contentObject.text === 'string') {
+            parsedBlocks = contentObject.text
+                .split('\n')
+                .filter((line) => line.trim() !== '')
+                .map((line) => ({
+                    type: 'paragraph' as const,
+                    text: line,
+                    characterId: null,
+                    imageUrl: null,
+                    isFlashback: false,
+                }));
+        }
+
+        parsedPov = typeof contentObject.povCharacterId === 'string' ? contentObject.povCharacterId : null;
+        parsedChatTheme = typeof contentObject.chatTheme === 'string' && contentObject.chatTheme.trim()
+            ? contentObject.chatTheme
+            : null;
+        parsedIsEnding = contentObject.isEnding === true || contentObject.is_ending === true;
+        parsedChoiceTimerSeconds = normalizeChoiceTimerSeconds(
+            contentObject.choiceTimerSeconds ?? contentObject.choice_timer_seconds
+        );
+    } else if (typeof rawContent === 'string') {
+        parsedBlocks = rawContent
+            .split('\n')
+            .filter((line) => line.trim() !== '')
+            .map((line) => ({
+                type: 'paragraph' as const,
+                text: line,
+                characterId: null,
+                imageUrl: null,
+                isFlashback: false,
+            }));
+    }
+
+    return {
+        povCharacterId: parsedPov,
+        chatTheme: parsedChatTheme,
+        isEnding: parsedIsEnding,
+        choiceTimerSeconds: parsedChoiceTimerSeconds,
+        blocks: parsedBlocks,
+    };
+};
+
+const extractCharacterIdsFromContent = (rawContent: unknown): string[] => {
+    const comparableContent = normalizeComparableContent(rawContent);
+    const characterIds: string[] = [];
+    const seenCharacterIds = new Set<string>();
+
+    const registerCharacter = (characterId: string | null) => {
+        if (!characterId || seenCharacterIds.has(characterId)) return;
+        seenCharacterIds.add(characterId);
+        characterIds.push(characterId);
+    };
+
+    registerCharacter(comparableContent.povCharacterId);
+    comparableContent.blocks.forEach((block) => registerCharacter(block.characterId));
+
+    return characterIds;
+};
+
+const buildLiveChoiceMap = (rows: ChapterChoiceRow[]): Map<string, ComparableChapterChoice[]> => {
+    const groupedChoices = new Map<string, ComparableChapterChoice[]>();
+
+    rows.forEach((row, index) => {
+        if (typeof row.from_chapter_id !== 'string' || !row.from_chapter_id) return;
+
+        const chapterChoices = groupedChoices.get(row.from_chapter_id) || [];
+        chapterChoices.push({
+            choiceText: typeof row.choice_text === 'string' ? row.choice_text.trim() : '',
+            toChapterId: typeof row.to_chapter_id === 'string' && row.to_chapter_id ? row.to_chapter_id : null,
+            outcomeText: typeof row.outcome_text === 'string' ? row.outcome_text.trim() : '',
+            orderIndex: Number.isFinite(Number(row.order_index)) ? Number(row.order_index) : index,
+        });
+        groupedChoices.set(row.from_chapter_id, chapterChoices);
+    });
+
+    groupedChoices.forEach((choices, chapterId) => {
+        const normalizedChoices = choices
+            .slice()
+            .sort((a, b) => a.orderIndex - b.orderIndex)
+            .map((choice, index) => ({
+                ...choice,
+                orderIndex: index,
+            }));
+        groupedChoices.set(chapterId, normalizedChoices);
+    });
+
+    return groupedChoices;
+};
+
+const hydrateManageChapters = (rawChapters: unknown): ManageChapter[] => {
+    if (!Array.isArray(rawChapters)) return [];
+
+    return rawChapters
+        .map((chapter) => {
+            if (!chapter || typeof chapter !== 'object') return null;
+            const chapterObject = chapter as Partial<ManageChapter>;
+
+            return {
+                id: typeof chapterObject.id === 'string' ? chapterObject.id : '',
+                title: typeof chapterObject.title === 'string' ? chapterObject.title : '',
+                status: chapterObject.status === 'published' ? 'published' : 'draft',
+                views: Number(chapterObject.views) || 0,
+                comments: Number(chapterObject.comments) || 0,
+                date: typeof chapterObject.date === 'string' ? chapterObject.date : '',
+                isPremium: !!chapterObject.isPremium,
+                coinPrice: Math.max(0, Number(chapterObject.coinPrice || 0)),
+                hasUnpublishedChanges: !!chapterObject.hasUnpublishedChanges,
+                characterIds: Array.isArray(chapterObject.characterIds)
+                    ? chapterObject.characterIds.filter((characterId): characterId is string => typeof characterId === 'string')
+                    : [],
+            } as ManageChapter;
+        })
+        .filter((chapter): chapter is ManageChapter => chapter !== null && chapter.id.length > 0);
+};
+
+const getCharacterInitial = (name: string): string => {
+    const firstChar = Array.from(name.trim())[0];
+    return firstChar ? firstChar.toLocaleUpperCase() : '?';
 };
 
 export default function StoryManagerPage() {
@@ -218,8 +482,17 @@ export default function StoryManagerPage() {
                     chapterLinks: ChapterBranchLink[];
                     characters: Character[];
                 }>;
-                setStoryData(parsed.storyData ?? null);
-                setChapters(parsed.chapters ?? []);
+
+                const cachedChapters = hydrateManageChapters(parsed.chapters);
+                const cachedStoryData = parsed.storyData
+                    ? {
+                        ...parsed.storyData,
+                        chapters: hydrateManageChapters(parsed.storyData.chapters),
+                    }
+                    : null;
+
+                setStoryData(cachedStoryData);
+                setChapters(cachedChapters);
                 setChapterLinks(parsed.chapterLinks ?? []);
                 setCharacters(parsed.characters ?? []);
                 setIsFromDB(true);
@@ -265,47 +538,49 @@ export default function StoryManagerPage() {
                     throw chaptersError;
                 }
 
-                const formattedChapters: ManageChapter[] = (chaptersData || []).map(ch => ({
-                    id: ch.id,
-                    title: ch.draft_title || ch.title,
-                    status: ch.status as 'draft' | 'published',
-                    views: ch.read_count || 0,
-                    comments: 0,
-                    date: new Date(ch.created_at).toLocaleDateString(),
-                    isPremium: ch.is_premium || false,
-                    coinPrice: ch.coin_price || 0,
-                    hasUnpublishedChanges: (() => {
-                        if (ch.status !== 'published') return false;
-
-                        const draftTitle = (ch.draft_title || ch.title || '').trim();
-                        const publishedTitle = (ch.published_title || ch.title || '').trim();
-                        const draftContent = toComparableJson(ch.draft_content ?? ch.content);
-                        const publishedContent = toComparableJson(ch.published_content ?? ch.content);
-                        const hasContentDiff = draftTitle !== publishedTitle || draftContent !== publishedContent;
-
-                        const draftTs = ch.draft_updated_at ? Date.parse(ch.draft_updated_at) : NaN;
-                        const publishedTs = ch.published_updated_at ? Date.parse(ch.published_updated_at) : NaN;
-                        const hasTimestampDiff =
-                            Number.isFinite(draftTs) && Number.isFinite(publishedTs) && draftTs > publishedTs;
-
-                        return hasContentDiff || hasTimestampDiff;
-                    })(),
-                }));
-
                 let branchLinksData: ChapterBranchLink[] = [];
+                let liveChoicesByChapter = new Map<string, ComparableChapterChoice[]>();
+                let canCompareBranchDrafts = false;
                 if (BRANCHING_FEATURE_ENABLED && nextPathMode === 'branching') {
-                    const { data: rawLinks, error: chapterLinksError } = await supabase
-                        .from('chapter_choices')
-                        .select('from_chapter_id, to_chapter_id')
-                        .eq('story_id', storyId);
+                    let choiceRows: ChapterChoiceRow[] = [];
 
-                    if (chapterLinksError) {
-                        console.error('Failed to fetch chapter choices:', chapterLinksError);
+                    const { data: rawChoiceRowsWithOutcome, error: chapterChoicesError } = await supabase
+                        .from('chapter_choices')
+                        .select('from_chapter_id, to_chapter_id, choice_text, outcome_text, order_index')
+                        .eq('story_id', storyId)
+                        .order('order_index', { ascending: true });
+
+                    if (chapterChoicesError && isMissingOutcomeTextColumnError(chapterChoicesError as { code?: string; message?: string })) {
+                        const { data: fallbackChoiceRows, error: fallbackChoiceRowsError } = await supabase
+                            .from('chapter_choices')
+                            .select('from_chapter_id, to_chapter_id, choice_text, order_index')
+                            .eq('story_id', storyId)
+                            .order('order_index', { ascending: true });
+
+                        if (fallbackChoiceRowsError) {
+                            console.error('Failed to fetch chapter choices:', fallbackChoiceRowsError);
+                        } else {
+                            choiceRows = ((fallbackChoiceRows || []) as Array<{
+                                from_chapter_id: string | null;
+                                to_chapter_id: string | null;
+                                choice_text: string | null;
+                                order_index: number | null;
+                            }>).map((row) => ({
+                                ...row,
+                                outcome_text: null,
+                            }));
+                            canCompareBranchDrafts = true;
+                        }
+                    } else if (chapterChoicesError) {
+                        console.error('Failed to fetch chapter choices:', chapterChoicesError);
                     } else {
-                        branchLinksData = ((rawLinks || []) as Array<{
-                            from_chapter_id: string | null;
-                            to_chapter_id: string | null;
-                        }>)
+                        choiceRows = (rawChoiceRowsWithOutcome || []) as ChapterChoiceRow[];
+                        canCompareBranchDrafts = true;
+                    }
+
+                    if (choiceRows.length > 0) {
+                        liveChoicesByChapter = buildLiveChoiceMap(choiceRows);
+                        branchLinksData = choiceRows
                             .filter((row) => typeof row.from_chapter_id === 'string' && typeof row.to_chapter_id === 'string')
                             .map((row) => ({
                                 fromChapterId: row.from_chapter_id as string,
@@ -313,6 +588,40 @@ export default function StoryManagerPage() {
                             }));
                     }
                 }
+
+                const formattedChapters: ManageChapter[] = (chaptersData || []).map((ch) => {
+                    const draftTitle = (ch.draft_title || ch.title || '').trim();
+                    const publishedTitle = (ch.published_title || ch.title || '').trim();
+                    const draftRawContent = ch.draft_content ?? ch.published_content ?? ch.content;
+                    const publishedRawContent = ch.published_content ?? ch.content;
+                    const draftContent = normalizeComparableContent(draftRawContent);
+                    const publishedContent = normalizeComparableContent(publishedRawContent);
+                    const embeddedDraftChoices = readEmbeddedBranchChoices(ch.draft_content);
+                    const liveChoices = liveChoicesByChapter.get(ch.id) || [];
+                    const hasContentDiff = ch.status === 'published'
+                        && (
+                            draftTitle !== publishedTitle
+                            || toComparableJson(draftContent) !== toComparableJson(publishedContent)
+                        );
+                    const hasBranchChoiceDraftDiff = ch.status === 'published'
+                        && nextPathMode === 'branching'
+                        && canCompareBranchDrafts
+                        && embeddedDraftChoices !== null
+                        && toComparableJson(embeddedDraftChoices) !== toComparableJson(liveChoices);
+
+                    return {
+                        id: ch.id,
+                        title: ch.draft_title || ch.title,
+                        status: ch.status as 'draft' | 'published',
+                        views: ch.read_count || 0,
+                        comments: 0,
+                        date: new Date(ch.created_at).toLocaleDateString(),
+                        isPremium: ch.is_premium || false,
+                        coinPrice: ch.coin_price || 0,
+                        hasUnpublishedChanges: hasContentDiff || hasBranchChoiceDraftDiff,
+                        characterIds: extractCharacterIdsFromContent(draftRawContent),
+                    };
+                });
 
                 const dbStory: ManageStory = {
                     id: storyData.id,
@@ -329,7 +638,7 @@ export default function StoryManagerPage() {
                     entryChapterId: storyData.entry_chapter_id || null,
                     coverImage: storyData.cover_url,
                     coverWideImage: storyData.cover_wide_url,
-                    readCount: storyData.read_count || 0,
+                    readCount: formattedChapters.reduce((sum, chapter) => sum + (chapter.views || 0), 0),
                     heartCount: 0,
                     commentCount: 0,
                     chapters: formattedChapters,
@@ -372,7 +681,17 @@ export default function StoryManagerPage() {
     const isBranchingStory = BRANCHING_FEATURE_ENABLED && story?.pathMode === 'branching';
     const publishedCount = chapters.filter(chapter => chapter.status === 'published').length;
     const isStoryCompleted = story?.completionStatus === 'completed';
+    const storyTypeLabel = story?.category === 'fanfic' ? 'Fanfiction' : 'Original';
+    const publicationLabel = story?.status === 'published' ? 'เผยแพร่แล้ว' : 'แบบร่าง';
+    const completionLabel = story?.completionStatus === 'completed' ? 'จบแล้ว' : 'ยังไม่จบ';
+    const storyModeLabel = isBranchingStory ? 'Interactive branching' : 'Linear narrative';
+    const chapterCount = story?.chapters.length ?? 0;
+    const totalStoryReadCount = chapters.reduce((sum, chapter) => sum + (chapter.views || 0), 0);
     const canRestoreManageScroll = isMounted && !isLoading && !!story;
+    const characterMap = useMemo(
+        () => new Map(characters.map((character) => [character.id, character])),
+        [characters]
+    );
     const effectiveEntryChapterId = isBranchingStory
         ? (story?.entryChapterId || chapters[0]?.id || null)
         : null;
@@ -1086,369 +1405,470 @@ export default function StoryManagerPage() {
         return (null);
     }
     if (authError) return (
-        <main className={styles.main}>
-            <header className={styles.header}>
+        <main className={`${styles.main} ffStudioShell`}>
+            <header className={`ffStudioTopbar ${styles.header}`}>
+                <div className="ffStudioTopbarInner">
+                    <div className={`ffStudioTopbarContext ${styles.headerContext}`}>
+                        <BrandLogo href="/" size="md" className={styles.logo} withStudioLabel />
+                        <span className={styles.headerDivider}>/</span>
+                        <div className="ffStudioTopbarCopy">
+                            <span className="ffStudioTopbarEyebrow">Story Studio</span>
+                            <span className="ffStudioTopbarTitle">จัดการเรื่อง</span>
+                            <span className="ffStudioTopbarMeta">ไม่มีสิทธิ์เข้าถึงหน้านี้</span>
+                        </div>
+                    </div>
+                </div>
             </header>
-            <div className={styles.content} style={{ textAlign: 'center', padding: '4rem 2rem', color: '#64748b' }}>
-                <h2>ไม่มีสิทธิ์เข้าถึง</h2>
-                <p>คุณไม่สามารถจัดการเรื่องนี้ได้ เนื่องจากคุณไม่ใช่เจ้าของเรื่อง</p>
+            <div className={`ffStudioPage ${styles.statePage}`}>
+                <div className={`ffStudioEmpty ${styles.stateCard}`}>
+                    <h2 className={styles.stateTitle}>ไม่มีสิทธิ์เข้าถึง</h2>
+                    <p className={styles.stateDescription}>คุณไม่สามารถจัดการเรื่องนี้ได้ เนื่องจากคุณไม่ใช่เจ้าของเรื่อง</p>
+                </div>
             </div>
         </main>
     );
     if (!story) return (
-        <main className={styles.main}>
-            <header className={styles.header}>
+        <main className={`${styles.main} ffStudioShell`}>
+            <header className={`ffStudioTopbar ${styles.header}`}>
+                <div className="ffStudioTopbarInner">
+                    <div className={`ffStudioTopbarContext ${styles.headerContext}`}>
+                        <BrandLogo href="/" size="md" className={styles.logo} withStudioLabel />
+                        <span className={styles.headerDivider}>/</span>
+                        <div className="ffStudioTopbarCopy">
+                            <span className="ffStudioTopbarEyebrow">Story Studio</span>
+                            <span className="ffStudioTopbarTitle">จัดการเรื่อง</span>
+                            <span className="ffStudioTopbarMeta">ไม่พบข้อมูลเรื่องนี้</span>
+                        </div>
+                    </div>
+                </div>
             </header>
-            <div className={styles.content} style={{ textAlign: 'center', padding: '4rem 2rem', color: '#64748b' }}>
-                <h2>ไม่พบข้อมูลเรื่องนี้</h2>
-                <p>เรื่องที่คุณค้นหาอาจถูกลบไปแล้ว หรือลิงก์ไม่ถูกต้อง</p>
+            <div className={`ffStudioPage ${styles.statePage}`}>
+                <div className={`ffStudioEmpty ${styles.stateCard}`}>
+                    <h2 className={styles.stateTitle}>ไม่พบข้อมูลเรื่องนี้</h2>
+                    <p className={styles.stateDescription}>เรื่องที่คุณค้นหาอาจถูกลบไปแล้ว หรือลิงก์ไม่ถูกต้อง</p>
+                </div>
             </div>
         </main>
     );
 
     return (
-        <main className={styles.main}>
-            <header className={styles.header}>
-                <div style={{ display: 'flex', gap: '1rem', marginLeft: 'auto' }}>
-                    <button className={styles.backBtn}><BarChart2 size={18} /> สถิติ</button>
-                    <button className={styles.backBtn} onClick={openEditModal}><Settings size={18} /> แก้ไขข้อมูล</button>
+        <main className={`${styles.main} ffStudioShell`}>
+            <header className={`ffStudioTopbar ${styles.header}`}>
+                <div className="ffStudioTopbarInner">
+                    <div className={`ffStudioTopbarContext ${styles.headerContext}`}>
+                        <BrandLogo href="/" size="md" className={styles.logo} withStudioLabel />
+                        <span className={styles.headerDivider}>/</span>
+                        <div className="ffStudioTopbarCopy">
+                            <span className="ffStudioTopbarEyebrow">Story Studio</span>
+                            <span className="ffStudioTopbarTitle">{story.title}</span>
+                            <span className="ffStudioTopbarMeta">{chapterCount} ตอน · เผยแพร่แล้ว {publishedCount} ตอน</span>
+                        </div>
+                    </div>
+                    <div className={`ffStudioTopbarActions ${styles.headerActions}`}>
+                        <button className={styles.backBtn}><BarChart2 size={18} /> สถิติ</button>
+                        <button className={`${styles.backBtn} ${styles.headerPrimaryBtn}`} onClick={openEditModal}><Settings size={18} /> แก้ไขข้อมูล</button>
+                    </div>
                 </div>
             </header>
 
-            {/* Hero Banner */}
-            <div className={styles.heroBanner}>
-                {(story.coverWideImage || story.coverImage) && (
-                    <img src={story.coverWideImage || story.coverImage || ''} alt="Cover Background" className={styles.heroBg} />
-                )}
-                <div className={styles.heroOverlay}>
-                    <div className={styles.heroContent}>
-                        {/* Poster Image (Left) */}
-                        <div className={styles.heroPosterContainer}>
-                            {story.coverImage ? (
-                                <img src={story.coverImage} alt={story.title} className={styles.heroPoster} />
-                            ) : (
-                                <div className={styles.heroPosterPlaceholder}>
-                                    <ImageIcon size={48} />
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Story Details (Right) */}
-                        <div className={styles.heroDetails}>
-                            {/* Optional generic badge */}
-                            {story.readCount > 1000 && (
-                                <div style={{ marginBottom: '0.75rem' }}>
-                                    <span className={styles.badgeTrending}>🔥 TRENDING</span>
-                                </div>
-                            )}
-                            <h1 className={styles.heroTitle}>{story.title}</h1>
-                            <p className={styles.heroSubtitle}>
-                                {story.category === 'fanfic' ? 'Fanfiction' : 'Original'} · {story.penName}
-                            </p>
-                            <p className={styles.heroSynopsis}>{story.synopsis}</p>
-                            <div className={styles.heroTags}>
-                                <span className={styles.tagPill}>{story.category === 'fanfic' ? 'แฟนฟิค' : 'ออริจินัล'}</span>
-                                <span className={styles.tagPill}>{story.status === 'published' ? '📢 เผยแพร่แล้ว' : '📄 แบบร่าง'}</span>
-                                <span className={styles.tagPill}>{story.completionStatus === 'completed' ? '✅ จบแล้ว' : '📝 ยังไม่จบ'}</span>
-                                <span className={styles.tagPill}>{isBranchingStory ? '🎯 ทางเลือกในตอน' : '➡️ Linear'}</span>
-                                <span className={styles.tagPill}>👁️ {story.readCount >= 1000 ? `${(story.readCount / 1000).toFixed(1)}K` : story.readCount} Views</span>
-                                <span className={styles.tagPill}>❤️ {story.heartCount} Loves</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div className={styles.content}>
-                <section className={styles.storyStatusPanel}>
-                    <div className={styles.storyStatusRow}>
-                        <div className={styles.storyStatusLabel}>สถานะการเผยแพร่</div>
-                        <div className={styles.storyStatusActions}>
-                            <button
-                                type="button"
-                                className={`${styles.storyStatusBtn} ${story.status === 'draft' ? styles.storyStatusActive : ''}`}
-                                onClick={() => handleQuickStoryStatusUpdate('draft')}
-                                disabled={!isFromDB || isUpdatingStoryStatus || story.status === 'draft'}
-                            >
-                                แบบร่าง
-                            </button>
-                            <button
-                                type="button"
-                                className={`${styles.storyStatusBtn} ${story.status === 'published' ? styles.storyStatusActive : ''}`}
-                                onClick={() => handleQuickStoryStatusUpdate('published')}
-                                disabled={!isFromDB || isUpdatingStoryStatus || story.status === 'published'}
-                            >
-                                เผยแพร่แล้ว
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className={styles.storyStatusRow}>
-                        <div className={styles.storyStatusLabel}>สถานะความสมบูรณ์เรื่อง</div>
-                        <div className={styles.storyStatusActions}>
-                            <button
-                                type="button"
-                                className={`${styles.storyStatusBtn} ${story.completionStatus === 'ongoing' ? styles.storyStatusActive : ''}`}
-                                onClick={() => handleQuickStoryStatusUpdate(undefined, 'ongoing')}
-                                disabled={!isFromDB || isUpdatingStoryStatus || story.completionStatus === 'ongoing'}
-                            >
-                                ยังไม่จบ
-                            </button>
-                            <button
-                                type="button"
-                                className={`${styles.storyStatusBtn} ${story.completionStatus === 'completed' ? styles.storyStatusActive : ''}`}
-                                onClick={() => handleQuickStoryStatusUpdate(undefined, 'completed')}
-                                disabled={!isFromDB || isUpdatingStoryStatus || story.completionStatus === 'completed'}
-                            >
-                                จบแล้ว
-                            </button>
-                        </div>
-                    </div>
-
-                    {isUpdatingStoryStatus && (
-                        <p className={styles.storyStatusHint}>กำลังอัปเดตสถานะ...</p>
-                    )}
-                    {!isFromDB && (
-                        <p className={styles.storyStatusHint}>โหมดเดโม: ไม่สามารถปรับสถานะเรื่องได้</p>
-                    )}
-                </section>
-
-                {/* Characters Section */}
-                <div className={styles.actions} style={{ marginTop: '2rem' }}>
-                    <h2 className={styles.sectionTitle}>
-                        แนะนำตัวละคร ({characters.length})
-                    </h2>
-                    <button
-                        className={styles.addBtn}
-                        onClick={handleOpenCreateCharModal}
-                    >
-                        <Plus size={18} /> เพิ่มตัวละคร
-                    </button>
-                </div>
-
-                {characters.length > 0 ? (
-                    <div className={styles.charactersGrid}>
-                        {characters.map((char) => (
-                            <div key={char.id} className={styles.characterCard}>
-                                <div className={styles.charImageWrap}>
-                                    {char.image_url ? (
-                                        <img src={char.image_url} alt={char.name} className={styles.charImage} />
+            <div className={`ffStudioPage ${styles.pageBody}`}>
+                <section className={styles.heroSection}>
+                    <div className={`${styles.heroBanner} ffStudioMasthead`}>
+                        {(story.coverWideImage || story.coverImage) && (
+                            <img src={story.coverWideImage || story.coverImage || ''} alt="Cover Background" className={styles.heroBg} />
+                        )}
+                        <div className={styles.heroOverlay}>
+                            <div className={styles.heroContent}>
+                                <div className={styles.heroPosterContainer}>
+                                    {story.coverImage ? (
+                                        <img src={story.coverImage} alt={story.title} className={styles.heroPoster} />
                                     ) : (
-                                        <div className={styles.charImagePlaceholder}>
-                                            <ImageIcon size={24} />
+                                        <div className={styles.heroPosterPlaceholder}>
+                                            <ImageIcon size={48} />
                                         </div>
                                     )}
                                 </div>
-                                <div className={styles.charInfo}>
-                                    <h4 className={styles.charName}>{char.name}</h4>
-                                    {char.age && <span className={styles.charDetail}>อายุ: {char.age}</span>}
-                                    {char.occupation && <span className={styles.charDetail}>อาชีพ: {char.occupation}</span>}
+
+                                <div className={styles.heroDetails}>
+                                    {totalStoryReadCount > 1000 && (
+                                        <div className={styles.trendingWrap}>
+                                            <span className={styles.badgeTrending}>TRENDING</span>
+                                        </div>
+                                    )}
+                                    <h1 className={styles.heroTitle}>{story.title}</h1>
+                                    <p className={styles.heroSubtitle}>
+                                        {storyTypeLabel} · {story.penName}
+                                    </p>
+                                    <p className={styles.heroSynopsis}>{story.synopsis}</p>
+                                    <div className={styles.heroTags}>
+                                        <span className={styles.tagPill}>{story.category === 'fanfic' ? 'แฟนฟิค' : 'ออริจินัล'}</span>
+                                        <span className={styles.tagPill}>{publicationLabel}</span>
+                                        <span className={styles.tagPill}>{completionLabel}</span>
+                                        <span className={styles.tagPill}>{storyModeLabel}</span>
+                                        <span className={styles.tagPill}>Editor: {editorStyle}</span>
+                                    </div>
                                 </div>
-                                <div style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', display: 'flex', gap: '0.25rem' }}>
-                                    <button
-                                        className={styles.editCharBtn}
-                                        onClick={() => handleEditCharacter(char)}
-                                        title="แก้ไขตัวละคร"
-                                    >
-                                        <Edit3 size={14} />
-                                    </button>
-                                    <button
-                                        className={styles.deleteCharBtn}
-                                        onClick={() => handleDeleteCharacter(char.id)}
-                                        title="ลบตัวละคร"
-                                    >
-                                        <X size={14} />
-                                    </button>
-                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className={`${styles.heroSummaryStrip} ffStudioPanel`}>
+                        {[
+                            { label: 'ตอนทั้งหมด', value: `${chapterCount} ตอน` },
+                            { label: 'ยอดอ่าน', value: totalStoryReadCount.toLocaleString('th-TH') },
+                            { label: 'หัวใจ', value: story.heartCount.toLocaleString('th-TH') },
+                            { label: 'คอมเมนต์', value: story.commentCount.toLocaleString('th-TH') },
+                        ].map((item) => (
+                            <div key={item.label} className={styles.heroSummaryItem}>
+                                <span className={styles.heroSummaryLabel}>{item.label}</span>
+                                <strong className={styles.heroSummaryValue}>{item.value}</strong>
                             </div>
                         ))}
                     </div>
-                ) : (
-                    <div className={styles.emptyState} style={{ padding: '2rem', minHeight: 'auto', background: 'transparent' }}>
-                        <p style={{ color: '#94a3b8', margin: 0 }}>ยังไม่มีการเพิ่มตัวละครแนะนำ</p>
-                    </div>
-                )}
+                </section>
 
-                {/* Chapters Section */}
-                <div className={styles.actions} style={{ marginTop: '2rem' }}>
-                    <h2 className={styles.sectionTitle}>
-                        สารบัญตอน ({story.chapters.length}) · เผยแพร่แล้ว {publishedCount} ตอน
-                    </h2>
-                    <button
-                        className={styles.addBtn}
-                        onClick={handleCreateChapter}
-                        disabled={isStoryCompleted}
-                        title={isStoryCompleted ? "ตั้งสถานะเรื่องเป็น 'ยังไม่จบ' ก่อนเพิ่มตอนใหม่" : "เพิ่มตอนใหม่"}
-                    >
-                        <Plus size={18} /> เพิ่มตอนใหม่
-                    </button>
-                </div>
-                {isStoryCompleted && (
-                    <p className={styles.completedNotice}>
-                        เรื่องนี้ตั้งเป็น &quot;จบแล้ว&quot; อยู่ จึงไม่สามารถเพิ่มตอนใหม่ได้
-                    </p>
-                )}
-
-                {isBranchingStory && decoratedChapters.length > 0 && (
-                    <div className={styles.branchOverviewGrid}>
-                        {branchingSections.map((section) => (
-                            <section
-                                key={section.key}
-                                className={`${styles.branchOverviewCard} ${styles[`branchOverviewCard${section.key[0].toUpperCase()}${section.key.slice(1)}`]}`}
-                            >
-                                <div className={styles.branchOverviewHeader}>
-                                    <div>
-                                        <h3 className={styles.branchOverviewTitle}>{section.title}</h3>
-                                        <p className={styles.branchOverviewSubtitle}>{section.description}</p>
-                                    </div>
-                                    <span className={styles.branchOverviewCount}>{section.chapters.length}</span>
-                                </div>
-                                <div className={styles.branchOverviewList}>
-                                    {section.chapters.map((chapter) => (
-                                        <button
-                                            key={chapter.id}
-                                            type="button"
-                                            className={styles.branchOverviewItem}
-                                            onClick={() => handleEditChapter(chapter.id)}
-                                        >
-                                            <span className={styles.branchOverviewItemTitle}>
-                                                ตอน {String(chapters.findIndex((item) => item.id === chapter.id) + 1).padStart(2, '0')} · {chapter.title}
-                                            </span>
-                                            <span className={styles.branchOverviewItemMeta}>
-                                                {chapter.outgoingChoiceCount > 0
-                                                    ? `${chapter.outgoingChoiceCount} ทางเลือก`
-                                                    : chapter.incomingChoiceCount > 0
-                                                        ? `ถูกชี้เข้า ${chapter.incomingChoiceCount} เส้นทาง`
-                                                        : chapter.isEntry
-                                                            ? 'ตอนเริ่มต้น'
-                                                            : 'ยังไม่เชื่อม'}
-                                            </span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </section>
-                        ))}
-                    </div>
-                )}
-
-                {story.chapters.length > 0 ? (
-                    <DragDropContext onDragEnd={handleDragEnd}>
-                        <Droppable droppableId="chapters-list">
-                            {(provided: DroppableProvided, snapshot: DroppableStateSnapshot) => (
-                                <div
-                                    className={`${styles.chapterList} ${snapshot.isDraggingOver ? styles.draggingOver : ''}`}
-                                    {...provided.droppableProps}
-                                    ref={provided.innerRef}
+                <div className={styles.content}>
+                    <section className={`${styles.storyStatusPanel} ffStudioPanel`}>
+                        <div className={styles.sectionHeading}>
+                            <span className={styles.sectionEyebrow}>Publishing Control</span>
+                            <h2 className={styles.sectionTitle}>สถานะเรื่อง</h2>
+                            <p className={styles.sectionDescription}>เปลี่ยนสถานะการเผยแพร่และความสมบูรณ์ของเรื่องได้จากแผงนี้</p>
+                        </div>
+                        <div className={styles.storyStatusRow}>
+                            <div className={styles.storyStatusLabel}>สถานะการเผยแพร่</div>
+                            <div className={styles.storyStatusActions}>
+                                <button
+                                    type="button"
+                                    className={`${styles.storyStatusBtn} ${story.status === 'draft' ? styles.storyStatusActive : ''}`}
+                                    onClick={() => handleQuickStoryStatusUpdate('draft')}
+                                    disabled={!isFromDB || isUpdatingStoryStatus || story.status === 'draft'}
                                 >
-                                    {decoratedChapters.map((chapter, index) => (
-                                        <Draggable key={chapter.id} draggableId={chapter.id} index={index}>
-                                            {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
-                                                <div
-                                                    className={`${styles.chapterItem} ${snapshot.isDragging ? styles.dragging : ''}`}
-                                                    ref={provided.innerRef}
-                                                    {...provided.draggableProps}
-                                                    style={provided.draggableProps.style}
-                                                >
-                                                    <div className={styles.chapterInfo}>
-                                                        <div
-                                                            {...provided.dragHandleProps}
-                                                            className={styles.dragHandle}
-                                                        >
-                                                            <GripVertical size={20} color="#cbd5e1" />
-                                                        </div>
-                                                        <div className={styles.chapterNumber}>
-                                                            {(index + 1).toString().padStart(2, '0')}
-                                                        </div>
-                                                        <div>
-                                                            <div className={styles.chapterTitle}>{chapter.title}</div>
-                                                            <div className={styles.chapterMeta}>
-                                                                <span>{chapter.date}</span>
-                                                                {chapter.status === 'published' ? (
-                                                                    <span className={styles.publishedBadge}>เผยแพร่แล้ว</span>
-                                                                ) : (
-                                                                    <span className={styles.draftBadge}>ยังไม่เผยแพร่</span>
-                                                                )}
-                                                                {chapter.hasUnpublishedChanges && (
-                                                                    <span className={styles.pendingDraftBadge}>มีฉบับร่างใหม่</span>
-                                                                )}
-                                                                {chapter.status === 'published' && (
-                                                                    <span style={{ marginLeft: '1rem' }}>👁️ {chapter.views} | 💬 {chapter.comments}</span>
-                                                                )}
-                                                                {chapter.isPremium && (
-                                                                    <span style={{ marginLeft: '1rem', color: '#b45309', fontWeight: 700 }}>
-                                                                        🔒 ตอนพิเศษ {chapter.coinPrice} เหรียญ
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            {isBranchingStory && (
-                                                                <div className={styles.chapterFlowMeta}>
-                                                                    {chapter.isEntry && (
-                                                                        <span className={`${styles.chapterFlowPill} ${styles.chapterFlowPillEntry}`}>
-                                                                            จุดเริ่มต้น
-                                                                        </span>
-                                                                    )}
-                                                                    {chapter.outgoingChoiceCount > 0 && (
-                                                                        <span className={`${styles.chapterFlowPill} ${styles.chapterFlowPillHub}`}>
-                                                                            {chapter.outgoingChoiceCount} ทางเลือก
-                                                                        </span>
-                                                                    )}
-                                                                    {chapter.incomingChoiceCount > 0 && (
-                                                                        <span className={`${styles.chapterFlowPill} ${styles.chapterFlowPillTarget}`}>
-                                                                            ปลายทาง {chapter.incomingChoiceCount} เส้น
-                                                                        </span>
-                                                                    )}
-                                                                    {!chapter.isEntry && chapter.incomingChoiceCount === 0 && chapter.outgoingChoiceCount === 0 && (
-                                                                        <span className={`${styles.chapterFlowPill} ${styles.chapterFlowPillUnlinked}`}>
-                                                                            ยังไม่เชื่อมใน flow
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                        <button
-                                                            className={styles.iconBtn}
-                                                            style={{ color: 'var(--primary)', background: '#ecfdf5', padding: '0.5rem', borderRadius: '8px' }}
-                                                            title="แก้ไขตอน"
-                                                            onClick={() => handleEditChapter(chapter.id)}
-                                                        >
-                                                            <Edit3 size={18} />
-                                                        </button>
-                                                        <button
-                                                            className={styles.iconBtn}
-                                                            style={{ color: '#ef4444', background: '#fef2f2', padding: '0.5rem', borderRadius: '8px' }}
-                                                            title="ลบตอน"
-                                                            onClick={() => handleDeleteChapter(chapter.id)}
-                                                        >
-                                                            <Trash2 size={18} />
-                                                        </button>
-                                                    </div>
+                                    แบบร่าง
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`${styles.storyStatusBtn} ${story.status === 'published' ? styles.storyStatusActive : ''}`}
+                                    onClick={() => handleQuickStoryStatusUpdate('published')}
+                                    disabled={!isFromDB || isUpdatingStoryStatus || story.status === 'published'}
+                                >
+                                    เผยแพร่แล้ว
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className={styles.storyStatusRow}>
+                            <div className={styles.storyStatusLabel}>สถานะความสมบูรณ์เรื่อง</div>
+                            <div className={styles.storyStatusActions}>
+                                <button
+                                    type="button"
+                                    className={`${styles.storyStatusBtn} ${story.completionStatus === 'ongoing' ? styles.storyStatusActive : ''}`}
+                                    onClick={() => handleQuickStoryStatusUpdate(undefined, 'ongoing')}
+                                    disabled={!isFromDB || isUpdatingStoryStatus || story.completionStatus === 'ongoing'}
+                                >
+                                    ยังไม่จบ
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`${styles.storyStatusBtn} ${story.completionStatus === 'completed' ? styles.storyStatusActive : ''}`}
+                                    onClick={() => handleQuickStoryStatusUpdate(undefined, 'completed')}
+                                    disabled={!isFromDB || isUpdatingStoryStatus || story.completionStatus === 'completed'}
+                                >
+                                    จบแล้ว
+                                </button>
+                            </div>
+                        </div>
+
+                        {isUpdatingStoryStatus && (
+                            <p className={styles.storyStatusHint}>กำลังอัปเดตสถานะ...</p>
+                        )}
+                        {!isFromDB && (
+                            <p className={styles.storyStatusHint}>โหมดเดโม: ไม่สามารถปรับสถานะเรื่องได้</p>
+                        )}
+                    </section>
+
+                    <section className={`${styles.sectionShell} ffStudioPanel`}>
+                        <div className={styles.sectionToolbar}>
+                            <div className={styles.sectionHeading}>
+                                <span className={styles.sectionEyebrow}>Character Library</span>
+                                <h2 className={styles.sectionTitle}>แนะนำตัวละคร ({characters.length})</h2>
+                                <p className={styles.sectionDescription}>ตัวละครในชุดนี้จะถูกใช้เป็นข้อมูลประกอบหน้ารายละเอียดและสารบัญของผู้อ่าน</p>
+                            </div>
+                            <button
+                                className={styles.addBtn}
+                                onClick={handleOpenCreateCharModal}
+                            >
+                                <Plus size={18} /> เพิ่มตัวละคร
+                            </button>
+                        </div>
+
+                        {characters.length > 0 ? (
+                            <div className={styles.charactersGrid}>
+                                {characters.map((char) => (
+                                    <div key={char.id} className={styles.characterCard}>
+                                        <div className={styles.characterCardActions}>
+                                            <button
+                                                className={styles.editCharBtn}
+                                                onClick={() => handleEditCharacter(char)}
+                                                title="แก้ไขตัวละคร"
+                                            >
+                                                <Edit3 size={14} />
+                                            </button>
+                                            <button
+                                                className={styles.deleteCharBtn}
+                                                onClick={() => handleDeleteCharacter(char.id)}
+                                                title="ลบตัวละคร"
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        </div>
+                                        <div className={styles.charImageWrap}>
+                                            {char.image_url ? (
+                                                <img src={char.image_url} alt={char.name} className={styles.charImage} />
+                                            ) : (
+                                                <div className={styles.charImagePlaceholder}>
+                                                    <ImageIcon size={24} />
                                                 </div>
                                             )}
-                                        </Draggable>
-                                    ))}
-                                    {provided.placeholder}
-                                </div>
-                            )}
-                        </Droppable>
-                    </DragDropContext>
-                ) : (
-                    <div className={styles.emptyState}>
-                        <div style={{ color: '#cbd5e1' }}><Edit3 size={48} /></div>
-                        <h3>ยังไม่มีตอนในเรื่องนี้</h3>
-                        <p>เริ่มเขียนตอนแรกของคุณเพื่อสร้างเรื่องราวให้สมบูรณ์</p>
-                        <button
-                            className={styles.addBtn}
-                            style={{ marginTop: '0.5rem' }}
-                            onClick={handleCreateChapter}
-                            disabled={isStoryCompleted}
-                            title={isStoryCompleted ? "ตั้งสถานะเรื่องเป็น 'ยังไม่จบ' ก่อนเพิ่มตอนใหม่" : "เขียนตอนแรก"}
-                        >
-                            <Plus size={18} /> เขียนตอนแรก
-                        </button>
-                    </div>
-                )}
+                                        </div>
+                                        <div className={styles.charInfo}>
+                                            <h4 className={styles.charName}>{char.name}</h4>
+                                            {char.age && <span className={styles.charDetail}>อายุ: {char.age}</span>}
+                                            {char.occupation && <span className={styles.charDetail}>อาชีพ: {char.occupation}</span>}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className={`ffStudioEmpty ${styles.characterEmptyState}`}>
+                                <p className={styles.emptyStateText}>ยังไม่มีการเพิ่มตัวละครแนะนำ</p>
+                            </div>
+                        )}
+                    </section>
+
+                    <section className={`${styles.sectionShell} ffStudioPanel`}>
+                        <div className={styles.sectionToolbar}>
+                            <div className={styles.sectionHeading}>
+                                <span className={styles.sectionEyebrow}>Chapter Workspace</span>
+                                <h2 className={styles.sectionTitle}>สารบัญตอน ({story.chapters.length}) · เผยแพร่แล้ว {publishedCount} ตอน</h2>
+                                <p className={styles.sectionDescription}>จัดเรียงตอน แก้ไขเนื้อหา และดูสถานะแต่ละตอนจากพื้นที่ทำงานเดียวกัน</p>
+                            </div>
+                            <button
+                                className={styles.addBtn}
+                                onClick={handleCreateChapter}
+                                disabled={isStoryCompleted}
+                                title={isStoryCompleted ? "ตั้งสถานะเรื่องเป็น 'ยังไม่จบ' ก่อนเพิ่มตอนใหม่" : "เพิ่มตอนใหม่"}
+                            >
+                                <Plus size={18} /> เพิ่มตอนใหม่
+                            </button>
+                        </div>
+                        {isStoryCompleted && (
+                            <p className={styles.completedNotice}>
+                                เรื่องนี้ตั้งเป็น &quot;จบแล้ว&quot; อยู่ จึงไม่สามารถเพิ่มตอนใหม่ได้
+                            </p>
+                        )}
+
+                        {isBranchingStory && decoratedChapters.length > 0 && (
+                            <div className={styles.branchOverviewGrid}>
+                                {branchingSections.map((section) => (
+                                    <section
+                                        key={section.key}
+                                        className={`${styles.branchOverviewCard} ${styles[`branchOverviewCard${section.key[0].toUpperCase()}${section.key.slice(1)}`]}`}
+                                    >
+                                        <div className={styles.branchOverviewHeader}>
+                                            <div>
+                                                <h3 className={styles.branchOverviewTitle}>{section.title}</h3>
+                                                <p className={styles.branchOverviewSubtitle}>{section.description}</p>
+                                            </div>
+                                            <span className={styles.branchOverviewCount}>{section.chapters.length}</span>
+                                        </div>
+                                        <div className={styles.branchOverviewList}>
+                                            {section.chapters.map((chapter) => (
+                                                <button
+                                                    key={chapter.id}
+                                                    type="button"
+                                                    className={styles.branchOverviewItem}
+                                                    onClick={() => handleEditChapter(chapter.id)}
+                                                >
+                                                    <span className={styles.branchOverviewItemTitle}>
+                                                        ตอน {String(chapters.findIndex((item) => item.id === chapter.id) + 1).padStart(2, '0')} · {chapter.title}
+                                                    </span>
+                                                    <span className={styles.branchOverviewItemMeta}>
+                                                        {chapter.outgoingChoiceCount > 0
+                                                            ? `${chapter.outgoingChoiceCount} ทางเลือก`
+                                                            : chapter.incomingChoiceCount > 0
+                                                                ? `ถูกชี้เข้า ${chapter.incomingChoiceCount} เส้นทาง`
+                                                                : chapter.isEntry
+                                                                    ? 'ตอนเริ่มต้น'
+                                                                    : 'ยังไม่เชื่อม'}
+                                                    </span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </section>
+                                ))}
+                            </div>
+                        )}
+
+                        {story.chapters.length > 0 ? (
+                            <DragDropContext onDragEnd={handleDragEnd}>
+                                <Droppable droppableId="chapters-list">
+                                    {(provided: DroppableProvided, snapshot: DroppableStateSnapshot) => (
+                                        <div
+                                            className={`${styles.chapterList} ${snapshot.isDraggingOver ? styles.draggingOver : ''}`}
+                                            {...provided.droppableProps}
+                                            ref={provided.innerRef}
+                                        >
+                                            {decoratedChapters.map((chapter, index) => {
+                                                const chapterCharacters = chapter.characterIds
+                                                    .map((characterId) => characterMap.get(characterId))
+                                                    .filter((character): character is Character => !!character);
+
+                                                return (
+                                                    <Draggable key={chapter.id} draggableId={chapter.id} index={index}>
+                                                        {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
+                                                            <div
+                                                                className={`${styles.chapterItem} ${snapshot.isDragging ? styles.dragging : ''}`}
+                                                                ref={provided.innerRef}
+                                                                {...provided.draggableProps}
+                                                                style={provided.draggableProps.style}
+                                                            >
+                                                                <div className={styles.chapterInfo}>
+                                                                    <div
+                                                                        {...provided.dragHandleProps}
+                                                                        className={styles.dragHandle}
+                                                                    >
+                                                                        <GripVertical size={20} color="#cbd5e1" />
+                                                                    </div>
+                                                                    <div className={styles.chapterNumber}>
+                                                                        {(index + 1).toString().padStart(2, '0')}
+                                                                    </div>
+                                                                    <div className={styles.chapterBody}>
+                                                                        <div className={styles.chapterTitle}>{chapter.title}</div>
+                                                                        <div className={styles.chapterMeta}>
+                                                                            <span className={styles.chapterMetaItem}>{chapter.date}</span>
+                                                                            {chapter.status === 'published' ? (
+                                                                                <span className={styles.publishedBadge}>เผยแพร่แล้ว</span>
+                                                                            ) : (
+                                                                                <span className={styles.draftBadge}>ยังไม่เผยแพร่</span>
+                                                                            )}
+                                                                            {chapter.hasUnpublishedChanges && (
+                                                                                <span className={styles.pendingDraftBadge}>มีฉบับร่างใหม่</span>
+                                                                            )}
+                                                                            {chapter.status === 'published' && (
+                                                                                <span className={styles.chapterMetricText}>👁️ {chapter.views} | 💬 {chapter.comments}</span>
+                                                                            )}
+                                                                            {chapter.isPremium && (
+                                                                                <span className={styles.chapterPremiumNote}>
+                                                                                    ตอนพิเศษ {chapter.coinPrice} เหรียญ
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                        {chapterCharacters.length > 0 && (
+                                                                            <div className={styles.chapterCharacterStrip} aria-label={`ตัวละครในตอนนี้ ${chapterCharacters.map((character) => character.name).join(', ')}`}>
+                                                                                {chapterCharacters.map((character) => {
+                                                                                    const ageText = typeof character.age === 'string' && character.age.trim()
+                                                                                        ? `อายุ ${character.age.trim()}`
+                                                                                        : null;
+
+                                                                                    return (
+                                                                                        <div
+                                                                                            key={character.id}
+                                                                                            className={styles.chapterCharacterItem}
+                                                                                            tabIndex={0}
+                                                                                            aria-label={ageText ? `${character.name}, ${ageText}` : character.name}
+                                                                                        >
+                                                                                            <span className={styles.chapterCharacterAvatar} aria-hidden="true">
+                                                                                                {character.image_url ? (
+                                                                                                    <img
+                                                                                                        src={character.image_url}
+                                                                                                        alt=""
+                                                                                                        className={styles.chapterCharacterImage}
+                                                                                                    />
+                                                                                                ) : (
+                                                                                                    <span className={styles.chapterCharacterFallback}>
+                                                                                                        {getCharacterInitial(character.name)}
+                                                                                                    </span>
+                                                                                                )}
+                                                                                            </span>
+                                                                                            <span className={styles.chapterCharacterTooltip} aria-hidden="true">
+                                                                                                <span className={styles.chapterCharacterTooltipName}>{character.name}</span>
+                                                                                                {ageText && (
+                                                                                                    <span className={styles.chapterCharacterTooltipMeta}>{ageText}</span>
+                                                                                                )}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                        )}
+                                                                        {isBranchingStory && (
+                                                                            <div className={styles.chapterFlowMeta}>
+                                                                                {chapter.isEntry && (
+                                                                                    <span className={`${styles.chapterFlowPill} ${styles.chapterFlowPillEntry}`}>
+                                                                                        จุดเริ่มต้น
+                                                                                    </span>
+                                                                                )}
+                                                                                {chapter.outgoingChoiceCount > 0 && (
+                                                                                    <span className={`${styles.chapterFlowPill} ${styles.chapterFlowPillHub}`}>
+                                                                                        {chapter.outgoingChoiceCount} ทางเลือก
+                                                                                    </span>
+                                                                                )}
+                                                                                {chapter.incomingChoiceCount > 0 && (
+                                                                                    <span className={`${styles.chapterFlowPill} ${styles.chapterFlowPillTarget}`}>
+                                                                                        ปลายทาง {chapter.incomingChoiceCount} เส้น
+                                                                                    </span>
+                                                                                )}
+                                                                                {!chapter.isEntry && chapter.incomingChoiceCount === 0 && chapter.outgoingChoiceCount === 0 && (
+                                                                                    <span className={`${styles.chapterFlowPill} ${styles.chapterFlowPillUnlinked}`}>
+                                                                                        ยังไม่เชื่อมใน flow
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                                <div className={styles.chapterActions}>
+                                                                    <button
+                                                                        className={`${styles.iconBtn} ${styles.chapterEditBtn}`}
+                                                                        title="แก้ไขตอน"
+                                                                        onClick={() => handleEditChapter(chapter.id)}
+                                                                    >
+                                                                        <Edit3 size={18} />
+                                                                    </button>
+                                                                    <button
+                                                                        className={`${styles.iconBtn} ${styles.chapterDeleteBtn}`}
+                                                                        title="ลบตอน"
+                                                                        onClick={() => handleDeleteChapter(chapter.id)}
+                                                                    >
+                                                                        <Trash2 size={18} />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </Draggable>
+                                                );
+                                            })}
+                                            {provided.placeholder}
+                                        </div>
+                                    )}
+                                </Droppable>
+                            </DragDropContext>
+                        ) : (
+                            <div className={`ffStudioEmpty ${styles.emptyState}`}>
+                                <div className={styles.emptyStateIcon}><Edit3 size={48} /></div>
+                                <h3>ยังไม่มีตอนในเรื่องนี้</h3>
+                                <p>เริ่มเขียนตอนแรกของคุณเพื่อสร้างเรื่องราวให้สมบูรณ์</p>
+                                <button
+                                    className={styles.addBtn}
+                                    onClick={handleCreateChapter}
+                                    disabled={isStoryCompleted}
+                                    title={isStoryCompleted ? "ตั้งสถานะเรื่องเป็น 'ยังไม่จบ' ก่อนเพิ่มตอนใหม่" : "เขียนตอนแรก"}
+                                >
+                                    <Plus size={18} /> เขียนตอนแรก
+                                </button>
+                            </div>
+                        )}
+                    </section>
+                </div>
             </div>
             {/* Edit Modal */}
             {showEditModal && (

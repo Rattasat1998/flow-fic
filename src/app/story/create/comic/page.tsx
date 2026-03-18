@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-    ArrowLeft, Trash2, PenTool, Eraser, Save, Plus, ChevronLeft, ChevronRight,
+    Trash2, PenTool, Eraser, Save, Plus, ChevronLeft, ChevronRight,
     Highlighter, Undo2, Redo2, ImagePlus, ArrowUpToLine, ArrowDownToLine, Trash, Loader2
 } from 'lucide-react';
 import { Rnd } from 'react-rnd';

@@ -61,7 +61,6 @@ export default function CommunityEnforcementPolicyPage() {
       <p style={{ marginBottom: "0.75rem" }}>
         <Link href="/terms">ข้อกำหนดและเงื่อนไขการใช้บริการ</Link>
       </p>
-      <Link href="/billing-policies">กลับไปหน้ารวมนโยบาย</Link>
     </main>
   );
 }

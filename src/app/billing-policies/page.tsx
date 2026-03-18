@@ -86,7 +86,6 @@ export default function BillingPoliciesPage() {
       <p style={{ marginBottom: "0.75rem" }}>
         <Link href="/privacy">นโยบายความเป็นส่วนตัว</Link>
       </p>
-      <Link href="/">กลับหน้าแรก</Link>
     </main>
   );
 }

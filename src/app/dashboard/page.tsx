@@ -18,9 +18,6 @@ import {
     Edit3,
     MoreVertical,
     Trash2,
-    LogOut,
-    User,
-    BookOpen
 } from 'lucide-react';
 import styles from './dashboard.module.css';
 import { supabase } from '@/lib/supabase';
@@ -70,6 +67,14 @@ type DashboardStory = {
     likesCount: number;
     commentsCount: number;
     favoritesCount: number;
+};
+
+type DashboardMetricsRow = {
+    story_id: string;
+    views_count: number | null;
+    likes_count: number | null;
+    favorites_count: number | null;
+    comments_count: number | null;
 };
 
 type ChapterReadRow = {
@@ -152,9 +157,27 @@ const removeStoragePaths = async (bucket: 'covers' | 'characters' | 'comics', pa
     return { ok: true as const };
 };
 
+const isMissingWriterMetricsRpcError = (error: unknown) => {
+    if (!error || typeof error !== 'object') return false;
+
+    const maybeError = error as {
+        code?: string;
+        message?: string;
+        details?: string;
+        hint?: string;
+    };
+
+    const message = typeof maybeError.message === 'string' ? maybeError.message : '';
+    const details = typeof maybeError.details === 'string' ? maybeError.details : '';
+    const hint = typeof maybeError.hint === 'string' ? maybeError.hint : '';
+    const combined = `${message} ${details} ${hint}`;
+
+    return maybeError.code === 'PGRST202' || combined.includes('get_writer_dashboard_metrics');
+};
+
 export default function DashboardPage() {
     const router = useRouter();
-    const { user, isLoading: isLoadingAuth, signOut } = useAuth();
+    const { user, isLoading: isLoadingAuth } = useAuth();
     const userId = user?.id ?? null;
     const userFullName = typeof user?.user_metadata?.full_name === 'string' ? user.user_metadata.full_name : '';
     const userAvatarUrl = typeof user?.user_metadata?.avatar_url === 'string' ? user.user_metadata.avatar_url : null;
@@ -207,49 +230,87 @@ export default function DashboardPage() {
                         storyIds.map((id) => [id, { views: 0, likes: 0, comments: 0, favorites: 0 }])
                     );
 
-                    const [
-                        { data: chaptersData },
-                        { data: likesData },
-                        { data: favoritesData },
-                        { data: commentsData },
-                    ] = await Promise.all([
-                        supabase.from('chapters').select('story_id, read_count').in('story_id', storyIds),
-                        supabase.from('likes').select('story_id').in('story_id', storyIds),
-                        supabase.from('favorites').select('story_id').in('story_id', storyIds),
-                        supabase.from('comments').select('story_id').in('story_id', storyIds),
-                    ]);
+                    const applyMetrics = (nextMetrics: Record<string, StoryMetrics>) => {
+                        setStoryMetrics(nextMetrics);
+                        const metricList = Object.values(nextMetrics);
+                        setTotalViews(metricList.reduce((sum, metric) => sum + metric.views, 0));
+                        setTotalLikes(metricList.reduce((sum, metric) => sum + metric.likes, 0));
+                        setTotalFavorites(metricList.reduce((sum, metric) => sum + metric.favorites, 0));
+                        setTotalComments(metricList.reduce((sum, metric) => sum + metric.comments, 0));
+                    };
 
-                    (chaptersData as ChapterReadRow[] | null)?.forEach((row) => {
-                        if (initialMetrics[row.story_id]) {
-                            initialMetrics[row.story_id].views += row.read_count || 0;
+                    const hydrateMetricsFromLegacyQueries = async () => {
+                        const nextMetrics = { ...initialMetrics };
+                        const [
+                            { data: chaptersData },
+                            { data: likesData },
+                            { data: favoritesData },
+                            { data: commentsData },
+                        ] = await Promise.all([
+                            supabase.from('chapters').select('story_id, read_count').in('story_id', storyIds),
+                            supabase.from('likes').select('story_id').in('story_id', storyIds),
+                            supabase.from('favorites').select('story_id').in('story_id', storyIds),
+                            supabase.from('comments').select('story_id').in('story_id', storyIds),
+                        ]);
+
+                        (chaptersData as ChapterReadRow[] | null)?.forEach((row) => {
+                            if (nextMetrics[row.story_id]) {
+                                nextMetrics[row.story_id].views += row.read_count || 0;
+                            }
+                        });
+
+                        (likesData as StoryIdRow[] | null)?.forEach((row) => {
+                            if (nextMetrics[row.story_id]) {
+                                nextMetrics[row.story_id].likes += 1;
+                            }
+                        });
+
+                        (favoritesData as StoryIdRow[] | null)?.forEach((row) => {
+                            if (nextMetrics[row.story_id]) {
+                                nextMetrics[row.story_id].favorites += 1;
+                            }
+                        });
+
+                        (commentsData as StoryIdRow[] | null)?.forEach((row) => {
+                            if (nextMetrics[row.story_id]) {
+                                nextMetrics[row.story_id].comments += 1;
+                            }
+                        });
+
+                        return nextMetrics;
+                    };
+
+                    const { data: metricRows, error: metricError } = await supabase.rpc(
+                        'get_writer_dashboard_metrics'
+                    );
+
+                    if (metricError) {
+                        if (isMissingWriterMetricsRpcError(metricError)) {
+                            console.warn(
+                                '[Dashboard] RPC get_writer_dashboard_metrics is unavailable. Falling back to legacy metric queries.',
+                                metricError
+                            );
+                        } else {
+                            console.error('[Dashboard] RPC get_writer_dashboard_metrics failed. Falling back to legacy metric queries.', metricError);
                         }
-                    });
 
-                    (likesData as StoryIdRow[] | null)?.forEach((row) => {
-                        if (initialMetrics[row.story_id]) {
-                            initialMetrics[row.story_id].likes += 1;
-                        }
-                    });
+                        const fallbackMetrics = await hydrateMetricsFromLegacyQueries();
+                        applyMetrics(fallbackMetrics);
+                    } else {
+                        const nextMetrics = { ...initialMetrics };
 
-                    (favoritesData as StoryIdRow[] | null)?.forEach((row) => {
-                        if (initialMetrics[row.story_id]) {
-                            initialMetrics[row.story_id].favorites += 1;
-                        }
-                    });
+                        ((metricRows as DashboardMetricsRow[] | null) || []).forEach((row) => {
+                            if (!nextMetrics[row.story_id]) return;
+                            nextMetrics[row.story_id] = {
+                                views: Math.max(0, Number(row.views_count || 0)),
+                                likes: Math.max(0, Number(row.likes_count || 0)),
+                                favorites: Math.max(0, Number(row.favorites_count || 0)),
+                                comments: Math.max(0, Number(row.comments_count || 0)),
+                            };
+                        });
 
-                    (commentsData as StoryIdRow[] | null)?.forEach((row) => {
-                        if (initialMetrics[row.story_id]) {
-                            initialMetrics[row.story_id].comments += 1;
-                        }
-                    });
-
-                    setStoryMetrics(initialMetrics);
-
-                    const metricList = Object.values(initialMetrics);
-                    setTotalViews(metricList.reduce((sum, metric) => sum + metric.views, 0));
-                    setTotalLikes(metricList.reduce((sum, metric) => sum + metric.likes, 0));
-                    setTotalFavorites(metricList.reduce((sum, metric) => sum + metric.favorites, 0));
-                    setTotalComments(metricList.reduce((sum, metric) => sum + metric.comments, 0));
+                        applyMetrics(nextMetrics);
+                    }
                 } else {
                     setStoryMetrics({});
                     setTotalViews(0);
@@ -305,12 +366,6 @@ export default function DashboardPage() {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [openStoryMenuId, isProfileMenuOpen]);
-
-    const handleSignOut = async () => {
-        setIsProfileMenuOpen(false);
-        await signOut();
-        router.push('/');
-    };
 
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -402,6 +457,8 @@ export default function DashboardPage() {
     const filteredStories = activeTab === 'all'
         ? allStories
         : allStories.filter(s => s.type === activeTab);
+    const publishedStoriesCount = allStories.filter((story) => story.status === 'published').length;
+    const completedStoriesCount = allStories.filter((story) => story.completionStatus === 'completed').length;
 
     const handleStoryStatusChange = async (storyId: string, nextStatus: StoryStatus) => {
         if (!user) return;
@@ -537,87 +594,106 @@ export default function DashboardPage() {
     };
 
     return (
-        <main className={styles.main}>
-            <nav className={styles.navbar}>
-                <div className={styles.navLeft}>
-                    <BrandLogo href="/" size="md" className={styles.logo} withStudioLabel />
-                    <span className={styles.navDivider}>/</span>
-                    <span className={styles.pageTitle}>แดชบอร์ดนักเขียน</span>
-                </div>
-                <div className={styles.navRight}>
-                    <Link href="/story/create" className={styles.createBtn}>
-                        <Plus size={16} /> แต่งเรื่องใหม่
-                    </Link>
+        <main className={`${styles.main} ffStudioShell`}>
+            <nav className={`ffStudioTopbar ${styles.navbar}`}>
+                <div className="ffStudioTopbarInner">
+                    <div className={`ffStudioTopbarContext ${styles.navLeft}`}>
+                        <BrandLogo href="/" size="md" className={styles.logo} withStudioLabel />
+                        <span className={styles.navDivider}>/</span>
+                        <div className="ffStudioTopbarCopy">
+                            <span className="ffStudioTopbarEyebrow">Writer Studio</span>
+                            <span className="ffStudioTopbarTitle">แดชบอร์ดนักเขียน</span>
+                            <span className="ffStudioTopbarMeta">
+                                ทั้งหมด {allStories.length} เรื่อง · เผยแพร่แล้ว {publishedStoriesCount} เรื่อง
+                            </span>
+                        </div>
+                    </div>
+                    <div className={`ffStudioTopbarActions ${styles.navRight}`}>
+                        <Link href="/story/create" className={styles.createBtn}>
+                            <Plus size={16} /> แต่งเรื่องใหม่
+                        </Link>
+                    </div>
                 </div>
             </nav>
 
-            <div className={styles.content}>
+            <div className={`ffStudioPage ${styles.content}`}>
+                <section className={`${styles.welcomeSection} ffStudioMasthead`}>
+                    <div className={styles.welcomeCopy}>
+                        <span className={styles.welcomeEyebrow}>Writer Overview</span>
+                        <h1 className={styles.greeting}>สวัสดี, {profile.pen_name}</h1>
+                        <p className={styles.subtitle}>{profile.bio || 'ภาพรวมผลงานและนิยายของคุณในสตูดิโอเขียนเรื่อง'}</p>
+                        <div className={styles.welcomePills}>
+                            <span className={styles.welcomePill}>ผลงานทั้งหมด {allStories.length} เรื่อง</span>
+                            <span className={styles.welcomePill}>เผยแพร่แล้ว {publishedStoriesCount} เรื่อง</span>
+                            <span className={styles.welcomePill}>จบแล้ว {completedStoriesCount} เรื่อง</span>
+                        </div>
+                    </div>
+                    <div className={styles.welcomeActions}>
+                        <button
+                            onClick={handleOpenProfileModal}
+                            className={styles.profileSettingsBtn}
+                        >
+                            <Settings size={14} /> ตั้งค่าโปรไฟล์นักเขียน
+                        </button>
+                    </div>
+                </section>
 
-                {/* Welcome Section */}
-                <div className={styles.welcomeSection}>
-                    <h1 className={styles.greeting}>สวัสดี, {profile.pen_name} 👋</h1>
-                    <p className={styles.subtitle}>{profile.bio || 'ภาพรวมผลงานและนิยายของคุณ'}</p>
-                    <button
-                        onClick={handleOpenProfileModal}
-                        style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'none', border: 'none', color: '#64748b', fontSize: '0.85rem', cursor: 'pointer', width: 'fit-content' }}
-                    >
-                        <Settings size={14} /> ตั้งค่าโปรไฟล์นักเขียน
-                    </button>
-                </div>
-
-                {/* Stats Grid — Real Data */}
                 <div className={styles.statsGrid}>
-                    <div className={styles.statCard}>
-                        <div className={styles.statIconWrapper} style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}>
+                    <div className={`${styles.statCard} ffStudioPanel`}>
+                        <div className={`${styles.statIconWrapper} ${styles.statToneAmber}`}>
                             <Eye size={24} />
                         </div>
                         <div className={styles.statInfo}>
                             <p className={styles.statLabel}>ยอดวิวรวม</p>
                             <h3 className={styles.statValue}>{totalViews.toLocaleString()}</h3>
+                            <p className={styles.statNote}>รวมทุกเรื่องที่เผยแพร่</p>
                         </div>
                     </div>
 
-                    <div className={styles.statCard}>
-                        <div className={styles.statIconWrapper} style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}>
+                    <div className={`${styles.statCard} ffStudioPanel`}>
+                        <div className={`${styles.statIconWrapper} ${styles.statToneRose}`}>
                             <Heart size={24} />
                         </div>
                         <div className={styles.statInfo}>
                             <p className={styles.statLabel}>หัวใจทั้งหมด</p>
                             <h3 className={styles.statValue}>{totalLikes.toLocaleString()}</h3>
+                            <p className={styles.statNote}>สัญญาณตอบรับจากผู้อ่าน</p>
                         </div>
                     </div>
 
-                    <div className={styles.statCard}>
-                        <div className={styles.statIconWrapper} style={{ backgroundColor: 'rgba(28, 198, 172, 0.1)', color: 'var(--primary)' }}>
+                    <div className={`${styles.statCard} ffStudioPanel`}>
+                        <div className={`${styles.statIconWrapper} ${styles.statToneOrange}`}>
                             <Bookmark size={24} />
                         </div>
                         <div className={styles.statInfo}>
                             <p className={styles.statLabel}>เก็บเข้าชั้น</p>
                             <h3 className={styles.statValue}>{totalFavorites.toLocaleString()}</h3>
+                            <p className={styles.statNote}>จำนวนครั้งที่ถูกเซฟไว้</p>
                         </div>
                     </div>
 
-                    <div className={styles.statCard}>
-                        <div className={styles.statIconWrapper} style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}>
+                    <div className={`${styles.statCard} ffStudioPanel`}>
+                        <div className={`${styles.statIconWrapper} ${styles.statToneBlue}`}>
                             <MessageSquare size={24} />
                         </div>
                         <div className={styles.statInfo}>
                             <p className={styles.statLabel}>คอมเมนต์</p>
                             <h3 className={styles.statValue}>{totalComments.toLocaleString()}</h3>
+                            <p className={styles.statNote}>บทสนทนาจากผู้อ่านทั้งหมด</p>
                         </div>
                     </div>
                 </div>
 
-                {/* Main Content Area */}
                 <div className={styles.mainGrid}>
-
-                    {/* Active Stories */}
-                    <div className={styles.card}>
+                    <section className={`${styles.card} ffStudioPanel`}>
                         <div className={styles.cardHeader}>
-                            <h2 className={styles.cardTitle}>นิยายของคุณ ({allStories.length})</h2>
+                            <div className={styles.cardHeaderCopy}>
+                                <span className={styles.cardEyebrow}>Story Library</span>
+                                <h2 className={styles.cardTitle}>นิยายของคุณ ({allStories.length})</h2>
+                                <p className={styles.cardSubtitle}>จัดการสถานะการเผยแพร่และเข้าไปแก้ไขแต่ละเรื่องได้จากรายการนี้</p>
+                            </div>
                         </div>
 
-                        {/* Category Tabs */}
                         <div className={styles.tabsContainer}>
                             <button
                                 className={`${styles.tabBtn} ${activeTab === 'all' ? styles.activeTab : ''}`}
@@ -647,105 +723,106 @@ export default function DashboardPage() {
 
                         <div className={styles.storyList}>
                             {filteredStories.length === 0 ? (
-                                <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
-                                    <p>ยังไม่มีนิยาย</p>
-                                    <Link href="/story/create" style={{ color: 'var(--primary)', fontWeight: 600 }}>+ สร้างเรื่องใหม่</Link>
+                                <div className={`ffStudioEmpty ${styles.emptyStories}`}>
+                                    <p>ยังไม่มีนิยายในหมวดนี้</p>
+                                    <Link href="/story/create" className={styles.emptyStoriesLink}>+ สร้างเรื่องใหม่</Link>
                                 </div>
                             ) : (
                                 filteredStories.map((story) => {
-                                    const timeAgo = story.createdAt
-                                        ? `สร้างเมื่อ ${new Date(story.createdAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}`
-                                        : '';
+                                    const createdDate = story.createdAt
+                                        ? new Date(story.createdAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })
+                                        : 'ไม่ทราบ';
 
                                     return (
                                         <div key={story.id} className={styles.storyListItem}>
                                             <img src={story.coverUrl} alt={story.title} className={styles.storyThumb} />
 
-                                            <div className={styles.storyDetails}>
-                                                <div className={styles.titleRow}>
-                                                    <h4 className={styles.storyTitle} style={{ fontSize: '1.1rem' }}>{story.title}</h4>
-                                                    {story.type === 'fanfic' && <span className={styles.badgeFanfic}>Fanfic</span>}
-                                                    {story.type === 'novel' && <span className={styles.badgeNovel}>Original</span>}
-                                                    {story.type === 'cartoon' && <span className={styles.badgeCartoon}>Cartoon</span>}
-                                                    {story.completionStatus === 'completed' ? (
-                                                        <span className={styles.badgeCompleted} style={{ backgroundColor: '#e0f2fe', color: '#0369a1' }}>Completed</span>
-                                                    ) : (
-                                                        <span className={styles.badgeOngoing} style={{ backgroundColor: '#e0f2fe', color: '#0369a1' }}>Ongoing</span>
-                                                    )}
+                                            <div className={styles.storyContent}>
+                                                <div className={styles.storyDetails}>
+                                                    <div className={styles.titleRow}>
+                                                        <h4 className={styles.storyTitle}>{story.title}</h4>
+                                                        {story.type === 'fanfic' && <span className={styles.badgeFanfic}>Fanfic</span>}
+                                                        {story.type === 'novel' && <span className={styles.badgeNovel}>Original</span>}
+                                                        {story.type === 'cartoon' && <span className={styles.badgeCartoon}>Cartoon</span>}
+                                                        {story.completionStatus === 'completed' ? (
+                                                            <span className={styles.badgeCompleted}>Completed</span>
+                                                        ) : (
+                                                            <span className={styles.badgeOngoing}>Ongoing</span>
+                                                        )}
+                                                    </div>
+                                                    <p className={styles.storySynopsis}>
+                                                        {story.synopsis?.trim() || 'ยังไม่ได้เพิ่มคำโปรยเรื่อง'}
+                                                    </p>
+                                                    <div className={styles.storyMeta}>
+                                                        <span className={styles.storyMetaItem}><Eye size={12} /> {formatCount(story.viewsCount)}</span>
+                                                        <span className={styles.storyMetaDivider}>•</span>
+                                                        <span className={styles.storyMetaItem}><Heart size={12} /> {formatCount(story.likesCount)}</span>
+                                                        <span className={styles.storyMetaDivider}>•</span>
+                                                        <span className={styles.storyMetaItem}><MessageSquare size={12} /> {formatCount(story.commentsCount)}</span>
+                                                        <span className={styles.storyMetaDivider}>•</span>
+                                                        <span className={styles.storyMetaItem}>สร้างเมื่อ {createdDate}</span>
+                                                    </div>
                                                 </div>
-                                                <div className={styles.storyMeta}>
-                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Eye size={12} /> {formatCount(story.viewsCount)}</span>
-                                                    <span style={{ margin: '0 0.5rem', color: '#cbd5e1' }}>•</span>
-                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Heart size={12} /> {formatCount(story.likesCount)}</span>
-                                                    <span style={{ margin: '0 0.5rem', color: '#cbd5e1' }}>•</span>
-                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><MessageSquare size={12} /> {formatCount(story.commentsCount)}</span>
-                                                    <span style={{ margin: '0 0.5rem', color: '#cbd5e1' }}>•</span>
-                                                    <span>{timeAgo}</span>
-                                                </div>
-                                            </div>
 
-                                            <div className={styles.storyTimeArea}>
-                                                <span>สร้างเมื่อ</span>
-                                                <span>{story.createdAt ? new Date(story.createdAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) : 'ไม่ทราบ'}</span>
-                                            </div>
+                                                <div className={styles.storySide}>
+                                                    <div className={styles.publishDropdownContainer}>
+                                                        <select
+                                                            className={`${styles.publishDropdownSelect} ${story.status === 'published' ? styles.public : styles.private}`}
+                                                            value={story.status === 'published' ? 'published' : 'draft'}
+                                                            onChange={(e) => handleStoryStatusChange(story.id, e.target.value as StoryStatus)}
+                                                            disabled={!!isUpdatingStoryStatus[story.id]}
+                                                            aria-label={`สถานะการเผยแพร่ของเรื่อง ${story.title}`}
+                                                        >
+                                                            <option value="published">เผยแพร่</option>
+                                                            <option value="draft">ไม่เผยแพร่</option>
+                                                        </select>
+                                                    </div>
 
-                                            <div className={styles.publishDropdownContainer}>
-                                                <select
-                                                    className={`${styles.publishDropdownSelect} ${story.status === 'published' ? styles.public : styles.private}`}
-                                                    value={story.status === 'published' ? 'published' : 'draft'}
-                                                    onChange={(e) => handleStoryStatusChange(story.id, e.target.value as StoryStatus)}
-                                                    disabled={!!isUpdatingStoryStatus[story.id]}
-                                                    aria-label={`สถานะการเผยแพร่ของเรื่อง ${story.title}`}
-                                                >
-                                                    <option value="published">เผยแพร่</option>
-                                                    <option value="draft">ไม่เผยแพร่</option>
-                                                </select>
-                                            </div>
-
-                                            <div className={styles.actionsContainer} data-story-actions="true">
-                                                <Link href={`/story/manage/${story.id}`} className={styles.editBtn}>
-                                                    <Edit3 size={14} /> แก้ไขเนื้อหา
-                                                </Link>
-                                                <button
-                                                    type="button"
-                                                    className={styles.moreMenuBtn}
-                                                    title="เมนูเพิ่มเติม"
-                                                    onClick={() => {
-                                                        setOpenStoryMenuId((prev) => (prev === story.id ? null : story.id));
-                                                    }}
-                                                >
-                                                    <MoreVertical size={18} />
-                                                </button>
-                                                {openStoryMenuId === story.id && (
-                                                    <div className={styles.storyActionMenu}>
+                                                    <div className={styles.actionsContainer} data-story-actions="true">
+                                                        <Link href={`/story/manage/${story.id}`} className={styles.editBtn}>
+                                                            <Edit3 size={14} /> แก้ไขเนื้อหา
+                                                        </Link>
                                                         <button
                                                             type="button"
-                                                            className={styles.storyActionMenuItem}
+                                                            className={styles.moreMenuBtn}
+                                                            title="เมนูเพิ่มเติม"
                                                             onClick={() => {
-                                                                setSelectedStory(story);
-                                                                setIsStoryInfoModalOpen(true);
-                                                                setOpenStoryMenuId(null);
+                                                                setOpenStoryMenuId((prev) => (prev === story.id ? null : story.id));
                                                             }}
                                                         >
-                                                            ดูรายละเอียด
+                                                            <MoreVertical size={18} />
                                                         </button>
-                                                        <button
-                                                            type="button"
-                                                            className={`${styles.storyActionMenuItem} ${styles.storyActionMenuItemDanger}`}
-                                                            onClick={() => handleDeleteStory(story)}
-                                                        >
-                                                            ลบ
-                                                        </button>
+                                                        {openStoryMenuId === story.id && (
+                                                            <div className={styles.storyActionMenu}>
+                                                                <button
+                                                                    type="button"
+                                                                    className={styles.storyActionMenuItem}
+                                                                    onClick={() => {
+                                                                        setSelectedStory(story);
+                                                                        setIsStoryInfoModalOpen(true);
+                                                                        setOpenStoryMenuId(null);
+                                                                    }}
+                                                                >
+                                                                    ดูรายละเอียด
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className={`${styles.storyActionMenuItem} ${styles.storyActionMenuItemDanger}`}
+                                                                    onClick={() => handleDeleteStory(story)}
+                                                                >
+                                                                    ลบ
+                                                                </button>
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                )}
+                                                </div>
                                             </div>
                                         </div>
                                     );
                                 })
                             )}
                         </div>
-                    </div>
-
+                    </section>
                 </div>
             </div>
 
@@ -881,7 +958,7 @@ export default function DashboardPage() {
 
                             {selectedStory.synopsis && (
                                 <div className={styles.storyInfoMetaItem}>
-                                    <span className={styles.storyInfoMetaLabel}>เรื่องย่อ</span>
+                                    <span className={styles.storyInfoMetaLabel}>คำโปรย</span>
                                     <div className={styles.storyInfoDesc}>
                                         {selectedStory.synopsis}
                                     </div>

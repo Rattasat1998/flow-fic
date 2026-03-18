@@ -100,7 +100,6 @@ export default function PrivacyPage() {
       <p style={{ marginBottom: "0.75rem" }}>
         <Link href="/legal-contact-and-versioning">ข้อมูลติดต่อทางกฎหมายและเวอร์ชันเอกสาร</Link>
       </p>
-      <Link href="/">กลับหน้าแรก</Link>
     </main>
   );
 }

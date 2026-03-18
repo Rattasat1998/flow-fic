@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -383,7 +382,6 @@ export default function AdminPaymentsPage() {
         <div className={styles.container}>
           <h1 className={styles.title}>Admin Payments</h1>
           <p className={styles.stateMessage}>กรุณาเข้าสู่ระบบก่อนใช้งานหน้าแอดมิน</p>
-          <Link href="/" className={styles.backLink}>กลับหน้าแรก</Link>
         </div>
       </main>
     );
@@ -395,7 +393,6 @@ export default function AdminPaymentsPage() {
         <div className={styles.container}>
           <h1 className={styles.title}>Admin Payments</h1>
           <p className={styles.stateMessage}>กำลังตรวจสอบสิทธิ์แอดมิน...</p>
-          <Link href="/dashboard" className={styles.backLink}>กลับ Dashboard</Link>
         </div>
       </main>
     );
@@ -407,7 +404,6 @@ export default function AdminPaymentsPage() {
         <div className={styles.container}>
           <h1 className={styles.title}>Admin Payments</h1>
           <p className={styles.stateMessage}>{accessMessage || 'ไม่มีสิทธิ์เข้าถึงหน้าแอดมิน'}</p>
-          <Link href="/dashboard" className={styles.backLink}>กลับ Dashboard</Link>
         </div>
       </main>
     );
@@ -423,7 +419,6 @@ export default function AdminPaymentsPage() {
           </div>
           <div className={styles.headerMeta}>
             <div>Signed in: {user.email || user.id}</div>
-            <Link href="/dashboard" className={styles.backLink}>กลับ Dashboard</Link>
           </div>
         </header>
 
