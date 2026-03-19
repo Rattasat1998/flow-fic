@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Search,
@@ -108,6 +108,13 @@ type HomeFilterInput = Pick<
   'q' | 'category' | 'subCategory' | 'completion' | 'length' | 'focusCore'
 >;
 
+type HomeNavTabConfig = {
+  id: 'mystery_all' | 'mystery_horror' | 'mystery_detective';
+  label: string;
+  category: DiscoveryCategoryFilter;
+  subCategory: DiscoverySubCategoryFilter;
+};
+
 type UserProfile = {
   pen_name: string;
   bio: string;
@@ -118,6 +125,30 @@ type DiscoveryCacheEntry = {
   timestamp: number;
   payload: DiscoveryResponse;
 };
+
+const HOME_NAV_TABS: HomeNavTabConfig[] = [
+  {
+    id: 'mystery_all',
+    label: 'สยอง/สืบสวน',
+    category: CORE_MAIN_CATEGORY_ID,
+    subCategory: 'all',
+  },
+  {
+    id: 'mystery_horror',
+    label: 'สยองขวัญ',
+    category: CORE_MAIN_CATEGORY_ID,
+    subCategory: 'mystery_horror',
+  },
+  {
+    id: 'mystery_detective',
+    label: 'สืบสวน',
+    category: CORE_MAIN_CATEGORY_ID,
+    subCategory: 'mystery_detective',
+  },
+];
+
+const isModifiedLinkClick = (event: React.MouseEvent<HTMLAnchorElement>) =>
+  event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0;
 
 function createInitialRails(loading: boolean): HomeRailsState {
   return {
@@ -201,11 +232,14 @@ type HomePageClientProps = {
 
 export default function HomePageClient({ initialFilters, initialDiscovery }: HomePageClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, isLoading: isLoadingAuth, signInWithFacebook, signInWithGoogle, signOut } = useAuth();
   const userId = user?.id ?? null;
   const { trackEvent } = useTracking({ autoPageView: true, pagePath: '/' });
 
   const [authError, setAuthError] = useState<string | null>(null);
+  const [isDashboardAuthDialogOpen, setIsDashboardAuthDialogOpen] = useState(false);
+  const [dashboardAuthDialogMessage, setDashboardAuthDialogMessage] = useState<string | null>(null);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
@@ -325,16 +359,8 @@ export default function HomePageClient({ initialFilters, initialDiscovery }: Hom
   }, [urlFilters.q]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const syncFromLocation = () => {
-      setUrlFilters(parseFiltersFromSearch(window.location.search));
-    };
-
-    syncFromLocation();
-    window.addEventListener('popstate', syncFromLocation);
-    return () => window.removeEventListener('popstate', syncFromLocation);
-  }, []);
+    setUrlFilters(parseFiltersFromSearch(searchParams.toString()));
+  }, [searchParams]);
 
   useEffect(() => {
     const normalizedInput = searchInput.trim();
@@ -483,6 +509,12 @@ export default function HomePageClient({ initialFilters, initialDiscovery }: Hom
     fetchProfile();
   }, [userId]);
 
+  useEffect(() => {
+    if (!user) return;
+    setIsDashboardAuthDialogOpen(false);
+    setDashboardAuthDialogMessage(null);
+  }, [user]);
+
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -627,6 +659,36 @@ export default function HomePageClient({ initialFilters, initialDiscovery }: Hom
     }
   };
 
+  const handleCloseDashboardAuthDialog = () => {
+    setIsDashboardAuthDialogOpen(false);
+    setDashboardAuthDialogMessage(null);
+    setAuthError(null);
+  };
+
+  const handleDashboardAccess = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (isLoadingAuth) {
+      event.preventDefault();
+      setAuthError(null);
+      setDashboardAuthDialogMessage('กำลังตรวจสอบสถานะการเข้าสู่ระบบ กรุณาลองอีกครั้ง');
+      setIsDashboardAuthDialogOpen(true);
+      return;
+    }
+
+    if (user) {
+      setAuthError(null);
+      setIsDashboardAuthDialogOpen(false);
+      setDashboardAuthDialogMessage(null);
+      setIsProfileMenuOpen(false);
+      return;
+    }
+
+    event.preventDefault();
+    setAuthError(null);
+    setDashboardAuthDialogMessage('เข้าสู่ระบบเพื่อดูสถิติ จัดการเรื่อง และตั้งค่าการเผยแพร่ในแดชบอร์ดนักเขียน');
+    setIsDashboardAuthDialogOpen(true);
+    setIsProfileMenuOpen(false);
+  };
+
   const handleSelectCategory = (category: DiscoveryCategoryFilter) => {
     const nextSubCategory: DiscoverySubCategoryFilter = category === CORE_MAIN_CATEGORY_ID ? urlFilters.subCategory : 'all';
     navigateWithFilters({
@@ -687,6 +749,59 @@ export default function HomePageClient({ initialFilters, initialDiscovery }: Hom
 
     trackFilterChange({ length });
   };
+
+  const handleNavbarTabClick = useCallback(
+    (
+      event: React.MouseEvent<HTMLAnchorElement>,
+      target: Pick<HomeNavTabConfig, 'category' | 'subCategory'>
+    ) => {
+      if (event.defaultPrevented || isModifiedLinkClick(event)) return;
+
+      event.preventDefault();
+
+      navigateWithFilters({
+        q: urlFilters.q,
+        category: target.category,
+        subCategory: target.subCategory,
+        completion: urlFilters.completion,
+        length: urlFilters.length,
+        focusCore: DEFAULT_DISCOVERY_FOCUS_CORE,
+      });
+
+      trackFilterChange({
+        category: target.category,
+        subCategory: target.subCategory,
+        focusCore: DEFAULT_DISCOVERY_FOCUS_CORE,
+      });
+    },
+    [navigateWithFilters, trackFilterChange, urlFilters.completion, urlFilters.length, urlFilters.q]
+  );
+
+  const homeNavTabs = useMemo(
+    () =>
+      HOME_NAV_TABS.map((tab) => ({
+        ...tab,
+        href: buildDiscoveryUrl({
+          q: urlFilters.q,
+          category: tab.category,
+          subCategory: tab.subCategory,
+          completion: urlFilters.completion,
+          length: urlFilters.length,
+          focusCore: DEFAULT_DISCOVERY_FOCUS_CORE,
+        }),
+        isActive:
+          urlFilters.category === tab.category
+          && urlFilters.subCategory === tab.subCategory,
+      })),
+    [
+      buildDiscoveryUrl,
+      urlFilters.category,
+      urlFilters.completion,
+      urlFilters.length,
+      urlFilters.q,
+      urlFilters.subCategory,
+    ]
+  );
 
   const heroStories = useMemo(() => {
     const candidates = [...rails.trending.items, ...rails.popular.items, ...rails.new.items];
@@ -819,154 +934,156 @@ export default function HomePageClient({ initialFilters, initialDiscovery }: Hom
             <div className={styles.navLeft}>
               <BrandLogo href="/" size="lg" className={styles.logo} />
               <div className={styles.navLinks}>
-                <Link href="/" className={styles.activeLink}>
-                  สยอง/สืบสวน
-            </Link>
-            <Link href={`/?category=mystery&subCategory=mystery_horror&focusCore=${DEFAULT_DISCOVERY_FOCUS_CORE ? 'true' : 'false'}`}>
-              สยองขวัญ
-            </Link>
-            <Link href={`/?category=mystery&subCategory=mystery_detective&focusCore=${DEFAULT_DISCOVERY_FOCUS_CORE ? 'true' : 'false'}`}>
-              สืบสวน
-            </Link>
-          </div>
-        </div>
-
-        <div className={styles.navSearchWrap}>
-          <Search size={16} className={styles.navSearchIcon} />
-          <input
-            ref={searchInputRef}
-            className={styles.navSearchInput}
-            placeholder="ค้นหาเรื่อง, คำโปรย, หรือนามปากกา"
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-          />
-          <span className={styles.navSearchHint}>⌘K</span>
-        </div>
-
-        <div className={styles.navRight}>
-          {user ? (
-            <Link href="/pricing" className={styles.coinBalancePill}>
-              <Coins size={15} />
-              <span>{walletCoinBalance === null ? '...' : `${walletCoinBalance.toLocaleString('th-TH')} เหรียญ`}</span>
-            </Link>
-          ) : (
-            <Link href="/pricing" className={styles.pricingLink}>
-              แพ็กเกจ
-            </Link>
-          )}
-          <Link href="/dashboard" className={styles.dashboardLink}>
-            แดชบอร์ดนักเขียน
-          </Link>
-          {user && (
-            <Link href="/notifications" className={styles.notifBellBtn}>
-              <Bell size={18} />
-              {unreadNotifCount > 0 && (
-                <span className={styles.notifBadge}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</span>
-              )}
-            </Link>
-          )}
-
-          {isLoadingAuth ? (
-            <div className={styles.authLoading}>...</div>
-          ) : user ? (
-            <div className={styles.profileMenuWrapper} ref={profileMenuRef}>
-              <div className={styles.profileAvatarBtn} onClick={() => setIsProfileMenuOpen((prev) => !prev)}>
-                {user.user_metadata?.avatar_url ? (
-                  <img src={user.user_metadata.avatar_url} alt="Profile" className={styles.userAvatar} />
-                ) : (
-                  <div className={styles.userAvatarPlaceholder}>
-                    {user.email?.charAt(0).toUpperCase() || 'U'}
-                  </div>
-                )}
+                {homeNavTabs.map((tab) => (
+                  <Link
+                    key={tab.id}
+                    href={tab.href}
+                    className={tab.isActive ? styles.activeLink : undefined}
+                    aria-current={tab.isActive ? 'page' : undefined}
+                    onClick={(event) => handleNavbarTabClick(event, tab)}
+                  >
+                    {tab.label}
+                  </Link>
+                ))}
               </div>
+            </div>
 
-              {isProfileMenuOpen && (
-                <div className={styles.profileDropdown}>
-                  <div className={styles.profileDropdownHeader}>
-                    <div className={styles.profileDropdownAvatar}>
-                      {user.user_metadata?.avatar_url ? (
-                        <img
-                          src={user.user_metadata.avatar_url}
-                          alt=""
-                          style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
-                        />
-                      ) : (
-                        (user.email?.charAt(0) || 'U').toUpperCase()
-                      )}
-                    </div>
-                    <div className={styles.profileDropdownInfo}>
-                      <div className={styles.profileDropdownName}>
-                        {user.user_metadata?.full_name || user.email?.split('@')[0]}
+            <div className={styles.navSearchWrap}>
+              <Search size={16} className={styles.navSearchIcon} />
+              <input
+                ref={searchInputRef}
+                className={styles.navSearchInput}
+                placeholder="ค้นหาเรื่อง, คำโปรย, หรือนามปากกา"
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+              />
+              <span className={styles.navSearchHint}>⌘K</span>
+            </div>
+
+            <div className={styles.navRight}>
+              {user ? (
+                <Link href="/pricing" className={styles.coinBalancePill}>
+                  <Coins size={15} />
+                  <span>{walletCoinBalance === null ? '...' : `${walletCoinBalance.toLocaleString('th-TH')} เหรียญ`}</span>
+                </Link>
+              ) : (
+                <Link href="/pricing" className={styles.pricingLink}>
+                  แพ็กเกจ
+                </Link>
+              )}
+              <Link href="/dashboard" className={styles.dashboardLink} onClick={handleDashboardAccess}>
+                แดชบอร์ดนักเขียน
+              </Link>
+              {user && (
+                <Link href="/notifications" className={styles.notifBellBtn}>
+                  <Bell size={18} />
+                  {unreadNotifCount > 0 && (
+                    <span className={styles.notifBadge}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</span>
+                  )}
+                </Link>
+              )}
+
+              {isLoadingAuth ? (
+                <div className={styles.authLoading}>...</div>
+              ) : user ? (
+                <div className={styles.profileMenuWrapper} ref={profileMenuRef}>
+                  <div className={styles.profileAvatarBtn} onClick={() => setIsProfileMenuOpen((prev) => !prev)}>
+                    {user.user_metadata?.avatar_url ? (
+                      <img src={user.user_metadata.avatar_url} alt="Profile" className={styles.userAvatar} />
+                    ) : (
+                      <div className={styles.userAvatarPlaceholder}>
+                        {user.email?.charAt(0).toUpperCase() || 'U'}
                       </div>
-                      <div className={styles.profileDropdownEmail}>{user.email || ''}</div>
-                    </div>
+                    )}
                   </div>
 
-                  <div className={styles.profileDropdownDivider} />
+                  {isProfileMenuOpen && (
+                    <div className={styles.profileDropdown}>
+                      <div className={styles.profileDropdownHeader}>
+                        <div className={styles.profileDropdownAvatar}>
+                          {user.user_metadata?.avatar_url ? (
+                            <img
+                              src={user.user_metadata.avatar_url}
+                              alt=""
+                              style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
+                            />
+                          ) : (
+                            (user.email?.charAt(0) || 'U').toUpperCase()
+                          )}
+                        </div>
+                        <div className={styles.profileDropdownInfo}>
+                          <div className={styles.profileDropdownName}>
+                            {user.user_metadata?.full_name || user.email?.split('@')[0]}
+                          </div>
+                          <div className={styles.profileDropdownEmail}>{user.email || ''}</div>
+                        </div>
+                      </div>
 
-                  <Link href="/dashboard" className={styles.profileDropdownItem} onClick={() => setIsProfileMenuOpen(false)}>
-                    <PenTool size={16} /> แดชบอร์ดนักเขียน
-                  </Link>
-                  <Link href="/bookshelf" className={styles.profileDropdownItem} onClick={() => setIsProfileMenuOpen(false)}>
-                    <Bookmark size={16} /> ชั้นหนังสือ
-                  </Link>
-                  <Link href="/loves" className={styles.profileDropdownItem} onClick={() => setIsProfileMenuOpen(false)}>
-                    <Heart size={16} /> รักเลย
-                  </Link>
-                  <button
-                    className={styles.profileDropdownItem}
-                    onClick={() => {
-                      setIsProfileMenuOpen(false);
-                      handleOpenProfileModal();
-                    }}
-                  >
-                    <Settings size={16} /> ตั้งค่าโปรไฟล์
+                      <div className={styles.profileDropdownDivider} />
+
+                      <Link href="/dashboard" className={styles.profileDropdownItem} onClick={handleDashboardAccess}>
+                        <PenTool size={16} /> แดชบอร์ดนักเขียน
+                      </Link>
+                      <Link href="/bookshelf" className={styles.profileDropdownItem} onClick={() => setIsProfileMenuOpen(false)}>
+                        <Bookmark size={16} /> ชั้นหนังสือ
+                      </Link>
+                      <Link href="/loves" className={styles.profileDropdownItem} onClick={() => setIsProfileMenuOpen(false)}>
+                        <Heart size={16} /> รักเลย
+                      </Link>
+                      <button
+                        className={styles.profileDropdownItem}
+                        onClick={() => {
+                          setIsProfileMenuOpen(false);
+                          handleOpenProfileModal();
+                        }}
+                      >
+                        <Settings size={16} /> ตั้งค่าโปรไฟล์
+                      </button>
+
+                      <div className={styles.profileDropdownDivider} />
+
+                      <button
+                        className={`${styles.profileDropdownItem} ${styles.profileDropdownLogout}`}
+                        onClick={handleSignOut}
+                      >
+                        <LogOut size={16} /> ออกจากระบบ
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className={styles.authButtons}>
+                  <button onClick={handleGoogleSignIn} className={`${styles.authBtn} ${styles.googleBtn}`}>
+                    <img
+                      src="/google-logo.svg"
+                      alt="G"
+                      className={styles.providerIcon}
+                      onError={(e) => (e.currentTarget.style.display = 'none')}
+                    />
+                    เข้าสู่ระบบด้วย Google
                   </button>
-
-                  <div className={styles.profileDropdownDivider} />
-
-                  <button
-                    className={`${styles.profileDropdownItem} ${styles.profileDropdownLogout}`}
-                    onClick={handleSignOut}
-                  >
-                    <LogOut size={16} /> ออกจากระบบ
+                  <button onClick={handleFacebookSignIn} className={`${styles.authBtn} ${styles.facebookBtn}`}>
+                    <img
+                      src="/facebook-logo.svg"
+                      alt="f"
+                      className={styles.providerIcon}
+                      onError={(e) => (e.currentTarget.style.display = 'none')}
+                    />
+                    Facebook
                   </button>
                 </div>
               )}
-            </div>
-          ) : (
-            <div className={styles.authButtons}>
-              <button onClick={handleGoogleSignIn} className={`${styles.authBtn} ${styles.googleBtn}`}>
-                <img
-                  src="/google-logo.svg"
-                  alt="G"
-                  className={styles.providerIcon}
-                  onError={(e) => (e.currentTarget.style.display = 'none')}
-                />
-                เข้าสู่ระบบด้วย Google
-              </button>
-              <button onClick={handleFacebookSignIn} className={`${styles.authBtn} ${styles.facebookBtn}`}>
-                <img
-                  src="/facebook-logo.svg"
-                  alt="f"
-                  className={styles.providerIcon}
-                  onError={(e) => (e.currentTarget.style.display = 'none')}
-                />
-                Facebook
-              </button>
-            </div>
-          )}
 
-          <button className={styles.mobileMenuBtn} type="button">
-            <Menu size={24} />
-          </button>
-        </div>
-      </nav>
+              <button className={styles.mobileMenuBtn} type="button">
+                <Menu size={24} />
+              </button>
+            </div>
+          </nav>
 
       <div className={styles.content}>
-        {authError && (
+        {authError && !isDashboardAuthDialogOpen && (
           <div className={styles.emptyMyNovels} style={{ color: '#b00020' }}>
-            Login error: {authError}
+            {authError}
           </div>
         )}
 
@@ -1200,55 +1317,63 @@ export default function HomePageClient({ initialFilters, initialDiscovery }: Hom
                 </div>
               ) : (
                 <div className={styles.storiesRail}>
-                  {railState.items.map((story, index) => (
-                    <Link
-                      key={`${railConfig.key}-${story.id}`}
-                      href={`/story/${story.id}`}
-                      className={styles.posterCard}
-                    >
-                      <div className={styles.posterCoverWrap}>
-                        {story.cover_url || story.cover_wide_url ? (
-                          <Image
-                            src={story.cover_url || story.cover_wide_url || ''}
-                            alt={story.title}
-                            className={styles.posterCover}
-                            fill
-                            sizes="(max-width: 768px) 45vw, 220px"
-                          />
-                        ) : (
-                          <div className={styles.posterCoverFallback}>{story.title.slice(0, 2)}</div>
-                        )}
+                  {railState.items.map((story, index) => {
+                    const isInteractiveStory = story.path_mode === 'branching';
 
-                        <div className={styles.posterTopBadges}>
-                          {railConfig.key === 'trending' && index < 3 && (
-                            <span className={styles.posterRankBadge}>#{index + 1}</span>
+                    return (
+                      <Link
+                        key={`${railConfig.key}-${story.id}`}
+                        href={`/story/${story.id}`}
+                        className={styles.posterCard}
+                      >
+                        <div className={styles.posterCoverWrap}>
+                          {story.cover_url || story.cover_wide_url ? (
+                            <Image
+                              src={story.cover_url || story.cover_wide_url || ''}
+                              alt={story.title}
+                              className={styles.posterCover}
+                              fill
+                              sizes="(max-width: 768px) 45vw, 220px"
+                            />
+                          ) : (
+                            <div className={styles.posterCoverFallback}>{story.title.slice(0, 2)}</div>
                           )}
-                          {story.completion_status === 'completed' && (
-                            <span className={styles.posterCompletedBadge}>จบแล้ว</span>
-                          )}
-                        </div>
-                      </div>
 
-                      <div className={styles.posterBody}>
-                        <h3 className={styles.posterTitle}>{story.title}</h3>
-                        <p className={styles.posterAuthor}>{story.pen_name}</p>
-                        <div className={styles.posterMetaRow}>
-                          <span className={styles.posterMetric}>
-                            <List size={12} className={styles.posterMetricIcon} />
-                            {story.published_chapter_count.toLocaleString('th-TH')} ตอน
-                          </span>
-                          <span className={styles.posterMetric}>
-                            <Eye size={12} className={styles.posterMetricIcon} />
-                            {(story.total_view_count ?? 0).toLocaleString('th-TH')}
-                          </span>
-                          <span className={styles.posterMetric}>
-                            <Heart size={12} className={styles.posterMetricIcon} />
-                            {(story.total_like_count ?? 0).toLocaleString('th-TH')}
-                          </span>
+                          <div className={styles.posterTopBadges}>
+                            {railConfig.key === 'trending' && index < 3 && (
+                              <span className={styles.posterRankBadge}>#{index + 1}</span>
+                            )}
+                            {story.completion_status === 'completed' && (
+                              <span className={styles.posterCompletedBadge}>จบแล้ว</span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </Link>
-                  ))}
+
+                        <div className={styles.posterBody}>
+                          <h3 className={styles.posterTitle}>{story.title}</h3>
+                          <p className={styles.posterAuthor}>{story.pen_name}</p>
+                          <div className={styles.posterMetaRow}>
+                            {isInteractiveStory ? (
+                              <span className={styles.posterModeChip}>Interactive</span>
+                            ) : (
+                              <span className={styles.posterMetric}>
+                                <List size={12} className={styles.posterMetricIcon} />
+                                {story.published_chapter_count.toLocaleString('th-TH')} ตอน
+                              </span>
+                            )}
+                            <span className={styles.posterMetric}>
+                              <Eye size={12} className={styles.posterMetricIcon} />
+                              {(story.total_view_count ?? 0).toLocaleString('th-TH')}
+                            </span>
+                            <span className={styles.posterMetric}>
+                              <Heart size={12} className={styles.posterMetricIcon} />
+                              {(story.total_like_count ?? 0).toLocaleString('th-TH')}
+                            </span>
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
                 </div>
               )}
             </section>
@@ -1319,6 +1444,66 @@ export default function HomePageClient({ initialFilters, initialDiscovery }: Hom
                 disabled={isSavingProfile || !editProfile.pen_name.trim()}
               >
                 {isSavingProfile ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isDashboardAuthDialogOpen && (
+        <div className={styles.modalOverlay} onClick={handleCloseDashboardAuthDialog}>
+          <div
+            className={`${styles.modalContent} ${styles.authGuardDialog}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dashboard-auth-dialog-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className={styles.modalHeader}>
+              <h2 id="dashboard-auth-dialog-title">เข้าสู่ระบบก่อนเข้าแดชบอร์ดนักเขียน</h2>
+              <button className={styles.closeBtn} onClick={handleCloseDashboardAuthDialog} type="button">
+                <X size={20} />
+              </button>
+            </div>
+            <div className={styles.modalBody}>
+              <p className={styles.authDialogLead}>
+                {dashboardAuthDialogMessage || 'กรุณาเข้าสู่ระบบก่อนเข้าแดชบอร์ดนักเขียน'}
+              </p>
+              {!isLoadingAuth && !user && (
+                <div className={styles.authDialogButtons}>
+                  <button
+                    type="button"
+                    onClick={handleGoogleSignIn}
+                    className={`${styles.authBtn} ${styles.googleBtn}`}
+                  >
+                    <img
+                      src="/google-logo.svg"
+                      alt="G"
+                      className={styles.providerIcon}
+                      onError={(e) => (e.currentTarget.style.display = 'none')}
+                    />
+                    เข้าสู่ระบบด้วย Google
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleFacebookSignIn}
+                    className={`${styles.authBtn} ${styles.facebookBtn}`}
+                  >
+                    <img
+                      src="/facebook-logo.svg"
+                      alt="f"
+                      className={styles.providerIcon}
+                      onError={(e) => (e.currentTarget.style.display = 'none')}
+                    />
+                    เข้าสู่ระบบด้วย Facebook
+                  </button>
+                </div>
+              )}
+              {authError && <p className={styles.authDialogError}>{authError}</p>}
+            </div>
+            <div className={styles.modalFooter}>
+              <button className={styles.cancelBtn} onClick={handleCloseDashboardAuthDialog} type="button">
+                ปิด
               </button>
             </div>
           </div>

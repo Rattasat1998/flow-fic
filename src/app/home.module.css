@@ -39,6 +39,9 @@
     display: flex;
     align-items: center;
     gap: 0.85rem;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
 }
 
 @media (min-width: 1024px) {
@@ -65,10 +68,15 @@
         display: flex;
         align-items: center;
         gap: 0.25rem;
+        position: relative;
+        z-index: 2;
     }
 }
 
 .navLinks a {
+    position: relative;
+    z-index: 1;
+    pointer-events: auto;
     font-size: 0.88rem;
     font-weight: 600;
     color: #6b7280;
@@ -98,9 +106,10 @@
         display: inline-flex;
         align-items: center;
         gap: 0.5rem;
-        flex: 1;
-        min-width: 200px;
+        flex: 1 1 240px;
+        min-width: 0;
         max-width: 480px;
+        width: 100%;
         height: 40px;
         border-radius: 10px;
         border: 1px solid #e5e7eb;
@@ -1339,7 +1348,9 @@
     margin-top: 0.04rem;
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 0.4rem;
+    min-height: 1.4rem;
     color: #9ca3af;
     font-size: 0.72rem;
     font-weight: 600;
@@ -1353,6 +1364,21 @@
 
 .posterMetricIcon {
     color: #d1d5db;
+}
+
+.posterModeChip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.35rem;
+    padding: 0.08rem 0.45rem;
+    border-radius: 999px;
+    border: 1px solid #fdba74;
+    background: #fff7ed;
+    color: #c2410c;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
 }
 
 @media (max-width: 1024px) {
@@ -1386,6 +1412,10 @@
     .posterMetaRow {
         font-size: 0.68rem;
     }
+
+    .posterModeChip {
+        font-size: 0.62rem;
+    }
 }
 
 /* ─── Modals ─── */
@@ -1416,6 +1446,10 @@
 
 .profileModalWide {
     max-width: 760px;
+}
+
+.authGuardDialog {
+    max-width: 480px;
 }
 
 .modalHeader {
@@ -1459,6 +1493,36 @@
     flex-direction: column;
     gap: 1rem;
     overflow-y: auto;
+}
+
+.authDialogLead {
+    margin: 0;
+    color: #374151;
+    font-size: 0.95rem;
+    line-height: 1.7;
+}
+
+.authDialogButtons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.authDialogButtons .authBtn {
+    width: 100%;
+    min-height: 44px;
+    font-size: 0.88rem;
+}
+
+.authDialogError {
+    margin: 0;
+    border-radius: 12px;
+    border: 1px solid #fecaca;
+    background: #fef2f2;
+    color: #b91c1c;
+    padding: 0.8rem 0.9rem;
+    font-size: 0.85rem;
+    line-height: 1.5;
 }
 
 .avatarSection {

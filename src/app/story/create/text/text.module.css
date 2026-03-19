@@ -196,6 +196,61 @@
     margin-top: 0.5rem;
 }
 
+.tagInputGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.tagChipList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+}
+
+.tagChip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.42rem 0.6rem;
+    border-radius: 999px;
+    background: rgba(28, 198, 172, 0.1);
+    border: 1px solid rgba(28, 198, 172, 0.18);
+    color: #0f766e;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.tagChipRemove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border: none;
+    border-radius: 999px;
+    background: rgba(15, 118, 110, 0.12);
+    color: inherit;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.tagChipRemove:hover {
+    background: rgba(15, 118, 110, 0.2);
+    transform: scale(1.04);
+}
+
+.tagInputField {
+    width: 100%;
+}
+
+.tagInputHint {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.82rem;
+    line-height: 1.5;
+}
+
 .textarea {
     resize: vertical;
     min-height: 100px;

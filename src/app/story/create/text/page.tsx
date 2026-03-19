@@ -33,6 +33,29 @@ function parseCreateFormat(raw: string | null): CreateStoryFormat {
     return raw === 'single' ? 'single' : 'multi';
 }
 
+function normalizeTagLabel(value: string): string {
+    return value.trim().replace(/\s+/g, ' ');
+}
+
+function parseTagCandidates(value: string): string[] {
+    return value
+        .split(',')
+        .map((item) => normalizeTagLabel(item))
+        .filter((item) => item.length > 0);
+}
+
+function appendUniqueTags(existing: string[], rawValue: string): string[] {
+    const nextTags = [...existing];
+
+    parseTagCandidates(rawValue).forEach((candidate) => {
+        if (!nextTags.includes(candidate)) {
+            nextTags.push(candidate);
+        }
+    });
+
+    return nextTags;
+}
+
 function CreateTextForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -59,7 +82,8 @@ function CreateTextForm() {
     const [subCategory, setSubCategory] = useState<string>('');
 
     const [fandom, setFandom] = useState('');
-    const [tags, setTags] = useState('');
+    const [tagInputValue, setTagInputValue] = useState('');
+    const [tagItems, setTagItems] = useState<string[]>([]);
     const [rating, setRating] = useState('all'); // all, 13+, 18+
 
     // Settings Checkboxes
@@ -194,6 +218,17 @@ function CreateTextForm() {
         setSettings(prev => ({ ...prev, [key]: !prev[key] }));
     };
 
+    const commitTagInput = (rawValue?: string) => {
+        const nextTags = appendUniqueTags(tagItems, rawValue ?? tagInputValue);
+        setTagItems(nextTags);
+        setTagInputValue('');
+        return nextTags;
+    };
+
+    const removeTagItem = (tagToRemove: string) => {
+        setTagItems((prev) => prev.filter((tag) => tag !== tagToRemove));
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -246,11 +281,9 @@ function CreateTextForm() {
                 coverWideUrl = coverWideImage;
             }
 
-            // 2. Parse tags from comma-separated string
-            const parsedTags = tags
-                .split(',')
-                .map(t => t.trim())
-                .filter(t => t.length > 0);
+            const parsedTags = appendUniqueTags(tagItems, tagInputValue);
+            setTagItems(parsedTags);
+            setTagInputValue('');
 
             // 3. Insert story into Supabase
             const { error } = await supabase
@@ -539,12 +572,53 @@ function CreateTextForm() {
 
                         <div className={styles.formGroup}>
                             <label>แท็ก (Tags)</label>
-                            <input
-                                type="text"
-                                placeholder="เช่น สืบสวน, โรงเรียนมัธยม, แฟนตาซี (คั่นด้วยลูกน้ำ)"
-                                value={tags}
-                                onChange={e => setTags(e.target.value)}
-                            />
+                            <div className={styles.tagInputGroup}>
+                                {tagItems.length > 0 && (
+                                    <div className={styles.tagChipList}>
+                                        {tagItems.map((tag) => (
+                                            <span key={tag} className={styles.tagChip}>
+                                                <span>{tag}</span>
+                                                <button
+                                                    type="button"
+                                                    className={styles.tagChipRemove}
+                                                    onClick={() => removeTagItem(tag)}
+                                                    aria-label={`ลบแท็ก ${tag}`}
+                                                >
+                                                    <X size={12} />
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                                <input
+                                    type="text"
+                                    className={styles.tagInputField}
+                                    placeholder="พิมพ์แท็กแล้วกด Enter หรือคั่นด้วย comma"
+                                    value={tagInputValue}
+                                    onChange={e => setTagInputValue(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            commitTagInput();
+                                            return;
+                                        }
+
+                                        if (e.key === ',' && tagInputValue.trim().length > 0) {
+                                            e.preventDefault();
+                                            commitTagInput();
+                                            return;
+                                        }
+
+                                        if (e.key === 'Backspace' && tagInputValue.trim().length === 0 && tagItems.length > 0) {
+                                            e.preventDefault();
+                                            setTagItems((prev) => prev.slice(0, -1));
+                                        }
+                                    }}
+                                />
+                                <p className={styles.tagInputHint}>
+                                    กด Enter เพื่อเพิ่มแท็ก และสามารถวางหลายแท็กคั่นด้วย comma ได้
+                                </p>
+                            </div>
                         </div>
 
                         <div className={styles.formGroup}>

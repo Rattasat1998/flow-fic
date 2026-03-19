@@ -9,18 +9,17 @@ import {
     MessageSquare,
     Bookmark,
     Plus,
-    PenTool,
-    Image as ImageIcon,
-    Sparkles,
     Settings,
     X,
     Upload,
     Edit3,
     MoreVertical,
     Trash2,
+    ChevronDown,
 } from 'lucide-react';
 import styles from './dashboard.module.css';
 import { supabase } from '@/lib/supabase';
+import { MAIN_CATEGORIES } from '@/lib/categories';
 import { useAuth } from '@/contexts/AuthContext';
 import { BrandLogo } from '@/components/brand/BrandLogo';
 import { WalletLedgerPanel } from '@/components/profile/WalletLedgerPanel';
@@ -31,6 +30,7 @@ type DBStoryRow = {
     cover_url: string | null;
     cover_wide_url: string | null;
     category: string;
+    main_category: string | null;
     pen_name: string;
     synopsis: string | null;
     status: string;
@@ -58,6 +58,7 @@ type DashboardStory = {
     title: string;
     coverUrl: string;
     type: 'fanfic' | 'cartoon' | 'novel';
+    mainCategory: string;
     penName: string;
     synopsis: string | null;
     status: StoryStatus;
@@ -184,7 +185,7 @@ export default function DashboardPage() {
     const userEmailFallback = typeof user?.email === 'string' ? user.email.split('@')[0] || 'Flow Writer' : 'Flow Writer';
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
     const profileMenuRef = useRef<HTMLDivElement>(null);
-    const [activeTab, setActiveTab] = useState('all');
+    const [activeTab, setActiveTab] = useState<'all' | string>('all');
     const [dbStories, setDbStories] = useState<DBStoryRow[]>([]);
     const [storyMetrics, setStoryMetrics] = useState<Record<string, StoryMetrics>>({});
 
@@ -442,6 +443,7 @@ export default function DashboardPage() {
             title: s.title,
             coverUrl: s.cover_url || s.cover_wide_url || 'https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?auto=format&fit=crop&w=800&q=80',
             type: s.category === 'fanfic' ? 'fanfic' : s.category === 'cartoon' ? 'cartoon' : 'novel',
+            mainCategory: s.main_category || '',
             penName: s.pen_name,
             synopsis: s.synopsis,
             status: s.status === 'published' ? 'published' : 'draft',
@@ -456,7 +458,12 @@ export default function DashboardPage() {
 
     const filteredStories = activeTab === 'all'
         ? allStories
-        : allStories.filter(s => s.type === activeTab);
+        : allStories.filter((story) => story.mainCategory === activeTab);
+    const storyCountByMainCategory = allStories.reduce<Record<string, number>>((acc, story) => {
+        if (!story.mainCategory) return acc;
+        acc[story.mainCategory] = (acc[story.mainCategory] || 0) + 1;
+        return acc;
+    }, {});
     const publishedStoriesCount = allStories.filter((story) => story.status === 'published').length;
     const completedStoriesCount = allStories.filter((story) => story.completionStatus === 'completed').length;
 
@@ -699,26 +706,21 @@ export default function DashboardPage() {
                                 className={`${styles.tabBtn} ${activeTab === 'all' ? styles.activeTab : ''}`}
                                 onClick={() => setActiveTab('all')}
                             >
-                                ทั้งหมด
+                                <span>ทั้งหมด</span>
+                                <span className={styles.tabBadge}>{formatCount(allStories.length)}</span>
                             </button>
-                            <button
-                                className={`${styles.tabBtn} ${activeTab === 'novel' ? styles.activeTab : ''}`}
-                                onClick={() => setActiveTab('novel')}
-                            >
-                                <PenTool size={14} /> นิยาย (Original)
-                            </button>
-                            <button
-                                className={`${styles.tabBtn} ${activeTab === 'fanfic' ? styles.activeTab : ''}`}
-                                onClick={() => setActiveTab('fanfic')}
-                            >
-                                <Sparkles size={14} /> แฟนฟิค
-                            </button>
-                            <button
-                                className={`${styles.tabBtn} ${activeTab === 'cartoon' ? styles.activeTab : ''}`}
-                                onClick={() => setActiveTab('cartoon')}
-                            >
-                                <ImageIcon size={14} /> การ์ตูน
-                            </button>
+                            {MAIN_CATEGORIES.map((category) => (
+                                <button
+                                    key={category.id}
+                                    className={`${styles.tabBtn} ${activeTab === category.id ? styles.activeTab : ''}`}
+                                    onClick={() => setActiveTab(category.id)}
+                                >
+                                    <span>{category.label}</span>
+                                    <span className={styles.tabBadge}>
+                                        {formatCount(storyCountByMainCategory[category.id] || 0)}
+                                    </span>
+                                </button>
+                            ))}
                         </div>
 
                         <div className={styles.storyList}>
@@ -765,9 +767,12 @@ export default function DashboardPage() {
                                                 </div>
 
                                                 <div className={styles.storySide}>
-                                                    <div className={styles.publishDropdownContainer}>
+                                                    <div
+                                                        className={`${styles.publishDropdownContainer} ${story.status === 'published' ? styles.public : styles.private}`}
+                                                    >
+                                                        <span className={styles.publishDropdownStatusDot} aria-hidden="true" />
                                                         <select
-                                                            className={`${styles.publishDropdownSelect} ${story.status === 'published' ? styles.public : styles.private}`}
+                                                            className={styles.publishDropdownSelect}
                                                             value={story.status === 'published' ? 'published' : 'draft'}
                                                             onChange={(e) => handleStoryStatusChange(story.id, e.target.value as StoryStatus)}
                                                             disabled={!!isUpdatingStoryStatus[story.id]}
@@ -776,6 +781,7 @@ export default function DashboardPage() {
                                                             <option value="published">เผยแพร่</option>
                                                             <option value="draft">ไม่เผยแพร่</option>
                                                         </select>
+                                                        <ChevronDown size={14} className={styles.publishDropdownCaret} aria-hidden="true" />
                                                     </div>
 
                                                     <div className={styles.actionsContainer} data-story-actions="true">
