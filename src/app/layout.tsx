@@ -4,6 +4,12 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { WebVitalsReporter } from "@/components/perf/WebVitalsReporter";
+import {
+  DEFAULT_SITE_DESCRIPTION,
+  DEFAULT_SITE_TITLE,
+  ROOT_SHARE_IMAGE_PATH,
+  getMetadataBase,
+} from "@/lib/server/share";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,13 +22,32 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FlowFic",
-  applicationName: "FlowFic",
-  description: "แพลตฟอร์มอ่านเขียนนิยายสยองขวัญและสืบสวนที่ให้ผู้อ่านเลือกเส้นทางเรื่องได้",
+  metadataBase: getMetadataBase(),
+  title: DEFAULT_SITE_TITLE,
+  applicationName: DEFAULT_SITE_TITLE,
+  description: DEFAULT_SITE_DESCRIPTION,
   icons: {
     icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
     shortcut: [{ url: "/icon.svg", type: "image/svg+xml" }],
     apple: [{ url: "/icon.svg", type: "image/svg+xml" }],
+  },
+  openGraph: {
+    type: "website",
+    siteName: DEFAULT_SITE_TITLE,
+    title: DEFAULT_SITE_TITLE,
+    description: DEFAULT_SITE_DESCRIPTION,
+    images: [{
+      url: ROOT_SHARE_IMAGE_PATH,
+      width: 1200,
+      height: 630,
+      alt: DEFAULT_SITE_TITLE,
+    }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: DEFAULT_SITE_TITLE,
+    description: DEFAULT_SITE_DESCRIPTION,
+    images: [ROOT_SHARE_IMAGE_PATH],
   },
 };
 

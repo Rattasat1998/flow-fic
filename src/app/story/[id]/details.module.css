@@ -121,7 +121,8 @@
 }
 
 .primaryActionBtn,
-.followBtn {
+.followBtn,
+.shareBtn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -195,13 +196,27 @@
     cursor: pointer;
 }
 
+.shareBtn {
+    background: #ffffff;
+    color: #111827;
+    border: 1px solid #e5e7eb;
+    cursor: pointer;
+}
+
 .followBtn:hover:not(:disabled) {
     background: #f9fafb;
     border-color: #f97316;
     color: #ea580c;
 }
 
-.followBtn:disabled {
+.shareBtn:hover:not(:disabled) {
+    background: #f9fafb;
+    border-color: #cbd5e1;
+    color: #111827;
+}
+
+.followBtn:disabled,
+.shareBtn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
 }
@@ -625,7 +640,8 @@
     }
 
     .primaryActionBtn,
-    .followBtn {
+    .followBtn,
+    .shareBtn {
         width: 100%;
     }
 
@@ -1105,6 +1121,11 @@
 }
 
 .followBtn {
+    background: rgba(255, 255, 255, 0.78);
+    border-color: rgba(15, 23, 42, 0.1);
+}
+
+.shareBtn {
     background: rgba(255, 255, 255, 0.78);
     border-color: rgba(15, 23, 42, 0.1);
 }
