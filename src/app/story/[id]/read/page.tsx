@@ -2595,7 +2595,7 @@ export default function StoryPage({ params }: StoryPageProps) {
             เข้าสู่ระบบเพื่อปลดล็อก
           </Link>
         )}
-        <Link href="/pricing" className={styles.premiumGateBtnGhost}>
+        <Link href="/pricing" prefetch={false} className={styles.premiumGateBtnGhost}>
           เติมเหรียญ
         </Link>
       </div>

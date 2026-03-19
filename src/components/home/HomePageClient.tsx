@@ -962,12 +962,12 @@ export default function HomePageClient({ initialFilters, initialDiscovery }: Hom
 
             <div className={styles.navRight}>
               {user ? (
-                <Link href="/pricing" className={styles.coinBalancePill}>
+                <Link href="/pricing" prefetch={false} className={styles.coinBalancePill}>
                   <Coins size={15} />
                   <span>{walletCoinBalance === null ? '...' : `${walletCoinBalance.toLocaleString('th-TH')} เหรียญ`}</span>
                 </Link>
               ) : (
-                <Link href="/pricing" className={styles.pricingLink}>
+                <Link href="/pricing" prefetch={false} className={styles.pricingLink}>
                   แพ็กเกจ
                 </Link>
               )}
