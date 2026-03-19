@@ -498,14 +498,8 @@ function CreateTextForm() {
                                 >
                                     เรื่องแต่งออริจินัล
                                 </button>
-                                <button
-                                    type="button"
-                                    className={`${styles.categoryBtn} ${category === 'fanfic' ? styles.activeCategory : ''}`}
-                                    onClick={() => setCategory('fanfic')}
-                                >
-                                    แฟนฟิคชัน
-                                </button>
                             </div>
+                            <span className={styles.hint}>เปิดให้สร้างเฉพาะเรื่องแต่งออริจินัลชั่วคราว</span>
                         </div>
 
                         {/* Category Taxonomy */}

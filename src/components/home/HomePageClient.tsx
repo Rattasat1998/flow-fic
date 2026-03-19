@@ -279,8 +279,8 @@ export default function HomePageClient({ initialFilters, initialDiscovery }: Hom
       if (trimmedQ) params.set('q', trimmedQ);
       else params.delete('q');
 
-      if (next.category !== 'all') params.set('category', next.category);
-      else params.delete('category');
+      if (next.category === 'all') params.set('category', 'all');
+      else params.set('category', next.category);
 
       if (next.subCategory !== 'all') params.set('subCategory', next.subCategory);
       else params.delete('subCategory');

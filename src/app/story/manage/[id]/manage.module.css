@@ -904,6 +904,12 @@
     color: #374151;
 }
 
+.editFieldHint {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
 .editInput {
     width: 100%;
     padding: 0.75rem;

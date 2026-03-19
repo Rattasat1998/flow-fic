@@ -2085,14 +2085,11 @@ export default function StoryManagerPage() {
                                     >
                                         ออริจินัล
                                     </button>
-                                    <button
-                                        type="button"
-                                        className={`${styles.editCategoryBtn} ${editForm.category === 'fanfic' ? styles.editCategoryActive : ''}`}
-                                        onClick={() => setEditForm(f => ({ ...f, category: 'fanfic' }))}
-                                    >
-                                        แฟนฟิค
-                                    </button>
                                 </div>
+                                <span className={styles.editFieldHint}>ซ่อนตัวเลือกแฟนฟิคชั่วคราว</span>
+                                {editForm.category === 'fanfic' && (
+                                    <span className={styles.editFieldHint}>เรื่องนี้ยังคงเป็นแฟนฟิคอยู่จนกว่าจะเปลี่ยนประเภท</span>
+                                )}
                             </div>
 
                             {BRANCHING_FEATURE_ENABLED && (
