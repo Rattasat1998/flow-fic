@@ -1805,6 +1805,9 @@ create table if not exists public.reader_progress (
   last_chapter_id uuid references public.chapters(id) on delete set null,
   last_chapter_index int not null default 0,
   chapter_states jsonb not null default '{}'::jsonb,
+  completed_at timestamptz,
+  completed_chapter_id uuid references public.chapters(id) on delete set null,
+  completed_story_version text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint reader_progress_user_story_unique unique (user_id, story_id)
@@ -1847,3 +1850,116 @@ create policy "reader_progress_delete_own" on public.reader_progress
 
 grant select, insert, update, delete on table public.reader_progress to authenticated;
 grant all on table public.reader_progress to service_role;
+
+drop function if exists public.get_story_progress_version(uuid);
+
+create function public.get_story_progress_version(
+  p_story_id uuid
+)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_story_row public.stories%rowtype;
+  v_is_owner boolean := false;
+  v_payload jsonb;
+begin
+  if p_story_id is null then
+    return null;
+  end if;
+
+  select s.*
+    into v_story_row
+  from public.stories s
+  where s.id = p_story_id
+  limit 1;
+
+  if not found then
+    return null;
+  end if;
+
+  v_is_owner := v_user_id is not null and v_story_row.user_id = v_user_id;
+
+  if v_story_row.status <> 'published' and not v_is_owner then
+    return null;
+  end if;
+
+  with visible_chapters as (
+    select
+      c.id,
+      c.order_index,
+      coalesce(
+        (
+          case
+            when jsonb_typeof(coalesce(c.published_content, c.content, '{}'::jsonb)) = 'object'
+              then (coalesce(c.published_content, c.content, '{}'::jsonb)->>'isEnding')::boolean
+            else null
+          end
+        ),
+        false
+      ) as is_ending
+    from public.chapters c
+    where c.story_id = p_story_id
+      and (
+        (v_story_row.status = 'published' and c.status = 'published')
+        or (v_story_row.status <> 'published' and v_is_owner)
+      )
+  ),
+  visible_choices as (
+    select
+      cc.from_chapter_id,
+      cc.to_chapter_id,
+      cc.order_index
+    from public.chapter_choices cc
+    join public.chapters fc on fc.id = cc.from_chapter_id
+    join public.chapters tc on tc.id = cc.to_chapter_id
+    where cc.story_id = p_story_id
+      and (
+        (v_story_row.status = 'published' and fc.status = 'published' and tc.status = 'published')
+        or (v_story_row.status <> 'published' and v_is_owner)
+      )
+  )
+  select jsonb_build_object(
+    'path_mode', coalesce(v_story_row.path_mode, 'linear'),
+    'entry_chapter_id', v_story_row.entry_chapter_id,
+    'chapters', coalesce(
+      (
+        select jsonb_agg(
+          jsonb_build_object(
+            'id', vc.id,
+            'order_index', vc.order_index,
+            'is_ending', vc.is_ending
+          )
+          order by vc.order_index asc, vc.id asc
+        )
+        from visible_chapters vc
+      ),
+      '[]'::jsonb
+    ),
+    'choices', coalesce(
+      (
+        select jsonb_agg(
+          jsonb_build_object(
+            'from_chapter_id', vch.from_chapter_id,
+            'to_chapter_id', vch.to_chapter_id,
+            'order_index', vch.order_index
+          )
+          order by vch.from_chapter_id asc, vch.order_index asc, vch.to_chapter_id asc
+        )
+        from visible_choices vch
+      ),
+      '[]'::jsonb
+    )
+  )
+    into v_payload;
+
+  return md5(coalesce(v_payload::text, '{}'::text));
+end;
+$$;
+
+revoke all on function public.get_story_progress_version(uuid) from public;
+grant execute on function public.get_story_progress_version(uuid)
+  to anon, authenticated, service_role;

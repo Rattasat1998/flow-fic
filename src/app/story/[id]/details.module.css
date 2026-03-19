@@ -1,9 +1,7 @@
 .main {
     min-height: 100vh;
-    background:
-        radial-gradient(circle at top, rgba(185, 162, 123, 0.08), transparent 32%),
-        linear-gradient(180deg, #f4f0e7 0%, #faf8f2 18rem, #f7f4ed 100%);
-    color: #18212b;
+    background: #ffffff;
+    color: #111827;
     display: flex;
     flex-direction: column;
 }
@@ -30,12 +28,10 @@
     width: 100%;
     max-width: 240px;
     padding: 0.7rem;
-    border-radius: 22px;
-    background: rgba(255, 255, 255, 0.8);
-    border: 1px solid rgba(24, 33, 43, 0.1);
-    box-shadow:
-        0 18px 38px rgba(24, 33, 43, 0.08),
-        inset 0 1px 0 rgba(255, 255, 255, 0.72);
+    border-radius: 16px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
 }
 
 .coverImage {
@@ -43,8 +39,8 @@
     aspect-ratio: 3 / 4;
     object-fit: cover;
     display: block;
-    border-radius: 16px;
-    background: #ded6c7;
+    border-radius: 12px;
+    background: #f3f4f6;
 }
 
 .mastheadBody {
@@ -63,11 +59,11 @@
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #6b6257;
+    color: #6b7280;
 }
 
 .storyEyebrowDivider {
-    color: #a39380;
+    color: #d1d5db;
 }
 
 .pathModePill {
@@ -75,9 +71,9 @@
     align-items: center;
     padding: 0.28rem 0.75rem;
     border-radius: 999px;
-    border: 1px solid rgba(48, 92, 69, 0.18);
-    background: rgba(237, 245, 239, 0.85);
-    color: #305c45;
+    border: 1px solid #fed7aa;
+    background: #fff7ed;
+    color: #ea580c;
     font-size: 0.74rem;
     letter-spacing: 0.06em;
 }
@@ -88,7 +84,7 @@
     font-size: clamp(1.85rem, 3.6vw, 3.1rem);
     line-height: 1.02;
     letter-spacing: -0.04em;
-    color: #111926;
+    color: #111827;
     text-wrap: balance;
 }
 
@@ -104,16 +100,16 @@
     align-items: center;
     padding: 0.32rem 0.78rem;
     border-radius: 999px;
-    border: 1px solid rgba(24, 33, 43, 0.08);
-    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid #e5e7eb;
+    background: #f9fafb;
     font-size: 0.92rem;
     font-weight: 700;
-    color: #18212b;
+    color: #111827;
 }
 
 .storyStateMuted {
     font-size: 0.95rem;
-    color: #6d655c;
+    color: #6b7280;
 }
 
 .actionRow {
@@ -145,28 +141,64 @@
 }
 
 .primaryActionBtn {
-    background: #18212b;
-    color: #fcfcfa;
-    border: 1px solid #18212b;
-    box-shadow: 0 10px 24px rgba(24, 33, 43, 0.1);
+    background: #f97316;
+    color: #ffffff;
+    border: 1px solid #f97316;
+    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2);
 }
 
 .primaryActionBtn:hover {
-    background: #0f1720;
+    background: #ea580c;
     transform: translateY(-1px);
 }
 
+.readCtaUnread {
+    background: #f97316;
+    border-color: #f97316;
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2);
+}
+
+.readCtaUnread:hover {
+    background: #ea580c;
+    border-color: #ea580c;
+}
+
+.readCtaInProgress {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.22);
+}
+
+.readCtaInProgress:hover {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+}
+
+.readCtaCompleted {
+    background: #059669;
+    border-color: #059669;
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.22);
+}
+
+.readCtaCompleted:hover {
+    background: #047857;
+    border-color: #047857;
+}
+
 .followBtn {
-    background: rgba(255, 255, 255, 0.78);
-    color: #314154;
-    border: 1px solid rgba(24, 33, 43, 0.14);
+    background: #ffffff;
+    color: #374151;
+    border: 1px solid #e5e7eb;
     cursor: pointer;
 }
 
 .followBtn:hover:not(:disabled) {
-    background: #ffffff;
-    border-color: rgba(48, 92, 69, 0.24);
-    color: #305c45;
+    background: #f9fafb;
+    border-color: #f97316;
+    color: #ea580c;
 }
 
 .followBtn:disabled {
@@ -175,15 +207,15 @@
 }
 
 .followBtnActive {
-    background: rgba(237, 245, 239, 0.9);
-    color: #305c45;
-    border-color: rgba(48, 92, 69, 0.24);
+    background: #fff7ed;
+    color: #ea580c;
+    border-color: #fed7aa;
 }
 
 .followBtnActive:hover:not(:disabled) {
-    background: rgba(232, 242, 234, 0.95);
-    color: #274a38;
-    border-color: rgba(48, 92, 69, 0.32);
+    background: #ffedd5;
+    color: #c2410c;
+    border-color: #fdba74;
 }
 
 .actionNote {
@@ -191,7 +223,7 @@
     max-width: 56ch;
     font-size: 0.92rem;
     line-height: 1.62;
-    color: #61594f;
+    color: #6b7280;
 }
 
 .summaryStrip {
@@ -199,13 +231,13 @@
     margin: 0 auto;
     display: grid;
     grid-template-columns: repeat(6, minmax(0, 1fr));
-    border-top: 1px solid rgba(162, 147, 128, 0.45);
-    border-bottom: 1px solid rgba(162, 147, 128, 0.45);
+    border-top: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
 }
 
 .summaryItem {
     padding: 1rem 1.1rem 1.05rem;
-    border-right: 1px solid rgba(162, 147, 128, 0.28);
+    border-right: 1px solid #f3f4f6;
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
@@ -220,14 +252,14 @@
     font-weight: 700;
     letter-spacing: 0.07em;
     text-transform: uppercase;
-    color: #85796a;
+    color: #9ca3af;
 }
 
 .summaryValue {
     font-size: 1rem;
     font-weight: 700;
     line-height: 1.35;
-    color: #18212b;
+    color: #111827;
 }
 
 .contentWrapper {
@@ -240,11 +272,10 @@
 }
 
 .section {
-    background: rgba(255, 255, 255, 0.6);
-    border: 1px solid rgba(162, 147, 128, 0.24);
-    border-radius: 22px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
     padding: 1.65rem 1.6rem;
-    box-shadow: 0 10px 30px rgba(24, 33, 43, 0.03);
 }
 
 .sectionHeader {
@@ -254,7 +285,7 @@
     gap: 1rem;
     padding-bottom: 1rem;
     margin-bottom: 1.1rem;
-    border-bottom: 1px solid rgba(162, 147, 128, 0.3);
+    border-bottom: 1px solid #f3f4f6;
 }
 
 .sectionTitle {
@@ -262,20 +293,20 @@
     font-size: 1.32rem;
     font-weight: 800;
     letter-spacing: -0.03em;
-    color: #111926;
+    color: #111827;
 }
 
 .sectionMeta {
     font-size: 0.92rem;
     line-height: 1.55;
-    color: #746b61;
+    color: #6b7280;
     text-align: right;
 }
 
 .synopsisText {
     margin: 0;
     max-width: 62ch;
-    color: #2f3a46;
+    color: #374151;
     font-size: 0.98rem;
     line-height: 1.8;
     white-space: pre-wrap;
@@ -287,7 +318,7 @@
     gap: 0.9rem;
     padding: 0 0 1.1rem;
     margin-bottom: 1.1rem;
-    border-bottom: 1px dashed rgba(162, 147, 128, 0.35);
+    border-bottom: 1px dashed #e5e7eb;
 }
 
 .characterShowcaseHeader {
@@ -302,7 +333,7 @@
     font-size: 1.02rem;
     font-weight: 800;
     letter-spacing: -0.02em;
-    color: #18212b;
+    color: #111827;
 }
 
 .characterCardGrid {
@@ -312,16 +343,15 @@
 }
 
 .readerCharacterCard {
-    background: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(162, 147, 128, 0.22);
-    border-radius: 18px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
     padding: 0.95rem 0.85rem 0.9rem;
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
     gap: 0.7rem;
-    box-shadow: 0 8px 22px rgba(24, 33, 43, 0.04);
 }
 
 .readerCharacterPortrait {
@@ -330,8 +360,8 @@
     border-radius: 50%;
     overflow: hidden;
     border: 3px solid #ffffff;
-    background: linear-gradient(180deg, #f4efe4 0%, #ebe4d7 100%);
-    box-shadow: 0 6px 18px rgba(24, 33, 43, 0.08);
+    background: #f3f4f6;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .readerCharacterImage,
@@ -349,7 +379,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #7b6c59;
+    color: #6b7280;
     font-size: 1.35rem;
     font-weight: 800;
 }
@@ -366,14 +396,14 @@
     font-size: 0.95rem;
     font-weight: 800;
     line-height: 1.42;
-    color: #18212b;
+    color: #111827;
     text-wrap: balance;
 }
 
 .readerCharacterMeta {
     font-size: 0.8rem;
     line-height: 1.45;
-    color: #6f655a;
+    color: #6b7280;
 }
 
 .startCallout {
@@ -382,9 +412,9 @@
     gap: 0.45rem;
     padding: 1rem 1.05rem;
     margin-bottom: 1.15rem;
-    border-radius: 16px;
-    border: 1px solid rgba(48, 92, 69, 0.14);
-    background: rgba(245, 247, 242, 0.95);
+    border-radius: 14px;
+    border: 1px solid #fed7aa;
+    background: #fff7ed;
 }
 
 .startCalloutLabel {
@@ -392,20 +422,20 @@
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #4c6b59;
+    color: #ea580c;
 }
 
 .startCalloutTitle {
     font-size: 1rem;
     font-weight: 700;
-    color: #18212b;
+    color: #111827;
 }
 
 .startCalloutText {
     margin: 0;
     font-size: 0.93rem;
     line-height: 1.65;
-    color: #5d645b;
+    color: #6b7280;
 }
 
 .chapterList {
@@ -422,7 +452,7 @@
     padding: 1rem 0.15rem;
     background: transparent;
     border: none;
-    border-bottom: 1px solid rgba(162, 147, 128, 0.26);
+    border-bottom: 1px solid #f3f4f6;
     text-align: left;
     cursor: pointer;
     transition:
@@ -431,20 +461,27 @@
         transform 0.2s ease;
 }
 
+.chapterItemBranching {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
 .chapterItem:first-child {
-    border-top: 1px solid rgba(162, 147, 128, 0.26);
+    border-top: 1px solid #f3f4f6;
 }
 
 .chapterItem:hover {
-    background: rgba(255, 255, 255, 0.5);
-    border-color: rgba(130, 117, 99, 0.4);
+    background: #f9fafb;
+    border-color: #e5e7eb;
 }
 
 .chapterNumber {
     font-size: 0.88rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
-    color: #8a7c6b;
+    color: #9ca3af;
 }
 
 .chapterBody {
@@ -466,7 +503,7 @@
     font-size: 0.96rem;
     font-weight: 700;
     line-height: 1.45;
-    color: #18212b;
+    color: #111827;
 }
 
 .chapterStatus {
@@ -481,15 +518,15 @@
 }
 
 .chapterStatusPremium {
-    background: rgba(252, 243, 221, 0.92);
-    border: 1px solid rgba(201, 153, 43, 0.22);
-    color: #8a5a00;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    color: #92400e;
 }
 
 .chapterStatusAccessible {
-    background: rgba(237, 245, 239, 0.92);
-    border: 1px solid rgba(48, 92, 69, 0.2);
-    color: #305c45;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    color: #ea580c;
 }
 
 .chapterMeta {
@@ -499,12 +536,12 @@
     flex-wrap: wrap;
     font-size: 0.9rem;
     font-weight: 500;
-    color: #72685d;
+    color: #6b7280;
 }
 
 .chapterMetaAccent {
     font-weight: 700;
-    color: #305c45;
+    color: #ea580c;
 }
 
 .chapterAction {
@@ -521,13 +558,30 @@
     transform: translateX(2px);
 }
 
+.chapterActionBranching {
+    background-color: #f97316 !important;
+    color: #ffffff !important;
+    padding: 0.5rem 1.25rem;
+    border-radius: 999px;
+    opacity: 1 !important;
+    transform: none !important;
+    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2);
+    transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.chapterItem:hover .chapterActionBranching {
+    background-color: #ea580c !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 16px rgba(234, 88, 12, 0.3);
+}
+
 .emptyState {
     padding: 2.4rem 1.25rem;
     text-align: center;
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.55);
-    border: 1px dashed rgba(130, 117, 99, 0.36);
-    color: #70675d;
+    border-radius: 14px;
+    background: #f9fafb;
+    border: 1px dashed #d1d5db;
+    color: #6b7280;
     font-size: 0.98rem;
     font-weight: 600;
 }
@@ -563,12 +617,11 @@
 
     .storyTitle {
         max-width: 100%;
-        font-size: clamp(1.8rem, 8vw, 2.6rem);
+        font-size: clamp(1.55rem, 6.8vw, 2.2rem);
     }
 
     .actionRow {
-        flex-direction: column;
-        align-items: stretch;
+        display: none;
     }
 
     .primaryActionBtn,
@@ -586,7 +639,7 @@
     }
 
     .contentWrapper {
-        padding: 2rem 1rem 3.5rem;
+        padding: 2rem 1rem calc(7.5rem + env(safe-area-inset-bottom, 0px));
         gap: 1.25rem;
     }
 
@@ -615,6 +668,12 @@
         padding: 0.95rem 0;
     }
 
+    .chapterItemBranching {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
     .chapterHeadingRow {
         flex-direction: column;
         gap: 0.55rem;
@@ -623,6 +682,11 @@
     .chapterAction {
         grid-column: 2;
         justify-self: start;
+    }
+
+    .chapterItemBranching .chapterAction {
+        grid-column: auto;
+        justify-self: auto;
     }
 }
 
@@ -661,8 +725,8 @@
 
 .coinDialogCard {
     width: min(92vw, 380px);
-    background: linear-gradient(145deg, #fffbeb 0%, #ffffff 50%, #fef3c7 100%);
-    border: 1.5px solid #fcd34d;
+    background: linear-gradient(145deg, #fff7ed 0%, #ffffff 50%, #ffedd5 100%);
+    border: 1.5px solid #fdba74;
     border-radius: 20px;
     box-shadow:
         0 20px 50px rgba(245, 158, 11, 0.2),
@@ -693,7 +757,7 @@
     width: 72px;
     height: 72px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #f59e0b, #eab308);
+    background: linear-gradient(135deg, #f97316, #ea580c);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -809,15 +873,15 @@
 .coinDialogCancelBtn {
     background: #ffffff;
     color: #78350f;
-    border: 1.5px solid #fcd34d;
+    border: 1.5px solid #fdba74;
 }
 
 .coinDialogCancelBtn:hover {
-    background: #fffbeb;
+    background: #fff7ed;
 }
 
 .coinDialogConfirmBtn {
-    background: linear-gradient(135deg, #f59e0b, #d97706);
+    background: linear-gradient(135deg, #f97316, #c2410c);
     color: #ffffff;
     box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
 }
@@ -845,8 +909,8 @@
     display: flex;
     align-items: center;
     gap: 0.6rem;
-    background: linear-gradient(135deg, #fef3c7, #ffffff);
-    border: 1.5px solid #fcd34d;
+    background: linear-gradient(135deg, #ffedd5, #ffffff);
+    border: 1.5px solid #fdba74;
     border-radius: 999px;
     padding: 0.6rem 1.2rem;
     box-shadow:
@@ -883,7 +947,7 @@
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #f59e0b, #eab308);
+    background: linear-gradient(135deg, #f97316, #ea580c);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -932,6 +996,12 @@
     color: rgba(148, 163, 184, 0.9);
     font-size: 1.25rem;
     line-height: 1;
+}
+
+.mobileActionBtn {
+    min-height: 52px;
+    flex: 1 1 0;
+    min-width: 0;
 }
 
 .detailLayout {
@@ -987,10 +1057,21 @@
     color: var(--text-soft);
 }
 
+.authorLink {
+    color: inherit;
+    font-weight: 700;
+    text-decoration: none;
+    transition: color 0.2s ease, opacity 0.2s ease;
+}
+
+.authorLink:hover {
+    color: var(--primary);
+}
+
 .pathModePill {
-    border-color: rgba(249, 115, 22, 0.16);
-    background: rgba(255, 247, 237, 0.88);
-    color: #c2410c;
+    border-color: #fed7aa;
+    background: #fff7ed;
+    color: #ea580c;
 }
 
 .storyTitle {
@@ -1014,13 +1095,13 @@
 }
 
 .primaryActionBtn {
-    background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
-    border-color: #0f172a;
-    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.14);
+    background: #f97316;
+    border-color: #f97316;
+    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2);
 }
 
 .primaryActionBtn:hover {
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    background: #ea580c;
 }
 
 .followBtn {
@@ -1088,7 +1169,7 @@
 }
 
 .readerCharacterPortrait {
-    background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%);
+    background: #f3f4f6;
 }
 
 .readerCharacterPlaceholder {
@@ -1096,8 +1177,8 @@
 }
 
 .startCallout {
-    border-color: rgba(249, 115, 22, 0.16);
-    background: rgba(255, 247, 237, 0.78);
+    border-color: #fed7aa;
+    background: #fff7ed;
 }
 
 .startCalloutLabel {
@@ -1146,7 +1227,7 @@
 
 @media (max-width: 720px) {
     .detailLayout {
-        padding: 1rem 0 3rem;
+        padding: 1rem 0 calc(7rem + env(safe-area-inset-bottom, 0px));
         gap: 1rem;
     }
 
@@ -1156,6 +1237,10 @@
 
     .section {
         padding: 1.25rem 1.15rem;
+    }
+
+    .topbarDivider {
+        display: none;
     }
 
 }

@@ -76,11 +76,13 @@ export function useTracking(options: UseTrackingOptions = {}) {
     const sessionIdRef = useRef<string>('ssr');
     const mountTimeRef = useRef<number>(0);
     const hasFiredPageView = useRef(false);
+    const hasTrackedPageLeaveRef = useRef(false);
 
     // Initialize session id on client
     useEffect(() => {
         mountTimeRef.current = Date.now();
         sessionIdRef.current = getOrCreateTrackingSessionId();
+        hasTrackedPageLeaveRef.current = false;
     }, []);
 
     // Core tracking function — fire-and-forget
@@ -137,15 +139,18 @@ export function useTracking(options: UseTrackingOptions = {}) {
         }
     }, [options.autoPageView, options.pagePath, options.storyId, options.chapterId, options.autoMeta, trackEvent]);
 
-    // Track time spent when leaving page
+    // Track time spent when leaving page without blocking BFCache.
     useEffect(() => {
         if (!options.pagePath) return;
 
-        const handleUnload = () => {
-            const durationMs = Date.now() - mountTimeRef.current;
-            if (durationMs < 1000) return; // ignore very short visits
+        const trackPageLeave = () => {
+            if (hasTrackedPageLeaveRef.current) return;
 
-            // Use sendBeacon for reliable delivery on page unload
+            const durationMs = Date.now() - mountTimeRef.current;
+            if (durationMs < 1000) return;
+
+            hasTrackedPageLeaveRef.current = true;
+
             const payload = {
                 user_id: userId,
                 session_id: sessionIdRef.current,
@@ -156,7 +161,6 @@ export function useTracking(options: UseTrackingOptions = {}) {
                 metadata: { duration_ms: durationMs },
             };
 
-            // sendBeacon with Supabase REST API
             const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/page_events`;
             const headers = {
                 'Content-Type': 'application/json',
@@ -165,11 +169,9 @@ export function useTracking(options: UseTrackingOptions = {}) {
             };
 
             try {
-                const beaconHeaders = new Headers(headers);
-                // sendBeacon doesn't support custom headers, so fall back to fetch keepalive
                 fetch(url, {
                     method: 'POST',
-                    headers: beaconHeaders,
+                    headers,
                     body: JSON.stringify(payload),
                     keepalive: true,
                 }).catch(() => { });
@@ -178,15 +180,38 @@ export function useTracking(options: UseTrackingOptions = {}) {
             }
         };
 
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'hidden') handleUnload();
+        const resetPageLeaveTracking = () => {
+            mountTimeRef.current = Date.now();
+            sessionIdRef.current = getOrCreateTrackingSessionId();
+            hasTrackedPageLeaveRef.current = false;
         };
 
-        window.addEventListener('beforeunload', handleUnload);
+        const handlePageHide = () => {
+            trackPageLeave();
+        };
+
+        const handlePageShow = () => {
+            resetPageLeaveTracking();
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'hidden') {
+                trackPageLeave();
+                return;
+            }
+
+            if (document.visibilityState === 'visible') {
+                resetPageLeaveTracking();
+            }
+        };
+
+        window.addEventListener('pagehide', handlePageHide);
+        window.addEventListener('pageshow', handlePageShow);
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
-            window.removeEventListener('beforeunload', handleUnload);
+            window.removeEventListener('pagehide', handlePageHide);
+            window.removeEventListener('pageshow', handlePageShow);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, [options.pagePath, options.storyId, options.chapterId, userId]);

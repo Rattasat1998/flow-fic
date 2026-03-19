@@ -1,0 +1,341 @@
+.main {
+    min-height: 100vh;
+    background:
+        radial-gradient(circle at top, rgba(249, 115, 22, 0.06), transparent 26%),
+        linear-gradient(180deg, #ffffff 0%, #ffffff 18rem, #f9fafb 100%);
+    color: var(--foreground);
+}
+
+.topbar {
+    padding: 0;
+}
+
+.topbarContext {
+    min-width: 0;
+    flex: 1;
+}
+
+.topbarLogo {
+    flex-shrink: 0;
+}
+
+.topbarDivider {
+    color: rgba(148, 163, 184, 0.9);
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+.pageBody {
+    padding: 1.5rem 0 4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.statePage {
+    min-height: 72vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.stateCard {
+    width: min(560px, 100%);
+}
+
+.stateTitle {
+    margin: 0 0 0.5rem;
+    font-size: 1.3rem;
+    color: var(--foreground);
+}
+
+.stateDescription {
+    margin: 0;
+    color: var(--text-muted);
+    line-height: 1.65;
+}
+
+.heroSection {
+    padding: 1.8rem;
+    border-radius: var(--studio-radius-xl);
+    background:
+        radial-gradient(circle at top right, rgba(249, 115, 22, 0.12), transparent 28%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 247, 237, 0.94) 100%);
+    border: 1px solid rgba(249, 115, 22, 0.12);
+    box-shadow: var(--shadow-soft);
+}
+
+.heroInner {
+    display: grid;
+    grid-template-columns: 148px minmax(0, 1fr);
+    gap: 1.8rem;
+    align-items: center;
+}
+
+.avatarShell {
+    width: 148px;
+    height: 148px;
+    border-radius: 28px;
+    overflow: hidden;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+}
+
+.avatarImage,
+.avatarPlaceholder {
+    width: 100%;
+    height: 100%;
+}
+
+.avatarImage {
+    display: block;
+    object-fit: cover;
+}
+
+.avatarPlaceholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%);
+    color: #c2410c;
+    font-size: 3rem;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+}
+
+.heroContent {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+}
+
+.heroEyebrow {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: 0.32rem 0.72rem;
+    border-radius: 999px;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    color: #c2410c;
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.heroTitle {
+    margin: 0;
+    font-size: clamp(2rem, 3.6vw, 3.15rem);
+    line-height: 1.02;
+    letter-spacing: -0.04em;
+    color: #111827;
+    text-wrap: balance;
+}
+
+.heroBio {
+    margin: 0;
+    max-width: 62ch;
+    color: #475569;
+    font-size: 0.98rem;
+    line-height: 1.72;
+    white-space: pre-wrap;
+}
+
+.heroBioMuted {
+    color: #64748b;
+}
+
+.summaryStrip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: hidden;
+    background: var(--panel-bg-strong);
+}
+
+.summaryItem {
+    padding: 1rem 1.15rem 1.05rem;
+    border-right: 1px solid rgba(15, 23, 42, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 0.42rem;
+}
+
+.summaryItem:last-child {
+    border-right: none;
+}
+
+.summaryLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--text-soft);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.summaryValue {
+    color: var(--foreground);
+    font-size: 1rem;
+    font-weight: 800;
+    line-height: 1.35;
+}
+
+.section {
+    background: var(--panel-bg-strong);
+    border-color: var(--panel-border-strong);
+    box-shadow: none;
+    padding: 1.45rem 1.5rem;
+}
+
+.sectionHeader {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 1rem;
+    margin-bottom: 1.2rem;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.sectionTitle {
+    margin: 0;
+    color: var(--foreground);
+    font-size: 1.28rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+}
+
+.sectionMeta {
+    margin: 0.35rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.92rem;
+    line-height: 1.6;
+}
+
+.storyGrid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.emptyState {
+    padding: 1.5rem;
+}
+
+.emptyStateTitle {
+    margin: 0 0 0.45rem;
+    color: var(--foreground);
+    font-size: 1rem;
+    font-weight: 800;
+}
+
+.emptyStateDescription {
+    margin: 0;
+    color: var(--text-muted);
+    line-height: 1.6;
+}
+
+.footerActions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.homeLink {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0.72rem 1.1rem;
+    border-radius: 999px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(255, 255, 255, 0.86);
+    color: #334155;
+    font-size: 0.92rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.homeLink:hover {
+    transform: translateY(-1px);
+    border-color: rgba(249, 115, 22, 0.24);
+    background: rgba(255, 255, 255, 0.96);
+}
+
+@media (max-width: 960px) {
+    .heroInner {
+        grid-template-columns: 132px minmax(0, 1fr);
+        gap: 1.4rem;
+    }
+
+    .avatarShell {
+        width: 132px;
+        height: 132px;
+    }
+}
+
+@media (max-width: 720px) {
+    .pageBody {
+        padding: 1rem 0 3rem;
+        gap: 1rem;
+    }
+
+    .topbarDivider {
+        display: none;
+    }
+
+    .heroSection {
+        padding: 1.25rem;
+    }
+
+    .heroInner {
+        grid-template-columns: 1fr;
+        gap: 1.2rem;
+    }
+
+    .avatarShell {
+        width: 108px;
+        height: 108px;
+        border-radius: 22px;
+    }
+
+    .avatarPlaceholder {
+        font-size: 2.4rem;
+    }
+
+    .heroTitle {
+        font-size: clamp(1.7rem, 7vw, 2.35rem);
+    }
+
+    .summaryStrip {
+        grid-template-columns: 1fr;
+    }
+
+    .summaryItem {
+        border-right: none;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    }
+
+    .summaryItem:last-child {
+        border-bottom: none;
+    }
+
+    .section {
+        padding: 1.25rem 1.15rem;
+    }
+
+    .sectionHeader {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.45rem;
+    }
+
+    .storyGrid {
+        gap: 0.85rem;
+    }
+}

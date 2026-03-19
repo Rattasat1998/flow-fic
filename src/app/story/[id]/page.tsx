@@ -11,6 +11,16 @@ import { useTracking } from '@/hooks/useTracking';
 import { useFollow } from '@/hooks/useFollow';
 import { useAuth } from '@/contexts/AuthContext';
 import { BrandLogo } from '@/components/brand/BrandLogo';
+import {
+    deriveReaderCtaState,
+    mergeStoredStoryProgress,
+    normalizeStoredStoryProgress,
+    normalizeStoryProgressVersionValue,
+    readStoredStoryProgress,
+    type ReaderProgressRow,
+    type StoredStoryProgress,
+    writeStoredStoryProgress,
+} from '@/lib/readerProgress';
 
 interface StoryDetailsProps {
     params: Promise<{ id: string }>;
@@ -67,6 +77,7 @@ type StoryCharacter = {
 type StoryDetailCacheEntry = {
     story: DBStory;
     chapters: DBChapter[];
+    storyCharacters: StoryCharacter[];
     likeCount: number;
     coinBalance: number;
     followerCount: number;
@@ -77,22 +88,47 @@ type StoryDetailCacheEntry = {
 const fallbackCover = 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=600&q=80';
 const BRANCHING_FEATURE_ENABLED = FEATURE_FLAGS.branching;
 const STORY_DETAIL_CACHE_PREFIX = 'flowfic:story-detail';
+const STORY_DETAIL_RETURN_CACHE_PREFIX = 'flowfic:story-detail:return';
+const STORY_DETAIL_RETURN_STATE_PREFIX = 'flowfic:story-detail:return-state';
 const STORY_DETAIL_SCROLL_PREFIX = 'flowfic:story-detail-scroll';
 const useClientLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 const getStoryDetailCacheKey = (storyId: string, userId?: string | null) =>
     `${STORY_DETAIL_CACHE_PREFIX}:${userId || 'guest'}:${storyId}`;
 
+const getStoryDetailReturnCacheKey = (storyId: string) =>
+    `${STORY_DETAIL_RETURN_CACHE_PREFIX}:${storyId}`;
+
+const getStoryDetailReturnStateKey = (storyId: string) =>
+    `${STORY_DETAIL_RETURN_STATE_PREFIX}:${storyId}`;
+
 const getStoryDetailScrollKey = (storyId: string, userId?: string | null) =>
     `${STORY_DETAIL_SCROLL_PREFIX}:${userId || 'guest'}:${storyId}`;
 
-const readStoryDetailCache = (storyId: string, userId?: string | null): StoryDetailCacheEntry | null => {
-    if (typeof window === 'undefined') return null;
+const getClientNavigationType = (): PerformanceNavigationTiming['type'] | 'navigate' => {
+    if (typeof window === 'undefined' || typeof performance === 'undefined') return 'navigate';
+
+    const entry = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+    if (
+        entry?.type === 'reload'
+        || entry?.type === 'back_forward'
+        || entry?.type === 'prerender'
+        || entry?.type === 'navigate'
+    ) {
+        return entry.type;
+    }
+
+    return 'navigate';
+};
+
+const isStoryNotFoundError = (error: { code?: string } | null | undefined): boolean => {
+    return error?.code === 'PGRST116';
+};
+
+const parseStoryDetailCache = (raw: string | null): StoryDetailCacheEntry | null => {
+    if (!raw) return null;
 
     try {
-        const raw = sessionStorage.getItem(getStoryDetailCacheKey(storyId, userId));
-        if (!raw) return null;
-
         const parsed = JSON.parse(raw) as Partial<StoryDetailCacheEntry>;
         if (!parsed || typeof parsed !== 'object' || !parsed.story || !Array.isArray(parsed.chapters)) {
             return null;
@@ -101,6 +137,9 @@ const readStoryDetailCache = (storyId: string, userId?: string | null): StoryDet
         return {
             story: parsed.story as DBStory,
             chapters: parsed.chapters as DBChapter[],
+            storyCharacters: Array.isArray(parsed.storyCharacters)
+                ? parsed.storyCharacters as StoryCharacter[]
+                : [],
             likeCount: Number.isFinite(parsed.likeCount) ? Number(parsed.likeCount) : 0,
             coinBalance: Number.isFinite(parsed.coinBalance) ? Number(parsed.coinBalance) : 0,
             followerCount: Number.isFinite(parsed.followerCount) ? Number(parsed.followerCount) : 0,
@@ -112,13 +151,59 @@ const readStoryDetailCache = (storyId: string, userId?: string | null): StoryDet
     }
 };
 
+const readStoryDetailCache = (storyId: string, userId?: string | null): StoryDetailCacheEntry | null => {
+    if (typeof window === 'undefined') return null;
+
+    try {
+        return parseStoryDetailCache(sessionStorage.getItem(getStoryDetailCacheKey(storyId, userId)));
+    } catch {
+        return null;
+    }
+};
+
+const readStoryDetailReturnCache = (storyId: string): StoryDetailCacheEntry | null => {
+    if (typeof window === 'undefined') return null;
+
+    try {
+        return parseStoryDetailCache(sessionStorage.getItem(getStoryDetailReturnCacheKey(storyId)));
+    } catch {
+        return null;
+    }
+};
+
 const writeStoryDetailCache = (storyId: string, userId: string | null | undefined, cache: StoryDetailCacheEntry) => {
     if (typeof window === 'undefined') return;
 
     try {
         sessionStorage.setItem(getStoryDetailCacheKey(storyId, userId), JSON.stringify(cache));
+        sessionStorage.setItem(getStoryDetailReturnCacheKey(storyId), JSON.stringify(cache));
     } catch {
         // Ignore storage quota / private mode failures
+    }
+};
+
+const markStoryDetailReturnState = (storyId: string) => {
+    if (typeof window === 'undefined') return;
+
+    try {
+        sessionStorage.setItem(getStoryDetailReturnStateKey(storyId), new Date().toISOString());
+    } catch {
+        // Ignore storage failures
+    }
+};
+
+const consumeStoryDetailReturnState = (storyId: string): boolean => {
+    if (typeof window === 'undefined') return false;
+
+    try {
+        const key = getStoryDetailReturnStateKey(storyId);
+        const hasValue = !!sessionStorage.getItem(key);
+        if (hasValue) {
+            sessionStorage.removeItem(key);
+        }
+        return hasValue;
+    } catch {
+        return false;
     }
 };
 
@@ -128,10 +213,11 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
     const router = useRouter();
 
     useTracking({ autoPageView: true, pagePath: `/story/${storyId}`, storyId });
-    const { user } = useAuth();
+    const { user, isLoading: isLoadingAuth } = useAuth();
     const userId = user?.id ?? null;
     const detailCacheKey = useMemo(() => getStoryDetailCacheKey(storyId, userId), [storyId, userId]);
     const detailScrollKey = useMemo(() => getStoryDetailScrollKey(storyId, userId), [storyId, userId]);
+    const navigationType = useMemo(() => getClientNavigationType(), []);
 
     const [isLoading, setIsLoading] = useState(true);
     const [dbStory, setDbStory] = useState<DBStory | null>(null);
@@ -141,6 +227,8 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
     const [loadError, setLoadError] = useState('');
     const [hydratedCache, setHydratedCache] = useState<StoryDetailCacheEntry | null>(null);
     const hasRestoredScrollRef = useRef(false);
+    const hasConsumedReturnIntentRef = useRef(false);
+    const isReturnNavigationRef = useRef(false);
 
     // Coin dialog state
     const [coinBalance, setCoinBalance] = useState(0);
@@ -153,6 +241,8 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
     const [isUnlocking, setIsUnlocking] = useState(false);
     const [unlockError, setUnlockError] = useState<string | null>(null);
     const [coinToast, setCoinToast] = useState<{ coins: number; balance: number } | null>(null);
+    const [readerProgress, setReaderProgress] = useState<StoredStoryProgress | null>(null);
+    const [storyProgressVersion, setStoryProgressVersion] = useState<string | null>(null);
 
     const { isFollowing, followerCount, toggleFollow, isLoading: isFollowLoading } = useFollow({
         storyId,
@@ -168,31 +258,70 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
         ? hydratedCache.isFollowing
         : isFollowing;
     const hasHydratedCache = hydratedCache !== null;
+    const cachedFollowerCount = hydratedCache?.followerCount ?? 0;
+    const cachedIsFollowing = hydratedCache?.isFollowing ?? false;
+    const isBackForwardNavigation = navigationType === 'back_forward';
+    const hasRenderableSnapshot = hasHydratedCache || dbStory !== null;
+
+    useEffect(() => {
+        hasConsumedReturnIntentRef.current = false;
+        isReturnNavigationRef.current = false;
+    }, [storyId]);
+
+    useClientLayoutEffect(() => {
+        setReaderProgress(readStoredStoryProgress(storyId, userId));
+    }, [storyId, userId]);
 
     useClientLayoutEffect(() => {
         hasRestoredScrollRef.current = false;
         setLoadError('');
-        setStoryCharacters([]);
 
-        const cached = readStoryDetailCache(storyId, userId);
-        setHydratedCache(cached);
+        if (!hasConsumedReturnIntentRef.current) {
+            hasConsumedReturnIntentRef.current = true;
+            isReturnNavigationRef.current = consumeStoryDetailReturnState(storyId);
+        }
 
-        if (!cached) {
-            setDbStory(null);
-            setDbChapters([]);
-            setStoryCharacters([]);
-            setLikeCount(0);
-            setCoinBalance(0);
-            setIsLoading(true);
+        const fallbackCached = isReturnNavigationRef.current || isBackForwardNavigation
+            ? readStoryDetailReturnCache(storyId)
+            : null;
+        if (isLoadingAuth) {
+            if (!fallbackCached) return;
+
+            setHydratedCache(fallbackCached);
+            setDbStory(fallbackCached.story);
+            setDbChapters(fallbackCached.chapters);
+            setStoryCharacters(fallbackCached.storyCharacters);
+            setLikeCount(fallbackCached.likeCount);
+            setCoinBalance(fallbackCached.coinBalance);
+            setIsLoading(false);
             return;
         }
 
-        setDbStory(cached.story);
-        setDbChapters(cached.chapters);
-        setLikeCount(cached.likeCount);
-        setCoinBalance(cached.coinBalance);
-        setIsLoading(false);
-    }, [detailCacheKey, storyId, userId]);
+        const cached = readStoryDetailCache(storyId, userId) || fallbackCached;
+        if (cached) {
+            setHydratedCache(cached);
+            setDbStory(cached.story);
+            setDbChapters(cached.chapters);
+            setStoryCharacters(cached.storyCharacters);
+            setLikeCount(cached.likeCount);
+            setCoinBalance(cached.coinBalance);
+            setIsLoading(false);
+            return;
+        }
+
+        if (hasRenderableSnapshot) {
+            setIsLoading(false);
+            return;
+        }
+
+        setHydratedCache(null);
+        setDbStory(null);
+        setDbChapters([]);
+        setStoryCharacters([]);
+        setLikeCount(0);
+        setCoinBalance(0);
+        setIsLoading(true);
+    }, [detailCacheKey, hasRenderableSnapshot, isBackForwardNavigation, isLoadingAuth, storyId, userId]);
 
     const persistStoryDetailSnapshot = useCallback(() => {
         if (!dbStory) return;
@@ -200,6 +329,7 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
         const nextCache: StoryDetailCacheEntry = {
             story: dbStory,
             chapters: dbChapters,
+            storyCharacters,
             likeCount,
             coinBalance,
             followerCount: effectiveFollowerCount,
@@ -211,6 +341,7 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
     }, [
         dbStory,
         dbChapters,
+        storyCharacters,
         likeCount,
         coinBalance,
         effectiveFollowerCount,
@@ -232,7 +363,8 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
     const persistStoryDetailReturnState = useCallback(() => {
         persistStoryDetailSnapshot();
         saveStoryDetailScrollPosition();
-    }, [persistStoryDetailSnapshot, saveStoryDetailScrollPosition]);
+        markStoryDetailReturnState(storyId);
+    }, [persistStoryDetailSnapshot, saveStoryDetailScrollPosition, storyId]);
 
     useEffect(() => {
         if (!dbStory) return;
@@ -249,7 +381,7 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
     }, [persistStoryDetailReturnState]);
 
     useEffect(() => {
-        if (isLoading || !dbStory || hasRestoredScrollRef.current) return;
+        if (isLoadingAuth || isLoading || !dbStory || hasRestoredScrollRef.current) return;
 
         const rawScroll = sessionStorage.getItem(detailScrollKey);
         hasRestoredScrollRef.current = true;
@@ -272,17 +404,26 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
         return () => {
             cancelled = true;
         };
-    }, [detailScrollKey, isLoading, dbStory]);
+    }, [detailScrollKey, isLoadingAuth, isLoading, dbStory]);
 
     useEffect(() => {
+        if (isLoadingAuth) return;
+
         let cancelled = false;
+        let rafId: number | null = null;
+        let timeoutId: number | null = null;
 
         const fetchStoryDetails = async () => {
             const hasCachedSnapshot = hasHydratedCache;
-            if (!hasCachedSnapshot) {
+            const shouldSilentRevalidate = hasCachedSnapshot || isBackForwardNavigation;
+            const localStoredProgress = readStoredStoryProgress(storyId, userId);
+
+            if (!shouldSilentRevalidate) {
                 setIsLoading(true);
             }
             setLoadError('');
+            setStoryProgressVersion(null);
+            setReaderProgress(localStoredProgress);
 
             const { data: storyData, error: storyError } = await supabase
                 .from('stories')
@@ -294,15 +435,19 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
             if (cancelled) return;
 
             if (storyError || !storyData) {
-                if (!hasCachedSnapshot) {
-                    setDbStory(null);
-                    setDbChapters([]);
-                    setStoryCharacters([]);
-                    setLikeCount(0);
-                    setCoinBalance(0);
-                    setLoadError('ไม่พบข้อมูลเรื่อง');
+                if (hasCachedSnapshot && !isStoryNotFoundError(storyError)) {
                     setIsLoading(false);
+                    return;
                 }
+
+                setHydratedCache(null);
+                setDbStory(null);
+                setDbChapters([]);
+                setStoryCharacters([]);
+                setLikeCount(0);
+                setCoinBalance(0);
+                setLoadError(isStoryNotFoundError(storyError) || !storyData ? 'ไม่พบข้อมูลเรื่อง' : 'ไม่สามารถโหลดข้อมูลเรื่องนี้ได้');
+                setIsLoading(false);
                 return;
             }
 
@@ -328,6 +473,10 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
                 .eq('story_id', storyId)
                 .order('order_index', { ascending: true });
 
+            const { data: storyProgressVersionData } = await supabase.rpc('get_story_progress_version', {
+                p_story_id: storyId,
+            });
+
             const chapterData = ((chapterRows as ReaderChapterRow[] | null) || []).map((chapter) => ({
                 id: chapter.id,
                 title: chapter.title || 'ไม่มีชื่อ',
@@ -348,20 +497,31 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
 
             // Fetch wallet + unlock records
             let nextCoinBalance = 0;
+            let remoteProgress: StoredStoryProgress | null = null;
             if (userId) {
-                const { data: walletData } = await supabase
-                    .from('wallets')
-                    .select('coin_balance')
-                    .eq('user_id', userId)
-                    .maybeSingle();
-                nextCoinBalance = walletData?.coin_balance || 0;
+                const [{ data: walletData }, { data: unlockRows }, { data: progressRow }] = await Promise.all([
+                    supabase
+                        .from('wallets')
+                        .select('coin_balance')
+                        .eq('user_id', userId)
+                        .maybeSingle(),
+                    supabase
+                        .from('chapter_unlocks')
+                        .select('chapter_id')
+                        .eq('user_id', userId)
+                        .eq('story_id', storyId),
+                    supabase
+                        .from('reader_progress')
+                        .select('last_chapter_id, last_chapter_index, chapter_states, updated_at, completed_at, completed_chapter_id, completed_story_version')
+                        .eq('user_id', userId)
+                        .eq('story_id', storyId)
+                        .maybeSingle(),
+                ]);
 
-                // Check which chapters the user has actually unlocked (paid for)
-                const { data: unlockRows } = await supabase
-                    .from('chapter_unlocks')
-                    .select('chapter_id')
-                    .eq('user_id', userId)
-                    .eq('story_id', storyId);
+                nextCoinBalance = walletData?.coin_balance || 0;
+                if (progressRow) {
+                    remoteProgress = normalizeStoredStoryProgress(progressRow as ReaderProgressRow);
+                }
 
                 const unlockedIds = new Set((unlockRows || []).map((r: { chapter_id: string }) => r.chapter_id));
 
@@ -376,18 +536,59 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
             if (cancelled) return;
             setCoinBalance(nextCoinBalance);
 
-            setDbStory(storyData as DBStory);
-            setDbChapters(chapterData as DBChapter[] || []);
-            setStoryCharacters(((characterRows as StoryCharacter[] | null) || []).filter((character) => character.name.trim().length > 0));
-            setLikeCount(likesCount || 0);
+            const mergedProgress = mergeStoredStoryProgress(localStoredProgress, remoteProgress);
+            if (mergedProgress) {
+                writeStoredStoryProgress(storyId, userId, mergedProgress);
+            }
+            setReaderProgress(mergedProgress);
+            setStoryProgressVersion(normalizeStoryProgressVersionValue(storyProgressVersionData));
+
+            const nextStory = storyData as DBStory;
+            const nextChapters = chapterData as DBChapter[] || [];
+            const nextCharacters = ((characterRows as StoryCharacter[] | null) || []).filter((character) => character.name.trim().length > 0);
+            const nextLikeCount = likesCount || 0;
+            const nextCache: StoryDetailCacheEntry = {
+                story: nextStory,
+                chapters: nextChapters,
+                storyCharacters: nextCharacters,
+                likeCount: nextLikeCount,
+                coinBalance: nextCoinBalance,
+                followerCount: cachedFollowerCount,
+                isFollowing: cachedIsFollowing,
+                updatedAt: new Date().toISOString(),
+            };
+
+            writeStoryDetailCache(storyId, userId, nextCache);
+            setHydratedCache(nextCache);
+            setDbStory(nextStory);
+            setDbChapters(nextChapters);
+            setStoryCharacters(nextCharacters);
+            setLikeCount(nextLikeCount);
             setIsLoading(false);
         };
 
-        void fetchStoryDetails();
+        if (hasHydratedCache || isBackForwardNavigation) {
+            rafId = window.requestAnimationFrame(() => {
+                timeoutId = window.setTimeout(() => {
+                    if (!cancelled) {
+                        void fetchStoryDetails();
+                    }
+                }, 0);
+            });
+        } else {
+            void fetchStoryDetails();
+        }
+
         return () => {
             cancelled = true;
+            if (rafId !== null) {
+                window.cancelAnimationFrame(rafId);
+            }
+            if (timeoutId !== null) {
+                window.clearTimeout(timeoutId);
+            }
         };
-    }, [storyId, userId, hasHydratedCache]);
+    }, [storyId, userId, hasHydratedCache, isBackForwardNavigation, isLoadingAuth, cachedFollowerCount, cachedIsFollowing]);
 
     // Auto-dismiss toast
     useEffect(() => {
@@ -534,15 +735,20 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
     const cover = dbStory.cover_url || fallbackCover;
     const isBranchingStory = BRANCHING_FEATURE_ENABLED && dbStory.path_mode === 'branching';
     const entryChapterId = dbStory.entry_chapter_id || dbChapters[0]?.id || null;
-    const readHref = `/story/${storyId}/read`;
+    const readerCtaState = totalChapters > 0
+        ? deriveReaderCtaState(readerProgress, storyProgressVersion)
+        : 'unread';
+    const readHref = readerCtaState === 'completed'
+        ? `/story/${storyId}/read?restart=1`
+        : `/story/${storyId}/read`;
     const storyTypeLabel = dbStory.category === 'fanfic' ? 'แฟนฟิค' : 'ออริจินัล';
     const completionLabel = dbStory.completion_status === 'completed' ? 'จบแล้ว' : 'ยังไม่จบ';
     const publicationLabel = dbStory.status === 'published' ? 'เผยแพร่แล้ว' : 'แบบร่าง';
     const displayChapters = isBranchingStory
         ? dbChapters.filter((chapter) => chapter.id === entryChapterId || (entryChapterId === null && dbChapters.indexOf(chapter) === 0))
         : dbChapters;
-    const startChapter = displayChapters[0] || null;
     const showFollowButton = !isStoryOwner;
+    const authorProfileHref = `/writer/${dbStory.user_id}`;
     const summaryItems = [
         { label: 'ประเภท', value: storyTypeLabel },
         { label: 'สถานะเรื่อง', value: completionLabel },
@@ -555,14 +761,52 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
     const chapterSectionMeta = isBranchingStory
         ? 'เริ่มจาก entry chapter ของเรื่อง แล้วเลือกเส้นทางระหว่างอ่าน'
         : 'แสดงเฉพาะตอนที่เผยแพร่แล้ว';
-    const readActionLabel = dbChapters.length > 0
-        ? (isBranchingStory ? 'เริ่มจากจุดเริ่มต้น' : 'เริ่มอ่านตอนแรก')
-        : 'อ่านเลย';
-    const actionNote = dbChapters.length > 0
-        ? isBranchingStory && startChapter
-            ? `เริ่มที่ตอน ${String(startChapter.order_index + 1).padStart(2, '0')} และใช้ปุ่มคั่นหน้าในหน้าอ่านเพื่อกลับมาตรงจุดเดิม`
-            : `เผยแพร่แล้ว ${totalChapters} ตอน · ใช้ปุ่มคั่นหน้าในหน้าอ่านเพื่อกลับมาอ่านต่อ`
-        : 'เรื่องนี้ยังไม่มีตอนที่เผยแพร่';
+    const readActionLabel = dbChapters.length === 0
+        ? 'อ่านเลย'
+        : readerCtaState === 'completed'
+            ? 'อ่านซ้ำ'
+            : readerCtaState === 'in_progress'
+                ? 'อ่านต่อ'
+                : 'อ่านเลย';
+    const actionNote = dbChapters.length === 0
+        ? 'เรื่องนี้ยังไม่มีตอนที่เผยแพร่'
+        : readerCtaState === 'completed'
+            ? 'เริ่มอ่านใหม่จากต้นเรื่อง'
+            : readerCtaState === 'in_progress'
+                ? 'กลับไปจุดล่าสุดที่ค้างไว้'
+                : 'เริ่มจากต้นเรื่อง';
+    const readCtaVariantClassName = readerCtaState === 'completed'
+        ? styles.readCtaCompleted
+        : readerCtaState === 'in_progress'
+            ? styles.readCtaInProgress
+            : styles.readCtaUnread;
+    const storyDetailMobileActions = (
+        <div className="ffMobileActionInner">
+            <Link
+                href={readHref}
+                className={`ffMobileActionBtn ffMobileActionBtnPrimary ${styles.mobileActionBtn} ${readCtaVariantClassName}`}
+                onClick={persistStoryDetailReturnState}
+            >
+                <PlaySquare size={18} fill="currentColor" />
+                <span>{readActionLabel}</span>
+            </Link>
+            {showFollowButton && (
+                <button
+                    type="button"
+                    className={[
+                        'ffMobileActionBtn',
+                        effectiveIsFollowing ? 'ffMobileActionBtnPrimary' : 'ffMobileActionBtnSecondary',
+                        styles.mobileActionBtn,
+                    ].join(' ')}
+                    onClick={toggleFollow}
+                    disabled={isFollowLoading}
+                >
+                    {effectiveIsFollowing ? <UserCheck size={18} /> : <UserPlus size={18} />}
+                    <span>{effectiveIsFollowing ? 'กำลังติดตาม' : 'ติดตาม'}</span>
+                </button>
+            )}
+        </div>
+    );
 
     const renderChapterItem = (chapter: DBChapter) => {
         const isPremium = chapter.is_premium && chapter.coin_price > 0;
@@ -584,19 +828,21 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
                 ? styles.chapterStatusAccessible
                 : styles.chapterStatusPremium;
         const chapterActionLabel = !isPremium || chapter.can_read
-            ? 'อ่านตอน'
+            ? (isBranchingStory ? 'อ่านเลย' : 'อ่านตอน')
             : `ปลดล็อก ${chapter.coin_price.toLocaleString('th-TH')}`;
 
         return (
             <button
                 key={chapter.id}
                 type="button"
-                className={styles.chapterItem}
+                className={[styles.chapterItem, isBranchingStory && styles.chapterItemBranching].filter(Boolean).join(' ')}
                 onClick={() => handleChapterClick(chapter, dbChapters.indexOf(chapter))}
             >
-                <span className={styles.chapterNumber}>
-                    {String(chapter.order_index + 1).padStart(2, '0')}
-                </span>
+                {!isBranchingStory && (
+                    <span className={styles.chapterNumber}>
+                        {String(chapter.order_index + 1).padStart(2, '0')}
+                    </span>
+                )}
                 <span className={styles.chapterBody}>
                     <span className={styles.chapterHeadingRow}>
                         <span className={styles.chapterTitle}>{chapter.title}</span>
@@ -609,12 +855,11 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
                     <span className={styles.chapterMeta}>
                         <span>{chapter.read_count.toLocaleString('th-TH')} วิว</span>
                         <span>{new Date(chapter.created_at).toLocaleDateString('th-TH')}</span>
-                        {isBranchingStory && startChapter?.id === chapter.id && (
-                            <span className={styles.chapterMetaAccent}>จุดเริ่มต้นของเรื่อง</span>
-                        )}
                     </span>
                 </span>
-                <span className={styles.chapterAction}>{chapterActionLabel}</span>
+                <span className={[styles.chapterAction, isBranchingStory && styles.chapterActionBranching].filter(Boolean).join(' ')}>
+                    {chapterActionLabel}
+                </span>
             </button>
         );
     };
@@ -627,7 +872,13 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
                         <BrandLogo href="/" size="md" className={styles.topbarLogo} withStudioLabel />
                         <span className={styles.topbarDivider}>/</span>
                         <div className="ffStudioTopbarCopy">
-                            <span className="ffStudioTopbarEyebrow">{storyTypeLabel} · โดย {dbStory.pen_name}</span>
+                            <span className="ffStudioTopbarEyebrow">
+                                {storyTypeLabel}
+                                {' · โดย '}
+                                <Link href={authorProfileHref} className={styles.authorLink}>
+                                    {dbStory.pen_name}
+                                </Link>
+                            </span>
                             <span className="ffStudioTopbarTitle">{dbStory.title}</span>
                             <span className="ffStudioTopbarMeta">{totalChapters} ตอน · {publicationLabel}</span>
                         </div>
@@ -647,7 +898,9 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
                             <div className={styles.storyEyebrow}>
                                 <span>{storyTypeLabel}</span>
                                 <span className={styles.storyEyebrowDivider}>โดย</span>
-                                <span>{dbStory.pen_name}</span>
+                                <Link href={authorProfileHref} className={styles.authorLink}>
+                                    {dbStory.pen_name}
+                                </Link>
                                 {isBranchingStory && (
                                     <span className={styles.pathModePill}>เลือกเส้นทาง</span>
                                 )}
@@ -660,7 +913,7 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
                             <div className={styles.actionRow}>
                                 <Link
                                     href={readHref}
-                                    className={styles.primaryActionBtn}
+                                    className={`${styles.primaryActionBtn} ${readCtaVariantClassName}`}
                                     onClick={persistStoryDetailReturnState}
                                 >
                                     <PlaySquare size={18} fill="currentColor" />
@@ -708,17 +961,7 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
                             <div className={`ffStudioEmpty ${styles.emptyState}`}>เรื่องนี้ยังไม่มีตอนที่เผยแพร่</div>
                         ) : (
                             <>
-                                {isBranchingStory && startChapter && (
-                                    <div className={styles.startCallout}>
-                                        <span className={styles.startCalloutLabel}>เริ่มจากตอนนี้</span>
-                                        <strong className={styles.startCalloutTitle}>
-                                            ตอน {String(startChapter.order_index + 1).padStart(2, '0')} · {startChapter.title}
-                                        </strong>
-                                        <p className={styles.startCalloutText}>
-                                            เมื่อเข้าไปอ่าน ผู้อ่านจะเลือกเส้นทางต่อจากตอนนี้ระหว่างเรื่อง
-                                        </p>
-                                    </div>
-                                )}
+
 
                                 <div className={styles.chapterList}>
                                     {displayChapters.map((chapter) => renderChapterItem(chapter))}
@@ -765,6 +1008,9 @@ export default function StoryDetailsPage({ params }: StoryDetailsProps) {
                         </section>
                     )}
                 </div>
+            </div>
+            <div className="ffMobileActionBar">
+                {storyDetailMobileActions}
             </div>
 
             {/* Coin Spending Dialog */}

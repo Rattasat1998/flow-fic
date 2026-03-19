@@ -1,14 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
-const VALID_METRIC_NAMES = new Set(['FCP', 'LCP', 'CLS', 'INP', 'TTFB']);
+const VALID_METRIC_NAMES = new Set([
+  'CLS',
+  'FCP',
+  'FID',
+  'INP',
+  'LCP',
+  'TTFB',
+  'Next.js-hydration',
+  'Next.js-route-change-to-render',
+  'Next.js-render',
+]);
 
 type WebVitalBody = {
   id?: string;
   name?: string;
+  label?: string;
   value?: number;
   rating?: string;
   delta?: number;
+  startTime?: number;
   navigationType?: string;
   path?: string;
 };
@@ -22,9 +34,10 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as WebVitalBody;
     const metricName = typeof body.name === 'string' ? body.name : '';
     const metricPath = typeof body.path === 'string' && body.path.trim() ? body.path.trim() : '/';
+    const metricLabel = typeof body.label === 'string' ? body.label : 'unknown';
 
     if (!VALID_METRIC_NAMES.has(metricName)) {
-      return NextResponse.json({ error: 'Invalid metric name' }, { status: 400 });
+      return new NextResponse(null, { status: 204 });
     }
 
     if (!isFiniteNumber(body.value)) {
@@ -46,9 +59,11 @@ export async function POST(request: NextRequest) {
         story_id: null,
         chapter_id: null,
         metadata: {
+          metric_label: metricLabel,
           metric_name: metricName,
           metric_value: body.value,
           metric_delta: isFiniteNumber(body.delta) ? body.delta : null,
+          metric_start_time: isFiniteNumber(body.startTime) ? body.startTime : null,
           metric_rating: typeof body.rating === 'string' ? body.rating : null,
           navigation_type: typeof body.navigationType === 'string' ? body.navigationType : null,
         },

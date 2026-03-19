@@ -23,6 +23,10 @@
     margin: 0;
 }
 
+.mobileSubmitBtn {
+    min-height: 54px;
+}
+
 .container {
     max-width: 600px;
     margin: 0 auto;
@@ -594,6 +598,30 @@
 
     .unsplashSearchBtn {
         min-width: 72px;
+    }
+}
+
+@media (max-width: 720px) {
+    .header {
+        justify-content: flex-start;
+        padding: 0.95rem 1rem;
+    }
+
+    .container {
+        padding: 1.5rem 1rem calc(8rem + env(safe-area-inset-bottom, 0px));
+    }
+
+    .coverActions,
+    .unsplashSearchRow {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .coverActions .unsplashPickerBtn,
+    .coverActions .clearCoverBtn,
+    .unsplashSearchBtn {
+        width: 100%;
+        justify-content: center;
     }
 }
 

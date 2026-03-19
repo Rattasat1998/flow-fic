@@ -79,7 +79,7 @@ type ChapterContentPayload = {
 type StoryPathMode = 'linear' | 'branching';
 
 const MAX_BRANCH_CHOICES = 4;
-const MIN_BRANCH_CHOICES = 2;
+const MIN_BRANCH_CHOICES = 1;
 const MAX_BRANCH_TIMER_SECONDS = 300;
 const BRANCHING_FEATURE_ENABLED = FEATURE_FLAGS.branching;
 
@@ -1031,7 +1031,7 @@ export default function EditChapterPage() {
     const removeChapterChoice = useCallback((id: string) => {
         setChapterChoices((prev) => {
             if (prev.length <= MIN_BRANCH_CHOICES) {
-                showNotice('error', 'ต้องมีอย่างน้อย 2 ทางเลือก', 'ไม่สามารถลบออกได้มากกว่านี้');
+                showNotice('error', `ต้องมีอย่างน้อย ${MIN_BRANCH_CHOICES} ทางเลือก`, 'ไม่สามารถลบออกได้มากกว่านี้');
                 return prev;
             }
             return prev
@@ -1128,7 +1128,7 @@ export default function EditChapterPage() {
 
     const getChoiceValidationError = useCallback((choices: BranchChoiceDraft[] = chapterChoices): string | null => {
         if (!isBranchingStory) return null;
-        if (choices.length > 0 && choices.length < MIN_BRANCH_CHOICES) return `ต้องมีอย่างน้อย ${MIN_BRANCH_CHOICES} ทางเลือก (หากไม่มีต้องเป็นทางเลือกจบตอน)`;
+        if (!isEndingChapter && choices.length < MIN_BRANCH_CHOICES) return `ต้องมีอย่างน้อย ${MIN_BRANCH_CHOICES} ทางเลือก (หากไม่มีต้องตั้งเป็นตอนจบเส้นทาง)`;
         if (choices.length > MAX_BRANCH_CHOICES) return `เพิ่มตัวเลือกได้สูงสุด ${MAX_BRANCH_CHOICES} รายการ`;
 
         for (const choice of choices) {
@@ -1138,7 +1138,7 @@ export default function EditChapterPage() {
         }
 
         return null;
-    }, [isBranchingStory, chapterChoices, chapterId]);
+    }, [isBranchingStory, chapterChoices, chapterId, isEndingChapter]);
 
     const handleRestoreRevision = useCallback(async (revision: ChapterRevision) => {
         if (isSaving || isRestoringRevision) return;

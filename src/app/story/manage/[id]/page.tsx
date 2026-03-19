@@ -469,6 +469,7 @@ export default function StoryManagerPage() {
     // Required to prevent Next.js hydration errors with @hello-pangea/dnd
     const [isMounted, setIsMounted] = useState(false);
     const hasRestoredScrollRef = useRef(false);
+    const statsSummaryRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         setIsMounted(true);
@@ -777,6 +778,10 @@ export default function StoryManagerPage() {
         if (typeof window === 'undefined') return;
         sessionStorage.setItem(manageScrollKey, String(window.scrollY));
     }, [manageScrollKey]);
+
+    const scrollToStoryStats = useCallback(() => {
+        statsSummaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, []);
 
     useEffect(() => {
         if (!isMounted) return;
@@ -1451,6 +1456,44 @@ export default function StoryManagerPage() {
         </main>
     );
 
+    const manageMobileActions = (
+        <div className={`ffMobileActionInner ${styles.mobileActionGrid}`}>
+            <button
+                type="button"
+                className={`ffMobileActionBtn ffMobileActionBtnSecondary ${styles.mobileActionBtn}`}
+                onClick={scrollToStoryStats}
+            >
+                <BarChart2 size={18} />
+                <span>สถิติ</span>
+            </button>
+            <button
+                type="button"
+                className={`ffMobileActionBtn ffMobileActionBtnSecondary ${styles.mobileActionBtn}`}
+                onClick={openEditModal}
+            >
+                <Settings size={18} />
+                <span>แก้ไขข้อมูล</span>
+            </button>
+            <button
+                type="button"
+                className={`ffMobileActionBtn ffMobileActionBtnSecondary ${styles.mobileActionBtn}`}
+                onClick={handleOpenCreateCharModal}
+            >
+                <Plus size={18} />
+                <span>เพิ่มตัวละคร</span>
+            </button>
+            <button
+                type="button"
+                className={`ffMobileActionBtn ffMobileActionBtnPrimary ${styles.mobileActionBtn}`}
+                onClick={handleCreateChapter}
+                disabled={isStoryCompleted}
+            >
+                <Plus size={18} />
+                <span>เพิ่มตอน</span>
+            </button>
+        </div>
+    );
+
     return (
         <main className={`${styles.main} ffStudioShell`}>
             <header className={`ffStudioTopbar ${styles.header}`}>
@@ -1465,7 +1508,7 @@ export default function StoryManagerPage() {
                         </div>
                     </div>
                     <div className={`ffStudioTopbarActions ${styles.headerActions}`}>
-                        <button className={styles.backBtn}><BarChart2 size={18} /> สถิติ</button>
+                        <button className={styles.backBtn} onClick={scrollToStoryStats}><BarChart2 size={18} /> สถิติ</button>
                         <button className={`${styles.backBtn} ${styles.headerPrimaryBtn}`} onClick={openEditModal}><Settings size={18} /> แก้ไขข้อมูล</button>
                     </div>
                 </div>
@@ -1511,7 +1554,7 @@ export default function StoryManagerPage() {
                             </div>
                         </div>
                     </div>
-                    <div className={`${styles.heroSummaryStrip} ffStudioPanel`}>
+                    <div ref={statsSummaryRef} className={`${styles.heroSummaryStrip} ffStudioPanel`}>
                         {[
                             { label: 'ตอนทั้งหมด', value: `${chapterCount} ตอน` },
                             { label: 'ยอดอ่าน', value: totalStoryReadCount.toLocaleString('th-TH') },
@@ -1869,6 +1912,9 @@ export default function StoryManagerPage() {
                         )}
                     </section>
                 </div>
+            </div>
+            <div className="ffMobileActionBar">
+                {manageMobileActions}
             </div>
             {/* Edit Modal */}
             {showEditModal && (

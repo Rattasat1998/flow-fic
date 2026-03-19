@@ -12,6 +12,18 @@ import { BranchChoiceOverlay, OverlayChoice } from '@/components/story/BranchCho
 import styles from './story.module.css';
 import { supabase } from '@/lib/supabase';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
+import {
+  markStoryProgressCompleted,
+  mergeStoredStoryProgress,
+  normalizeStoredStoryProgress,
+  normalizeStoryProgressVersionValue,
+  preserveCompletionSummary,
+  readStoredStoryProgress,
+  type ReaderProgressRow,
+  type StoredChapterProgress,
+  type StoredStoryProgress,
+  writeStoredStoryProgress,
+} from '@/lib/readerProgress';
 import { getOrCreateTrackingSessionId } from '@/lib/trackingSession';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTracking } from '@/hooks/useTracking';
@@ -156,13 +168,6 @@ type ChapterUnlockRow = {
   chapter_id: string;
 };
 
-type ReaderProgressRow = {
-  last_chapter_id: string | null;
-  last_chapter_index: number | null;
-  chapter_states: unknown;
-  updated_at: string | null;
-};
-
 type ReaderBootstrapCommentRow = {
   id: string;
   user_id: string;
@@ -182,36 +187,15 @@ type ReaderBootstrapRpcRow = {
   is_vip_active: boolean | null;
   unlocked_chapter_ids: string[] | null;
   reader_progress: ReaderProgressRow | null;
+  story_progress_version: string | null;
   like_count: number | null;
   liked_chapter_id: string | null;
   favorited_chapter_id: string | null;
   comments: ReaderBootstrapCommentRow[] | null;
 };
-
-type StoredChapterProgress = {
-  scrollY?: number;
-  chatNextIndex?: number;
-  anchorBlockId?: string | null;
-  manualBookmarkBlockId?: string | null;
-  manualBookmarkScrollY?: number;
-  manualBookmarkUpdatedAt?: string | null;
-  updatedAt: string;
-};
-
-type StoredStoryProgress = {
-  lastChapterId: string | null;
-  lastChapterIndex: number;
-  updatedAt: string;
-  chapterStates: Record<string, StoredChapterProgress>;
-};
-
-const READ_PROGRESS_STORAGE_PREFIX = 'flowfic:reader-progress';
 const CHAPTER_READ_SESSION_CACHE_PREFIX = 'flowfic:chapter-read-session';
 let readerBootstrapRpcAvailability: boolean | null = null;
 let readerChapterReadRpcAvailability: boolean | null = null;
-
-const getReadProgressStorageKey = (storyId: string, userId?: string | null) =>
-  `${READ_PROGRESS_STORAGE_PREFIX}:${userId || 'guest'}:${storyId}`;
 
 const getChapterReadSessionCacheKey = (sessionId: string) =>
   `${CHAPTER_READ_SESSION_CACHE_PREFIX}:${sessionId}`;
@@ -247,91 +231,6 @@ const markChapterReadSessionCacheEntry = (sessionId: string, chapterId: string) 
   } catch {
     // Ignore sessionStorage failures
   }
-};
-
-const readStoredStoryProgress = (storyId: string, userId?: string | null): StoredStoryProgress | null => {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(getReadProgressStorageKey(storyId, userId));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as StoredStoryProgress;
-    if (!parsed || typeof parsed !== 'object') return null;
-    if (typeof parsed.lastChapterIndex !== 'number') return null;
-    if (!parsed.chapterStates || typeof parsed.chapterStates !== 'object') return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-};
-
-const writeStoredStoryProgress = (
-  storyId: string,
-  userId: string | null | undefined,
-  progress: StoredStoryProgress
-) => {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(getReadProgressStorageKey(storyId, userId), JSON.stringify(progress));
-  } catch {
-    // Ignore storage failures (private mode/quota exceeded)
-  }
-};
-
-const parseStoredChapterStates = (input: unknown): Record<string, StoredChapterProgress> => {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
-  const entries = Object.entries(input as Record<string, unknown>);
-  const parsed: Record<string, StoredChapterProgress> = {};
-
-  entries.forEach(([chapterId, value]) => {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return;
-    const raw = value as Record<string, unknown>;
-    parsed[chapterId] = {
-      scrollY: typeof raw.scrollY === 'number' ? raw.scrollY : undefined,
-      chatNextIndex: typeof raw.chatNextIndex === 'number' ? raw.chatNextIndex : undefined,
-      anchorBlockId: typeof raw.anchorBlockId === 'string'
-        ? raw.anchorBlockId
-        : typeof raw.anchor_block_id === 'string'
-          ? raw.anchor_block_id
-          : undefined,
-      manualBookmarkBlockId: typeof raw.manualBookmarkBlockId === 'string'
-        ? raw.manualBookmarkBlockId
-        : typeof raw.manual_bookmark_block_id === 'string'
-          ? raw.manual_bookmark_block_id
-          : raw.manualBookmarkBlockId === null || raw.manual_bookmark_block_id === null
-            ? null
-            : undefined,
-      manualBookmarkScrollY: typeof raw.manualBookmarkScrollY === 'number'
-        ? raw.manualBookmarkScrollY
-        : typeof raw.manual_bookmark_scroll_y === 'number'
-          ? raw.manual_bookmark_scroll_y
-          : undefined,
-      manualBookmarkUpdatedAt: typeof raw.manualBookmarkUpdatedAt === 'string'
-        ? raw.manualBookmarkUpdatedAt
-        : typeof raw.manual_bookmark_updated_at === 'string'
-          ? raw.manual_bookmark_updated_at
-          : raw.manualBookmarkUpdatedAt === null || raw.manual_bookmark_updated_at === null
-            ? null
-            : undefined,
-      updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : new Date(0).toISOString(),
-    };
-  });
-
-  return parsed;
-};
-
-const normalizeStoredStoryProgress = (raw: ReaderProgressRow): StoredStoryProgress => {
-  return {
-    lastChapterId: raw.last_chapter_id || null,
-    lastChapterIndex: Math.max(0, Number(raw.last_chapter_index || 0)),
-    updatedAt: raw.updated_at || new Date(0).toISOString(),
-    chapterStates: parseStoredChapterStates(raw.chapter_states),
-  };
-};
-
-const getProgressUpdatedAtMs = (progress: StoredStoryProgress | null): number => {
-  if (!progress) return 0;
-  const ms = Date.parse(progress.updatedAt);
-  return Number.isFinite(ms) ? ms : 0;
 };
 
 const isMissingReaderBootstrapRpcError = (error: unknown) => {
@@ -595,6 +494,7 @@ export default function StoryPage({ params }: StoryPageProps) {
   const initialChapterIndex = Number.isFinite(parsedInitialChapterIndex) && parsedInitialChapterIndex >= 0
     ? parsedInitialChapterIndex
     : 0;
+  const shouldRestartFromBeginning = searchParams.get('restart') === '1';
   const isPreviewMode = searchParams.get('preview') === '1';
   const previewChapterId = searchParams.get('previewChapter');
 
@@ -610,6 +510,7 @@ export default function StoryPage({ params }: StoryPageProps) {
   const [isTocOpen, setIsTocOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const narrativeChoicePanelRef = useRef<HTMLDivElement>(null);
+  const narrativeCompletionSentinelRef = useRef<HTMLDivElement>(null);
   const narrativeBlockRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const chapterChoicesRequestRef = useRef(0);
   const lastRestoredChapterRef = useRef<string | null>(null);
@@ -656,6 +557,7 @@ export default function StoryPage({ params }: StoryPageProps) {
   const [choiceCountdownRemainingMs, setChoiceCountdownRemainingMs] = useState<number | null>(null);
   const [visibleNarrativeBookmark, setVisibleNarrativeBookmark] = useState<{ chapterId: string; blockId: string } | null>(null);
   const [hoveredBookmarkBlockId, setHoveredBookmarkBlockId] = useState<string | null>(null);
+  const [storyProgressVersion, setStoryProgressVersion] = useState<string | null>(null);
 
   const setVisibleNarrativeBookmarkForChapter = useCallback((chapterId: string, blockId: string | null) => {
     setVisibleNarrativeBookmark((prev) => {
@@ -713,6 +615,9 @@ export default function StoryPage({ params }: StoryPageProps) {
         last_chapter_id: pending.lastChapterId,
         last_chapter_index: pending.lastChapterIndex,
         chapter_states: pending.chapterStates,
+        completed_at: pending.completedAt,
+        completed_chapter_id: pending.completedChapterId,
+        completed_story_version: pending.completedStoryVersion,
       }, {
         onConflict: 'user_id,story_id',
       });
@@ -748,9 +653,11 @@ export default function StoryPage({ params }: StoryPageProps) {
     const nextProgress = updater(previous, nowIso);
     if (!nextProgress) return null;
 
-    writeStoredStoryProgress(storyId, userId, nextProgress);
-    scheduleProgressSync(nextProgress);
-    return nextProgress;
+    const nextWithCompletion = preserveCompletionSummary(previous, nextProgress);
+
+    writeStoredStoryProgress(storyId, userId, nextWithCompletion);
+    scheduleProgressSync(nextWithCompletion);
+    return nextWithCompletion;
   }, [isPreviewMode, scheduleProgressSync, storyId, userId]);
 
   const clearManualBookmarkFields = useCallback((chapterState?: StoredChapterProgress): StoredChapterProgress | undefined => {
@@ -829,6 +736,7 @@ export default function StoryPage({ params }: StoryPageProps) {
       setLikedChapterId(null);
       setFavoritedChapterId(null);
       setComments([]);
+      setStoryProgressVersion(null);
 
       // Fetch Story
       let storyQuery = supabase
@@ -888,6 +796,7 @@ export default function StoryPage({ params }: StoryPageProps) {
       let nextCoinBalance = 0;
       let nextUnlockedChapterIds: string[] = [];
       let nextIsVipAccessActive = false;
+      let nextStoryProgressVersion: string | null = null;
       let preloadedLikeCount: number | null = null;
       let preloadedLikedChapterId: string | null = null;
       let preloadedFavoritedChapterId: string | null = null;
@@ -933,6 +842,7 @@ export default function StoryPage({ params }: StoryPageProps) {
         if (bootstrapRow.reader_progress && typeof bootstrapRow.reader_progress === 'object') {
           remoteProgress = normalizeStoredStoryProgress(bootstrapRow.reader_progress as ReaderProgressRow);
         }
+        nextStoryProgressVersion = normalizeStoryProgressVersionValue(bootstrapRow.story_progress_version);
 
         preloadedLikeCount = Math.max(0, Number(bootstrapRow.like_count || 0));
         preloadedLikedChapterId = bootstrapRow.liked_chapter_id || null;
@@ -957,6 +867,10 @@ export default function StoryPage({ params }: StoryPageProps) {
         engagementPreloaded = true;
       }
 
+      const progressVersionPromise = !isPreviewMode
+        ? supabase.rpc('get_story_progress_version', { p_story_id: storyId })
+        : Promise.resolve({ data: null, error: null });
+
       const accessPromise = !isPreviewMode && user
         ? Promise.all([
           supabase
@@ -976,7 +890,7 @@ export default function StoryPage({ params }: StoryPageProps) {
             .eq('user_id', user.id),
           supabase
             .from('reader_progress')
-            .select('last_chapter_id, last_chapter_index, chapter_states, updated_at')
+            .select('last_chapter_id, last_chapter_index, chapter_states, updated_at, completed_at, completed_chapter_id, completed_story_version')
             .eq('story_id', storyId)
             .eq('user_id', user.id)
             .maybeSingle(),
@@ -985,16 +899,18 @@ export default function StoryPage({ params }: StoryPageProps) {
 
       if (!bootstrapRow) {
         try {
-          const [charactersResult, parsedChaptersResult, accessResult] = await Promise.all([
+          const [charactersResult, parsedChaptersResult, accessResult, progressVersionResult] = await Promise.all([
             charactersPromise,
             fetchReaderChapters(),
             accessPromise,
+            progressVersionPromise,
           ]);
 
           if (cancelled) return;
 
           nextCharacters = (charactersResult.data as Character[] | null) || [];
           parsedChapters = parsedChaptersResult;
+          nextStoryProgressVersion = normalizeStoryProgressVersionValue(progressVersionResult.data);
 
           if (accessResult) {
             const [{ data: walletData }, { data: vipData }, { data: unlockRows }, { data: progressRow }] = accessResult;
@@ -1022,6 +938,7 @@ export default function StoryPage({ params }: StoryPageProps) {
       setCoinBalance(nextCoinBalance);
       setUnlockedChapterIds(nextUnlockedChapterIds);
       setIsVipAccessActive(nextIsVipAccessActive);
+      setStoryProgressVersion(nextStoryProgressVersion);
 
       const normalizedStory: DBStory = {
         ...(storyData as DBStory),
@@ -1041,9 +958,7 @@ export default function StoryPage({ params }: StoryPageProps) {
       const localStoredProgress = !isPreviewMode
         ? readStoredStoryProgress(storyId, userId)
         : null;
-      const storedProgress = getProgressUpdatedAtMs(remoteProgress) >= getProgressUpdatedAtMs(localStoredProgress)
-        ? remoteProgress || localStoredProgress
-        : localStoredProgress || remoteProgress;
+      const storedProgress = mergeStoredStoryProgress(localStoredProgress, remoteProgress);
 
       if (storedProgress) {
         writeStoredStoryProgress(storyId, userId, storedProgress);
@@ -1065,6 +980,15 @@ export default function StoryPage({ params }: StoryPageProps) {
       if (previewChapterId) {
         const previewIndex = parsedChapters.findIndex((chapter) => chapter.id === previewChapterId);
         nextSelectedChapterIndex = previewIndex >= 0 ? previewIndex : 0;
+      } else if (shouldRestartFromBeginning) {
+        if (normalizedPathMode === 'branching') {
+          const entryIndex = normalizedStory.entry_chapter_id
+            ? parsedChapters.findIndex((chapter) => chapter.id === normalizedStory.entry_chapter_id)
+            : -1;
+          nextSelectedChapterIndex = entryIndex >= 0 ? entryIndex : 0;
+        } else {
+          nextSelectedChapterIndex = 0;
+        }
       } else if (normalizedPathMode === 'branching') {
         const requestedById = initialChapterIdParam
           ? parsedChapters.findIndex((chapter) => chapter.id === initialChapterIdParam)
@@ -1099,6 +1023,7 @@ export default function StoryPage({ params }: StoryPageProps) {
         }
       }
       const shouldRestoreInitialProgress = !isPreviewMode
+        && !shouldRestartFromBeginning
         && !hasExplicitChapterParam
         && (
           storyUsesChatStyle
@@ -1206,6 +1131,7 @@ export default function StoryPage({ params }: StoryPageProps) {
     userId,
     isPreviewMode,
     previewChapterId,
+    shouldRestartFromBeginning,
     hasExplicitChapterParam,
     initialChapterIndex,
     initialChapterIdParam,
@@ -1491,6 +1417,11 @@ export default function StoryPage({ params }: StoryPageProps) {
 
   const activeChapter = dbChapters[selectedChapterIndex] || null;
   const activeChapterId = activeChapter?.id || null;
+  const isCompletionTargetChapter = !!activeChapter && (
+    isBranchingPath
+      ? activeChapter.isEnding
+      : selectedChapterIndex === Math.max(dbChapters.length - 1, 0)
+  );
   const chapterChoicesForRead = useMemo(
     () => (
       activeChapterId && chapterChoicesStateChapterId === activeChapterId
@@ -1526,7 +1457,8 @@ export default function StoryPage({ params }: StoryPageProps) {
   const normalizedNarrativeStoryTitle = activeStory?.title.trim().toLocaleLowerCase() || '';
   const normalizedNarrativeChapterTitle = activeChapter?.title.trim().toLocaleLowerCase() || '';
   const shouldShowNarrativeChapterTitle = !!activeChapter?.title.trim()
-    && normalizedNarrativeChapterTitle !== normalizedNarrativeStoryTitle;
+    && normalizedNarrativeChapterTitle !== normalizedNarrativeStoryTitle
+    && !isBranchingPath;
   const shouldShowNarrativeChapterMeta = shouldShowNarrativeChapterTitle || !!activeChapter?.isPremium;
 
   const chatScript = useMemo<ReaderChatMessage[]>(() => {
@@ -1598,6 +1530,33 @@ export default function StoryPage({ params }: StoryPageProps) {
       },
     }));
   }, [updateStoredStoryProgress]);
+
+  const markCurrentChapterCompleted = useCallback(() => {
+    if (isPreviewMode || !storyProgressVersion) return;
+
+    const chapter = dbChapters[selectedChapterIndex];
+    if (!chapter || !canReadChapter(chapter)) return;
+
+    updateStoredStoryProgress((previous, nowIso) => {
+      if (previous?.completedChapterId && previous.completedStoryVersion === storyProgressVersion) {
+        return previous;
+      }
+
+      return markStoryProgressCompleted(previous, {
+        chapterId: chapter.id,
+        chapterIndex: selectedChapterIndex,
+        storyVersion: storyProgressVersion,
+        nowIso,
+      });
+    });
+  }, [
+    isPreviewMode,
+    storyProgressVersion,
+    dbChapters,
+    selectedChapterIndex,
+    canReadChapter,
+    updateStoredStoryProgress,
+  ]);
 
   const clearPendingLongPressBookmark = useCallback(() => {
     if (longPressBookmarkTimerRef.current) {
@@ -1987,6 +1946,24 @@ export default function StoryPage({ params }: StoryPageProps) {
     canReadChapter,
     currentIndex,
     saveReadingProgress,
+  ]);
+
+  useEffect(() => {
+    if (!isChatStyle || isPreviewMode) return;
+    if (!activeChapter || !canReadChapter(activeChapter)) return;
+    if (!isCompletionTargetChapter) return;
+    if (chatScript.length === 0 || currentIndex < chatScript.length) return;
+
+    markCurrentChapterCompleted();
+  }, [
+    isChatStyle,
+    isPreviewMode,
+    activeChapter,
+    canReadChapter,
+    isCompletionTargetChapter,
+    currentIndex,
+    chatScript.length,
+    markCurrentChapterCompleted,
   ]);
 
   const handleNextLine = () => {
@@ -2440,6 +2417,41 @@ export default function StoryPage({ params }: StoryPageProps) {
     startChoiceCountdown,
   ]);
 
+  useEffect(() => {
+    if (isChatStyle || isPreviewMode) return;
+    if (!activeChapter || !canReadChapter(activeChapter)) return;
+    if (!isCompletionTargetChapter) return;
+
+    const sentinel = narrativeCompletionSentinelRef.current;
+    if (!sentinel) return;
+
+    if (typeof IntersectionObserver === 'undefined') {
+      const frameId = window.requestAnimationFrame(() => {
+        markCurrentChapterCompleted();
+      });
+      return () => window.cancelAnimationFrame(frameId);
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          markCurrentChapterCompleted();
+        }
+      },
+      { threshold: 0.6 }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [
+    isChatStyle,
+    isPreviewMode,
+    activeChapter,
+    canReadChapter,
+    isCompletionTargetChapter,
+    markCurrentChapterCompleted,
+  ]);
+
   const choiceCountdownDurationMs = activeChapterChoiceTimerSeconds > 0
     ? activeChapterChoiceTimerSeconds * 1000
     : 0;
@@ -2491,7 +2503,7 @@ export default function StoryPage({ params }: StoryPageProps) {
   const isLastChapter = selectedChapterIndex === Math.max(dbChapters.length - 1, 0);
   const showPremiumGate = !!currentChapter && !canReadChapter(currentChapter);
   const showNarrativeIntroMeta = selectedChapterIndex === 0;
-  const showNarrativeCompactChapterHeading = !isChatStyle && !showNarrativeIntroMeta && !!currentChapter;
+  const showNarrativeCompactChapterHeading = !isChatStyle && !showNarrativeIntroMeta && !!currentChapter && !isBranchingPath;
   const narrativeChapterHeadingText = currentChapter
     ? currentChapter.title.trim()
       ? `ตอนที่ ${selectedChapterIndex + 1}: ${currentChapter.title}`
@@ -2507,6 +2519,46 @@ export default function StoryPage({ params }: StoryPageProps) {
     !isCurrentChapterLocked &&
     currentIndex >= chatScript.length &&
     (showNarrativeChoiceSection || showEndingNotice);
+  const readerContextTitle = isBranchingPath
+    ? activeStory?.title || ''
+    : currentChapter?.title?.trim()
+      ? `ตอนที่ ${selectedChapterIndex + 1}: ${currentChapter.title}`
+      : activeStory?.title || '';
+  const readerMobileActions = (
+    <div className="ffMobileActionInner">
+      {allowTocInReader && (
+        <button
+          type="button"
+          className={`ffMobileActionBtn ffMobileActionBtnSecondary ${styles.readerMobileActionBtn}`}
+          onClick={() => setIsTocOpen(true)}
+        >
+          <List size={18} />
+          <span>สารบัญ</span>
+        </button>
+      )}
+      <button
+        type="button"
+        className={`ffMobileActionBtn ffMobileActionBtnSecondary ${styles.readerMobileActionBtn}`}
+        onClick={handleToggleLike}
+        style={{ color: isCurrentChapterLiked ? '#ef4444' : undefined }}
+      >
+        <Heart size={18} fill={isCurrentChapterLiked ? 'currentColor' : 'none'} />
+        <span>{storySettings.hideHeartCount ? 'หัวใจ' : `หัวใจ ${likeCount}`}</span>
+      </button>
+      <button
+        type="button"
+        className={[
+          'ffMobileActionBtn',
+          isCurrentChapterFavorited ? 'ffMobileActionBtnPrimary' : 'ffMobileActionBtnSecondary',
+          styles.readerMobileActionBtn,
+        ].join(' ')}
+        onClick={handleToggleFavorite}
+      >
+        {isCurrentChapterFavorited ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}
+        <span>{isCurrentChapterFavorited ? 'อยู่ในชั้น' : 'เก็บเข้าชั้น'}</span>
+      </button>
+    </div>
+  );
 
   const premiumGateJSX = showPremiumGate && currentChapter ? (
     <div className={`${styles.premiumGate} ${isChatStyle ? styles.premiumGateChat : ''}`}>
@@ -2632,7 +2684,7 @@ export default function StoryPage({ params }: StoryPageProps) {
                   </p>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+              <div className={styles.chatHeaderActions}>
                 <button
                   onClick={() => setIsTocOpen(true)}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(148,163,184,0.8)' }}
@@ -2722,12 +2774,17 @@ export default function StoryPage({ params }: StoryPageProps) {
               onNextLine={handleNextLine}
               hasMore={!isCurrentChapterLocked && currentIndex < chatScript.length}
               onCloseChapter={() => setIsTocOpen(true)}
+              secondaryActions={readerMobileActions}
             />
           </>
         ) : (
           <>
             {/* Reader Top Navbar */}
             <nav className={styles.readerNavbar}>
+              <div className={styles.readerNavContext}>
+                <span className={styles.readerNavContextEyebrow}>{activeStory.title}</span>
+                <span className={styles.readerNavContextTitle}>{readerContextTitle}</span>
+              </div>
               <div className={styles.readerNavRight}>
                 {allowTocInReader && (
                   <button
@@ -2816,21 +2873,78 @@ export default function StoryPage({ params }: StoryPageProps) {
                   {isCurrentChapterLocked ? (
                     premiumGateJSX
                   ) : (
-                    <article className={styles.readerContent}>
-                      {currentChapter && currentChapter.blocks.length > 0 ? (
-                        currentChapter.blocks.map((block: Block, idx: number) => {
-                          const paragraphClassName = getReaderParagraphClassName(block.characterId !== null, block.isFlashback);
-                          const blockRefKey = getNarrativeBlockRefKey(currentChapter.id, block.id);
-                          const shouldShowBookmarkRibbon = visibleNarrativeBookmark?.chapterId === currentChapter.id
-                            && visibleNarrativeBookmark.blockId === block.id;
-                          const shouldShowBookmarkGuide = canUseInlineNarrativeBookmark && !shouldShowBookmarkRibbon;
-                          const isBookmarkGuideHovered = hoveredBookmarkBlockId === block.id && shouldShowBookmarkGuide;
-                          const blockAnchorClassName = [
-                            styles.readerBlockAnchor,
-                            isBookmarkGuideHovered ? styles.readerBlockAnchorHovered : '',
-                          ].filter(Boolean).join(' ');
+                    <>
+                      <article className={styles.readerContent}>
+                        {currentChapter && currentChapter.blocks.length > 0 ? (
+                          currentChapter.blocks.map((block: Block, idx: number) => {
+                            const paragraphClassName = getReaderParagraphClassName(block.characterId !== null, block.isFlashback);
+                            const blockRefKey = getNarrativeBlockRefKey(currentChapter.id, block.id);
+                            const shouldShowBookmarkRibbon = visibleNarrativeBookmark?.chapterId === currentChapter.id
+                              && visibleNarrativeBookmark.blockId === block.id;
+                            const shouldShowBookmarkGuide = canUseInlineNarrativeBookmark && !shouldShowBookmarkRibbon;
+                            const isBookmarkGuideHovered = hoveredBookmarkBlockId === block.id && shouldShowBookmarkGuide;
+                            const blockAnchorClassName = [
+                              styles.readerBlockAnchor,
+                              isBookmarkGuideHovered ? styles.readerBlockAnchorHovered : '',
+                            ].filter(Boolean).join(' ');
 
-                          if (block.type === 'image' && block.imageUrl) {
+                            if (block.type === 'image' && block.imageUrl) {
+                              return (
+                                <div
+                                  key={block.id || idx}
+                                  ref={(node) => {
+                                    narrativeBlockRefs.current[blockRefKey] = node;
+                                  }}
+                                  className={blockAnchorClassName}
+                                  onMouseEnter={() => setHoveredBookmarkBlockId(block.id)}
+                                  onMouseLeave={() => setHoveredBookmarkBlockId((prev) => (prev === block.id ? null : prev))}
+                                  onPointerDown={(event) => handleNarrativeBookmarkPointerDown(event, currentChapter, selectedChapterIndex, block.id)}
+                                  onPointerMove={handleNarrativeBookmarkPointerMove}
+                                  onPointerUp={handleNarrativeBookmarkPointerEnd}
+                                  onPointerCancel={handleNarrativeBookmarkPointerEnd}
+                                  onPointerLeave={handleNarrativeBookmarkPointerEnd}
+                                  onContextMenu={(event) => {
+                                    if (suppressBookmarkContextMenuRef.current) {
+                                      event.preventDefault();
+                                      suppressBookmarkContextMenuRef.current = false;
+                                    }
+                                  }}
+                                >
+                                  {shouldShowBookmarkRibbon && (
+                                    <button
+                                      type="button"
+                                      className={styles.readerBookmarkRibbon}
+                                      onClick={() => handleClearManualNarrativeBookmark(block.id)}
+                                      aria-label="ลบที่คั่นหน้า"
+                                      title="ลบที่คั่นหน้า"
+                                      data-bookmark-control="true"
+                                    >
+                                      <BookmarkCheck size={13} />
+                                    </button>
+                                  )}
+                                  {shouldShowBookmarkGuide && (
+                                    <button
+                                      type="button"
+                                      className={styles.readerBookmarkGuide}
+                                      onClick={() => setManualNarrativeBookmarkForBlock(currentChapter, selectedChapterIndex, block.id)}
+                                      onFocus={() => setHoveredBookmarkBlockId(block.id)}
+                                      onBlur={() => setHoveredBookmarkBlockId((prev) => (prev === block.id ? null : prev))}
+                                      aria-label="คั่นหน้าตรงนี้"
+                                      title="คั่นหน้าตรงนี้"
+                                      data-bookmark-control="true"
+                                    />
+                                  )}
+                                  <div className={styles.readerImageOnlyWrap}>
+                                    <img
+                                      src={block.imageUrl}
+                                      alt="Story image"
+                                      className={styles.readerImageOnly}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            }
+
                             return (
                               <div
                                 key={block.id || idx}
@@ -2876,70 +2990,20 @@ export default function StoryPage({ params }: StoryPageProps) {
                                     data-bookmark-control="true"
                                   />
                                 )}
-                                <div className={styles.readerImageOnlyWrap}>
-                                  <img
-                                    src={block.imageUrl}
-                                    alt="Story image"
-                                    className={styles.readerImageOnly}
-                                  />
-                                </div>
+                                <p className={paragraphClassName}>{block.text}</p>
                               </div>
                             );
-                          }
-
-                          return (
-                            <div
-                              key={block.id || idx}
-                              ref={(node) => {
-                                narrativeBlockRefs.current[blockRefKey] = node;
-                              }}
-                              className={blockAnchorClassName}
-                              onMouseEnter={() => setHoveredBookmarkBlockId(block.id)}
-                              onMouseLeave={() => setHoveredBookmarkBlockId((prev) => (prev === block.id ? null : prev))}
-                              onPointerDown={(event) => handleNarrativeBookmarkPointerDown(event, currentChapter, selectedChapterIndex, block.id)}
-                              onPointerMove={handleNarrativeBookmarkPointerMove}
-                              onPointerUp={handleNarrativeBookmarkPointerEnd}
-                              onPointerCancel={handleNarrativeBookmarkPointerEnd}
-                              onPointerLeave={handleNarrativeBookmarkPointerEnd}
-                              onContextMenu={(event) => {
-                                if (suppressBookmarkContextMenuRef.current) {
-                                  event.preventDefault();
-                                  suppressBookmarkContextMenuRef.current = false;
-                                }
-                              }}
-                            >
-                              {shouldShowBookmarkRibbon && (
-                                <button
-                                  type="button"
-                                  className={styles.readerBookmarkRibbon}
-                                  onClick={() => handleClearManualNarrativeBookmark(block.id)}
-                                  aria-label="ลบที่คั่นหน้า"
-                                  title="ลบที่คั่นหน้า"
-                                  data-bookmark-control="true"
-                                >
-                                  <BookmarkCheck size={13} />
-                                </button>
-                              )}
-                              {shouldShowBookmarkGuide && (
-                                <button
-                                  type="button"
-                                  className={styles.readerBookmarkGuide}
-                                  onClick={() => setManualNarrativeBookmarkForBlock(currentChapter, selectedChapterIndex, block.id)}
-                                  onFocus={() => setHoveredBookmarkBlockId(block.id)}
-                                  onBlur={() => setHoveredBookmarkBlockId((prev) => (prev === block.id ? null : prev))}
-                                  aria-label="คั่นหน้าตรงนี้"
-                                  title="คั่นหน้าตรงนี้"
-                                  data-bookmark-control="true"
-                                />
-                              )}
-                              <p className={paragraphClassName}>{block.text}</p>
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <p>ตอนนี้ยังไม่มีเนื้อหา</p>
-                      )}
-                    </article>
+                          })
+                        ) : (
+                          <p>ตอนนี้ยังไม่มีเนื้อหา</p>
+                        )}
+                      </article>
+                      <div
+                        ref={narrativeCompletionSentinelRef}
+                        className={styles.readerCompletionSentinel}
+                        aria-hidden="true"
+                      />
+                    </>
                 )}
 
                 {isBranchingPath ? (
@@ -2985,11 +3049,11 @@ export default function StoryPage({ params }: StoryPageProps) {
                                   onClick={() => handleSelectBranchChoice(choice)}
                                 >
                                   <span>{index + 1}. {choice.choiceText}</span>
-                                  <small className={styles.branchChoiceMeta}>
-                                    {isLockedChoice
-                                      ? `🔒 ล็อก ${choice.coinPrice.toLocaleString('th-TH')} เหรียญ • ไปตอน ${choice.toOrderIndex + 1}`
-                                      : `ไปตอน ${choice.toOrderIndex + 1}: ${choice.toTitle}`}
-                                  </small>
+                                  {isLockedChoice && (
+                                    <small className={styles.branchChoiceMeta}>
+                                      {`🔒 ล็อก ${choice.coinPrice.toLocaleString('th-TH')} เหรียญ`}
+                                    </small>
+                                  )}
                                   {choice.outcomeText && (
                                     <p className={styles.branchChoiceOutcome}>{choice.outcomeText}</p>
                                   )}
@@ -3039,6 +3103,9 @@ export default function StoryPage({ params }: StoryPageProps) {
                 </>
               )}
             </main>
+            <div className="ffMobileActionBar">
+              {readerMobileActions}
+            </div>
 
           </>
         )}

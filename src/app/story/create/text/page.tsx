@@ -70,7 +70,7 @@ function CreateTextForm() {
 
     const [synopsis, setSynopsis] = useState('');
 
-
+    const formRef = useRef<HTMLFormElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const wideFileInputRef = useRef<HTMLInputElement>(null);
     const [coverImage, setCoverImage] = useState<string | null>(null);
@@ -294,15 +294,16 @@ function CreateTextForm() {
         }
     };
 
+    const mobileSubmitLabel = isSubmitting ? 'กำลังสร้าง...' : 'สร้างผลงาน';
+
     return (
         <main className={styles.main}>
             <header className={styles.header}>
                 <h1>สร้างผลงานใหม่</h1>
-                <div style={{ width: 60 }} /> {/* Spacer */}
             </header>
 
             <div className={styles.container}>
-                <form onSubmit={handleSubmit} className={styles.formContainer}>
+                <form ref={formRef} onSubmit={handleSubmit} className={styles.formContainer}>
                     <div className={styles.card}>
                         <h2 className={styles.cardTitle}>
                             ข้อมูลผลงาน ({writingStyle === 'chat' ? 'แชท' : 'บรรยาย'})
@@ -625,6 +626,19 @@ function CreateTextForm() {
                         )}
                     </button>
                 </form>
+            </div>
+            <div className="ffMobileActionBar">
+                <div className="ffMobileActionInner">
+                    <button
+                        type="button"
+                        className={`ffMobileActionBtn ffMobileActionBtnPrimary ${styles.mobileSubmitBtn}`}
+                        onClick={() => formRef.current?.requestSubmit()}
+                        disabled={isSubmitting}
+                    >
+                        {isSubmitting ? <Loader2 size={18} className={styles.spinner} /> : <Save size={18} />}
+                        <span>{mobileSubmitLabel}</span>
+                    </button>
+                </div>
             </div>
 
             {showUnsplashModal && (

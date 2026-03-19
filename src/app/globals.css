@@ -1,31 +1,24 @@
 :root {
   --background: #ffffff;
-  /* Global white background */
   --foreground: #0f172a;
-  /* Default text color */
   --primary: #f97316;
-  /* Bright Orange */
   --primary-hover: #ea580c;
-  /* Darker Orange for hover */
-  --surface: #f8fafc;
-  /* Light neutral surface for cards/sections */
-  --border: #e2e8f0;
-  /* Light border color */
+  --surface: #f9fafb;
+  --border: #e5e7eb;
   --font-sans: 'Inter', system-ui, sans-serif;
   --surface-elevated: #ffffff;
-  --surface-muted: #f1f5f9;
+  --surface-muted: #f3f4f6;
   --surface-soft: #fff7ed;
-  --text-muted: #64748b;
-  --text-soft: #94a3b8;
-  --shadow-soft: 0 12px 30px rgba(15, 23, 42, 0.08);
-  --shadow-strong: 0 24px 60px rgba(15, 23, 42, 0.12);
-  --panel-border-strong: rgba(15, 23, 42, 0.08);
-  --panel-bg: rgba(255, 255, 255, 0.82);
-  --panel-bg-strong: rgba(255, 255, 255, 0.94);
+  --text-muted: #6b7280;
+  --text-soft: #9ca3af;
+  --shadow-soft: 0 4px 16px rgba(0, 0, 0, 0.06);
+  --shadow-strong: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --panel-border-strong: rgba(0, 0, 0, 0.06);
+  --panel-bg: rgba(255, 255, 255, 0.92);
+  --panel-bg-strong: rgba(255, 255, 255, 0.96);
   --studio-shell-bg:
-    radial-gradient(circle at top, rgba(249, 115, 22, 0.1), transparent 26%),
-    radial-gradient(circle at top right, rgba(15, 23, 42, 0.06), transparent 20%),
-    linear-gradient(180deg, #f8fafc 0%, #fff8f1 44%, #ffffff 100%);
+    radial-gradient(circle at top, rgba(249, 115, 22, 0.06), transparent 30%),
+    linear-gradient(180deg, #f9fafb 0%, #ffffff 44%, #ffffff 100%);
   --studio-page-width: 1180px;
   --studio-radius-xl: 28px;
   --studio-radius-lg: 22px;
@@ -133,7 +126,7 @@ body {
 
 .ffStudioMasthead {
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 248, 241, 0.9) 100%);
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 247, 237, 0.92) 100%);
   border: 1px solid var(--panel-border-strong);
   border-radius: var(--studio-radius-xl);
   box-shadow: var(--shadow-strong);
@@ -147,6 +140,80 @@ body {
   border: 1px dashed rgba(148, 163, 184, 0.44);
   background: rgba(255, 255, 255, 0.7);
   color: var(--text-muted);
+}
+
+.ffMobileActionBar {
+  display: none;
+}
+
+.ffMobileActionInner {
+  display: flex;
+  align-items: stretch;
+  gap: 0.7rem;
+}
+
+.ffMobileActionBtn {
+  min-height: 52px;
+  border-radius: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.85rem 1rem;
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+}
+
+.ffMobileActionBtnPrimary {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 16px 30px rgba(249, 115, 22, 0.24);
+}
+
+.ffMobileActionBtnSecondary {
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.ffMobileActionBtnIconOnly {
+  flex: 0 0 72px;
+  min-width: 72px;
+  padding-inline: 0.7rem;
+}
+
+.ffMobileActionBtnWide {
+  flex: 1 1 0;
+}
+
+@media (max-width: 720px) {
+  .ffMobileActionBar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 80;
+    display: block;
+    padding:
+      0.75rem
+      max(0.85rem, env(safe-area-inset-right))
+      calc(0.8rem + env(safe-area-inset-bottom))
+      max(0.85rem, env(safe-area-inset-left));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.92) 34%, rgba(255, 255, 255, 0.98) 100%);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  .ffMobileActionInner {
+    width: min(var(--studio-page-width), 100%);
+    margin: 0 auto;
+  }
 }
 
 @media (max-width: 720px) {

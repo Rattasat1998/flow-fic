@@ -25,19 +25,19 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    background-color: #fffbeb;
-    border: 1px solid #fde68a;
+    background-color: #fff7ed;
+    border: 1px solid #fed7aa;
     padding: 0.4rem 0.8rem;
     border-radius: 999px;
 }
 
 .coinIcon {
-    color: #f59e0b;
+    color: #f97316;
 }
 
 .balanceAmount {
     font-weight: 700;
-    color: #d97706;
+    color: #c2410c;
     font-size: 0.9rem;
 }
 
@@ -76,11 +76,12 @@
 }
 
 .vipCard {
-    background: linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%);
+    background: linear-gradient(135deg, #ffffff 0%, #fff7ed 100%);
+    border: 1px solid #fed7aa;
     border-radius: 20px;
     padding: 2rem;
-    color: white;
-    box-shadow: 0 10px 25px -5px rgba(76, 29, 149, 0.4);
+    color: #0f172a;
+    box-shadow: 0 12px 28px rgba(249, 115, 22, 0.14);
     position: relative;
     overflow: hidden;
 }
@@ -92,7 +93,7 @@
     right: 0;
     width: 300px;
     height: 300px;
-    background: radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(249, 115, 22, 0.14) 0%, transparent 70%);
     transform: translate(30%, -30%);
     border-radius: 50%;
     pointer-events: none;
@@ -114,17 +115,14 @@
 }
 
 .vipIcon {
-    color: #fde047;
+    color: var(--primary);
 }
 
 .vipHeader h2 {
     font-size: 1.5rem;
     font-weight: 800;
     margin: 0;
-    background: linear-gradient(to right, #fff, #c4b5fd);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: #111827;
 }
 
 .vipPrice {
@@ -135,7 +133,7 @@
 .currency {
     font-size: 1rem;
     font-weight: 600;
-    color: #cbd5e1;
+    color: #64748b;
 }
 
 .amount {
@@ -146,12 +144,12 @@
 
 .period {
     font-size: 0.9rem;
-    color: #cbd5e1;
+    color: #64748b;
     margin-left: 0.25rem;
 }
 
 .vipDesc {
-    color: #e2e8f0;
+    color: #475569;
     font-size: 1rem;
     margin: 0 0 1.5rem 0;
     position: relative;
@@ -160,7 +158,7 @@
 
 .vipFootnote {
     margin: -0.5rem 0 1.25rem 0;
-    color: #cbd5e1;
+    color: #64748b;
     font-size: 0.82rem;
     line-height: 1.45;
     position: relative;
@@ -183,13 +181,13 @@
     align-items: flex-start;
     gap: 0.75rem;
     font-size: 0.95rem;
-    color: #f8fafc;
+    color: #334155;
     line-height: 1.4;
 }
 
 .featureIcon {
-    background-color: rgba(16, 185, 129, 0.2);
-    color: #34d399;
+    background-color: #fff7ed;
+    color: var(--primary);
     border-radius: 50%;
     padding: 2px;
     display: flex;
@@ -201,8 +199,8 @@
 
 .subscribeBtn {
     width: 100%;
-    background: linear-gradient(90deg, #f59e0b, #facc15);
-    color: #713f12;
+    background: linear-gradient(90deg, var(--primary), var(--primary-hover));
+    color: #ffffff;
     border: none;
     padding: 1.15rem;
     border-radius: 12px;
@@ -212,12 +210,12 @@
     transition: transform 0.2s, box-shadow 0.2s;
     position: relative;
     z-index: 10;
-    box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.4);
+    box-shadow: 0 8px 18px rgba(249, 115, 22, 0.22);
 }
 
 .subscribeBtn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(245, 158, 11, 0.5);
+    box-shadow: 0 14px 24px rgba(249, 115, 22, 0.28);
 }
 
 .divider {
@@ -278,14 +276,14 @@
 }
 
 .coinCard:hover {
-    border-color: #f59e0b;
-    box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.1);
+    border-color: var(--primary);
+    box-shadow: 0 10px 20px rgba(249, 115, 22, 0.08);
 }
 
 .popularCard {
     border-color: var(--primary);
     border-width: 2px;
-    background-color: rgba(28, 198, 172, 0.02);
+    background-color: #fff7ed;
 }
 
 .popularBadge {
@@ -308,7 +306,7 @@
 }
 
 .coinIconLg {
-    color: #f59e0b;
+    color: #f97316;
 }
 
 .coinAmount h3 {
@@ -321,8 +319,8 @@
 .bonusText {
     font-size: 0.8rem;
     font-weight: 600;
-    color: #10b981;
-    background-color: #ecfdf5;
+    color: #f97316;
+    background-color: #fff7ed;
     padding: 0.2rem 0.5rem;
     border-radius: 4px;
     margin-bottom: 1.25rem;
@@ -357,9 +355,9 @@
 
 .purchaseBtnSecondary {
     width: 100%;
-    background-color: #eff6ff;
-    border: 1px solid #bfdbfe;
-    color: #1d4ed8;
+    background-color: #fff7ed;
+    border: 1px solid #fed7aa;
+    color: #9a3412;
     font-weight: 700;
     padding: 0.6rem;
     border-radius: 8px;
@@ -368,15 +366,15 @@
 }
 
 .coinCard:hover .purchaseBtn {
-    background-color: #f59e0b;
+    background-color: var(--primary);
     color: white;
-    border-color: #f59e0b;
+    border-color: var(--primary);
 }
 
 .coinCard:hover .purchaseBtnSecondary {
-    background-color: #2563eb;
-    color: white;
-    border-color: #2563eb;
+    background-color: #ffedd5;
+    color: #9a3412;
+    border-color: #fdba74;
 }
 
 .popularCard .purchaseBtn {
@@ -386,9 +384,9 @@
 }
 
 .popularCard .purchaseBtnSecondary {
-    background-color: #dbeafe;
-    color: #1e3a8a;
-    border-color: #93c5fd;
+    background-color: #ffedd5;
+    color: #9a3412;
+    border-color: #fdba74;
 }
 
 .checkoutDialogBackdrop {
@@ -422,7 +420,7 @@
 .checkoutDialogButton {
     width: 100%;
     border: none;
-    background: #f59e0b;
+    background: var(--primary);
     color: #ffffff;
     padding: 0.65rem 0.85rem;
     border-radius: 10px;
@@ -431,5 +429,5 @@
 }
 
 .checkoutDialogButton:hover {
-    background: #d97706;
+    background: var(--primary-hover);
 }

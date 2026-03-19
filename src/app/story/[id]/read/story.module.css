@@ -32,6 +32,12 @@
   margin: 0 auto;
 }
 
+.chatHeaderActions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
 .headerAvatar {
   width: 44px;
   height: 44px;
@@ -122,9 +128,9 @@
 }
 
 .chapterTabActive {
-  background: #ecfdf5;
-  border-color: #6ee7b7;
-  color: #047857;
+  background: #fff7ed;
+  border-color: #fdba74;
+  color: #c2410c;
 }
 
 .readerArticle {
@@ -193,6 +199,31 @@
   margin-left: auto;
 }
 
+.readerNavContext {
+  display: none;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.readerNavContextEyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.readerNavContextTitle {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .readerNavHome {
   display: flex;
   flex-direction: column;
@@ -228,6 +259,17 @@
 .readerNavAction:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.readerMobileActionBtn {
+  min-height: 52px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding-inline: 0.75rem;
+}
+
+.readerMobileActionBtn span {
+  white-space: nowrap;
 }
 
 .readerLayout {
@@ -330,8 +372,8 @@
 
 .readerPremiumTagLocked {
   color: #92400e;
-  background: #fef3c7;
-  border-color: #fcd34d;
+  background: #ffedd5;
+  border-color: #fdba74;
 }
 
 .readerContent {
@@ -346,6 +388,12 @@
 .readerContent p {
   margin-bottom: 1.3rem;
   text-indent: 1.75rem;
+}
+
+.readerCompletionSentinel {
+  width: 100%;
+  max-width: 640px;
+  height: 1px;
 }
 
 .readerBlockAnchor {
@@ -379,7 +427,7 @@
   padding: 0.55rem 0 1rem;
   border: none;
   border-radius: 0.7rem 0.7rem 0 0;
-  background: linear-gradient(180deg, #fb923c 0%, #f97316 100%);
+  background: linear-gradient(180deg, var(--primary) 0%, var(--primary-hover) 100%);
   color: #fff7ed;
   cursor: pointer;
   clip-path: polygon(0 0, 100% 0, 100% 80%, 50% 100%, 0 80%);
@@ -535,27 +583,59 @@
     font-size: 1rem;
     line-height: 1.8;
   }
+}
 
-  .readerNavAction span {
+@media (max-width: 720px) {
+  .readerNavbar {
+    justify-content: flex-start;
+    height: auto;
+    min-height: 60px;
+    padding: 0.75rem 1rem;
+  }
+
+  .readerNavContext {
+    display: flex;
+  }
+
+  .readerNavRight,
+  .chatHeaderActions {
     display: none;
+  }
+
+  .readerContainer {
+    max-width: 100%;
+    padding: 1.5rem 1rem calc(7.25rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .chatContainer {
+    padding: 1.25rem 1rem calc(8.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .chapterNav {
+    width: 100%;
+  }
+
+  .tocModal {
+    max-width: 100%;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
 
 @media (max-width: 560px) {
   .readerNavbar {
-    padding: 0 0.75rem;
+    padding: 0.7rem 0.75rem;
   }
 
-  .readerNavRight {
-    gap: 0.5rem;
+  .readerNavContextTitle {
+    font-size: 0.84rem;
   }
 
   .readerContainer {
-    padding: 1.6rem 1rem 2.2rem;
+    padding: 1.4rem 0.95rem calc(7rem + env(safe-area-inset-bottom, 0px));
   }
 
   .readerContent {
-    font-size: 0.98rem;
+    font-size: 0.94rem;
   }
 
   .readerContent p {
@@ -576,6 +656,10 @@
   .readerBookmarkGuide {
     right: 0;
     width: 1.15rem;
+  }
+
+  .chatContainer {
+    padding: 1.1rem 0.9rem calc(8.2rem + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -706,9 +790,9 @@
   max-width: 100%;
   padding: 0.35rem 0.7rem;
   border-radius: 999px;
-  border: 1px solid #dbeafe;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
+  color: #9a3412;
   font-size: 0.82rem;
   font-weight: 600;
   line-height: 1.3;
@@ -738,18 +822,17 @@
 }
 
 .tocItemActive {
-  background-color: #f0fdf4;
-  /* Light green tint like readawrite */
-  border-color: #bbf7d0;
+  background-color: #fff7ed;
+  border-color: #fed7aa;
 }
 
 .tocItemActive .tocItemTitle {
-  color: #16a34a;
+  color: #c2410c;
   font-weight: 600;
 }
 
 .tocItemActive .tocItemIndex {
-  color: #16a34a;
+  color: #c2410c;
   font-weight: 600;
 }
 
@@ -782,22 +865,22 @@
   font-size: 0.74rem;
   font-weight: 700;
   color: #b45309;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
   border-radius: 999px;
   padding: 0.15rem 0.5rem;
 }
 
 .tocLockTagUnlocked {
-  color: #15803d;
-  background: #f0fdf4;
-  border-color: #bbf7d0;
+  color: #c2410c;
+  background: #fff7ed;
+  border-color: #fed7aa;
 }
 
 .premiumGate {
   width: 100%;
   max-width: 800px;
-  background: linear-gradient(135deg, #fff7ed, #fffbeb);
+  background: linear-gradient(135deg, #fff7ed, #fff7ed);
   border: 1px solid #fed7aa;
   border-radius: 16px;
   padding: 1.2rem;
@@ -924,8 +1007,8 @@
 
 .unlockConfirmCard {
   width: min(92vw, 380px);
-  background: linear-gradient(145deg, #fffbeb 0%, #ffffff 50%, #fef3c7 100%);
-  border: 1.5px solid #fcd34d;
+  background: linear-gradient(145deg, #fff7ed 0%, #ffffff 50%, #ffedd5 100%);
+  border: 1.5px solid #fdba74;
   border-radius: 20px;
   box-shadow:
     0 20px 50px rgba(245, 158, 11, 0.2),
@@ -956,7 +1039,7 @@
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #f59e0b, #eab308);
+  background: linear-gradient(135deg, #f97316, #ea580c);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1073,15 +1156,15 @@
 .unlockConfirmCancelBtn {
   background: #ffffff;
   color: #78350f;
-  border: 1.5px solid #fcd34d;
+  border: 1.5px solid #fdba74;
 }
 
 .unlockConfirmCancelBtn:hover {
-  background: #fffbeb;
+  background: #fff7ed;
 }
 
 .unlockConfirmSubmitBtn {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
+  background: linear-gradient(135deg, #f97316, #c2410c);
   color: #ffffff;
   box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
 }
@@ -1109,8 +1192,8 @@
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  background: linear-gradient(135deg, #fef3c7, #ffffff);
-  border: 1.5px solid #fcd34d;
+  background: linear-gradient(135deg, #ffedd5, #ffffff);
+  border: 1.5px solid #fdba74;
   border-radius: 999px;
   padding: 0.6rem 1.2rem;
   box-shadow:
@@ -1147,7 +1230,7 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #f59e0b, #eab308);
+  background: linear-gradient(135deg, #f97316, #ea580c);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1374,58 +1457,58 @@
 
 /* Mint Theme */
 :global(.theme-mint) .main {
-  background: linear-gradient(180deg, #ecfdf5 0%, #d1fae5 40%, #ecfdf5 100%);
+  background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 40%, #fff7ed 100%);
 }
 
 :global(.theme-mint) .header {
-  background: rgba(236, 253, 245, 0.92);
-  border-bottom-color: rgba(110, 231, 183, 0.3);
+  background: rgba(255, 247, 237, 0.92);
+  border-bottom-color: rgba(249, 115, 22, 0.18);
 }
 
 :global(.theme-mint) .header h1 {
-  color: #064e3b;
+  color: #111827;
 }
 
 :global(.theme-mint) .header p {
-  color: #10b981;
+  color: #f97316;
   opacity: 1;
 }
 
 :global(.theme-mint) .headerAvatar {
-  border-color: #34d399;
-  box-shadow: 0 0 12px rgba(52, 211, 153, 0.25);
+  border-color: #fdba74;
+  box-shadow: 0 0 12px rgba(249, 115, 22, 0.22);
 }
 
 :global(.theme-mint) .emptyState {
-  color: #6ee7b7;
+  color: #fdba74;
 }
 
 /* Midnight Theme */
 :global(.theme-midnight) .main {
-  background: linear-gradient(180deg, #1e1b4b 0%, #312e81 40%, #1e1b4b 100%);
+  background: linear-gradient(180deg, #1f2937 0%, #111827 40%, #1f2937 100%);
 }
 
 :global(.theme-midnight) .header {
-  background: rgba(30, 27, 75, 0.88);
-  border-bottom-color: rgba(99, 102, 241, 0.15);
+  background: rgba(17, 24, 39, 0.88);
+  border-bottom-color: rgba(249, 115, 22, 0.16);
 }
 
 :global(.theme-midnight) .header h1 {
-  color: #e0e7ff;
+  color: #f8fafc;
 }
 
 :global(.theme-midnight) .header p {
-  color: #818cf8;
+  color: #fdba74;
   opacity: 0.9;
 }
 
 :global(.theme-midnight) .headerAvatar {
-  border-color: #818cf8;
-  box-shadow: 0 0 12px rgba(129, 140, 248, 0.35);
+  border-color: #fdba74;
+  box-shadow: 0 0 12px rgba(249, 115, 22, 0.28);
 }
 
 :global(.theme-midnight) .emptyState {
-  color: rgba(129, 140, 248, 0.5);
+  color: rgba(253, 186, 116, 0.58);
 }
 .branchChoicePanel {
   margin-top: 2rem;
@@ -1494,7 +1577,7 @@
 .branchChoiceTimerFill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #f59e0b, #ef4444);
+  background: linear-gradient(90deg, #f97316, #ea580c);
   transition: width 0.2s linear;
 }
 
@@ -1597,12 +1680,12 @@
 }
 
 .branchChoiceBtnLocked {
-  border-color: #fcd34d;
-  background: #fffbeb;
+  border-color: #fdba74;
+  background: #fff7ed;
 }
 
 .branchChoiceBtnLocked:hover {
-  border-color: #f59e0b;
+  border-color: #f97316;
   box-shadow: 0 8px 22px rgba(245, 158, 11, 0.15);
 }
 
@@ -1700,7 +1783,7 @@
 
 .tocPathTagEntry {
   border: 1px solid #93c5fd;
-  background: #eff6ff;
+  background: #fff7ed;
   color: #1d4ed8;
 }
 

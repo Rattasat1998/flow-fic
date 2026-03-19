@@ -1,6 +1,6 @@
 .main {
     min-height: 100vh;
-    background-color: #f1f5f9;
+    background-color: #f9fafb;
 }
 
 .navbar {
@@ -50,17 +50,17 @@
     display: flex;
     align-items: center;
     gap: 0.35rem;
-    background-color: var(--primary);
+    background-color: #f97316;
     color: white;
     padding: 0.4rem 1rem;
     border-radius: 9999px;
     font-size: 0.85rem;
     font-weight: 600;
-    transition: opacity 0.2s;
+    transition: background-color 0.15s;
 }
 
 .createBtn:hover {
-    opacity: 0.9;
+    background-color: #ea580c;
 }
 
 .profileMenuWrapper {
@@ -71,7 +71,7 @@
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    background-color: #475569;
+    background-color: #f97316;
     color: white;
     display: flex;
     align-items: center;
@@ -126,7 +126,7 @@
     width: 44px;
     height: 44px;
     border-radius: 50%;
-    background: #475569;
+    background: #f97316;
     color: white;
     font-size: 1rem;
     font-weight: 700;
@@ -288,7 +288,7 @@
 .statChange {
     font-size: 0.75rem;
     font-weight: 600;
-    color: #10b981;
+    color: #f97316;
     display: flex;
     align-items: center;
     gap: 0.25rem;
@@ -306,7 +306,7 @@
 .statAction {
     font-size: 0.75rem;
     font-weight: 600;
-    color: #3b82f6;
+    color: #f97316;
     margin: 0;
     margin-top: 0.25rem;
     cursor: pointer;
@@ -440,8 +440,8 @@
 .badgeNovel {
     font-size: 0.65rem;
     font-weight: 700;
-    background-color: #ecfdf5;
-    color: #10b981;
+    background-color: #fff7ed;
+    color: #f97316;
     padding: 0.15rem 0.4rem;
     border-radius: 4px;
     text-transform: uppercase;
@@ -450,8 +450,8 @@
 .badgeFanfic {
     font-size: 0.65rem;
     font-weight: 700;
-    background-color: #fef2f2;
-    color: #ef4444;
+    background-color: #f9fafb;
+    color: #64748b;
     padding: 0.15rem 0.4rem;
     border-radius: 4px;
     text-transform: uppercase;
@@ -460,8 +460,8 @@
 .badgeCartoon {
     font-size: 0.65rem;
     font-weight: 700;
-    background-color: #eff6ff;
-    color: #3b82f6;
+    background-color: #fff7ed;
+    color: #c2410c;
     padding: 0.15rem 0.4rem;
     border-radius: 4px;
     text-transform: uppercase;
@@ -470,8 +470,8 @@
 .badgeDraft {
     font-size: 0.65rem;
     font-weight: 700;
-    background-color: #fffbeb;
-    color: #d97706;
+    background-color: #fff7ed;
+    color: #c2410c;
     padding: 0.15rem 0.4rem;
     border-radius: 4px;
     text-transform: uppercase;
@@ -480,8 +480,8 @@
 .badgeCompleted {
     font-size: 0.65rem;
     font-weight: 700;
-    background-color: #dcfce7;
-    color: #166534;
+    background-color: #fff7ed;
+    color: #c2410c;
     padding: 0.15rem 0.4rem;
     border-radius: 4px;
     text-transform: uppercase;
@@ -490,8 +490,8 @@
 .badgeOngoing {
     font-size: 0.65rem;
     font-weight: 700;
-    background-color: #e0f2fe;
-    color: #0369a1;
+    background-color: #f9fafb;
+    color: #64748b;
     padding: 0.15rem 0.4rem;
     border-radius: 4px;
     text-transform: uppercase;
@@ -582,15 +582,15 @@
 }
 
 .publishDropdownSelect.public {
-    border-color: #10b981;
-    color: #10b981;
-    background: #ecfdf5;
+    border-color: #f97316;
+    color: #f97316;
+    background: #fff7ed;
 }
 
 .publishDropdownSelect.private {
-    border-color: #f59e0b;
-    color: #f59e0b;
-    background: #fffbeb;
+    border-color: #fed7aa;
+    color: #c2410c;
+    background: #fff7ed;
 }
 
 .actionsContainer {
@@ -644,7 +644,7 @@
 }
 
 .moreMenuBtn:focus-visible {
-    outline: 2px solid rgba(59, 130, 246, 0.35);
+    outline: 2px solid rgba(249, 115, 22, 0.28);
     outline-offset: 2px;
 }
 
@@ -735,12 +735,12 @@
 }
 
 .aiSuggestion {
-    background-color: rgba(139, 92, 246, 0.05);
-    border: 1px solid rgba(139, 92, 246, 0.2);
+    background-color: #fff7ed;
+    border: 1px solid #fed7aa;
     border-radius: 6px;
     padding: 0.75rem;
     font-size: 0.85rem;
-    color: #4c1d95;
+    color: #9a3412;
 }
 
 .aiSuggestion strong {
@@ -749,7 +749,7 @@
 }
 
 .aiAssistBtn {
-    background: linear-gradient(135deg, #8b5cf6, #d946ef);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
     color: white;
     border: none;
     padding: 0.6rem 1rem;
@@ -1144,7 +1144,7 @@
     min-height: 44px;
     padding: 0.72rem 1.1rem;
     border-radius: 999px;
-    background: linear-gradient(135deg, var(--primary) 0%, #fb923c 100%);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
     box-shadow: 0 14px 28px rgba(249, 115, 22, 0.2);
 }
 
@@ -1263,7 +1263,7 @@
 
 .statToneAmber {
     background: rgba(245, 158, 11, 0.12);
-    color: #d97706;
+    color: #c2410c;
 }
 
 .statToneRose {
@@ -1441,7 +1441,7 @@
 }
 
 .badgeNovel {
-    background: rgba(16, 185, 129, 0.12);
+    background: rgba(249, 115, 22, 0.12);
     color: #0f766e;
 }
 

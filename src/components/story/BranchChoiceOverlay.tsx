@@ -180,18 +180,16 @@ export function BranchChoiceOverlay({
               >
                 <span className={styles.choiceIndex}>{index + 1}</span>
                 <span className={styles.choiceText}>{choice.choiceText}</span>
-                <span className={styles.choiceMeta}>
-                  {isLocked ? (
+                {isLocked && (
+                  <span className={styles.choiceMeta}>
                     <span className={styles.choiceLockBadge}>
                       <Lock size={12} />
                       {choice.coinPrice > 0
                         ? `${choice.coinPrice.toLocaleString('th-TH')} เหรียญ`
                         : 'ต้องปลดล็อก'}
                     </span>
-                  ) : (
-                    <>ไปตอน {choice.toOrderIndex + 1}</>
-                  )}
-                </span>
+                  </span>
+                )}
 
                 {/* Consequence preview (shown after hover delay) */}
                 {previewVisibleId === choice.id &&
