@@ -1,5 +1,4 @@
 import HomePageClient from '@/components/home/HomePageClient';
-import { CORE_MAIN_CATEGORY_ID } from '@/lib/categories';
 import {
   getDiscoveryResponse,
   parseDiscoveryFiltersWithOptions,
@@ -16,9 +15,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const resolvedSearchParams = await Promise.resolve(searchParams ?? {});
   const initialFilters = {
     ...parseDiscoveryFiltersWithOptions(resolvedSearchParams, {
-      defaultCategory: CORE_MAIN_CATEGORY_ID,
+      defaultCategory: 'all',
       defaultSubCategory: 'all',
-      defaultFocusCore: true,
+      defaultFocusCore: false,
       defaultLimit: HOME_DISCOVERY_LIMIT,
     }),
     limit: HOME_DISCOVERY_LIMIT,
