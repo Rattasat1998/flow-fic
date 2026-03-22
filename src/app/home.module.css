@@ -48,9 +48,13 @@
 }
 
 .logo {
+    color: #f8fbff;
     flex-shrink: 0;
-    transform: translateY(1px) scale(0.93);
-    transform-origin: left center;
+    text-decoration: none;
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1;
 }
 
 .navLinks {
@@ -88,30 +92,47 @@
     box-shadow: inset 0 -1px 0 rgba(255, 143, 112, 0.8);
 }
 
-.navSearchWrap {
+.navSearchShell {
     display: none;
 }
 
 @media (min-width: 820px) {
-    .navSearchWrap {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
-        height: 36px;
+    .navSearchShell {
+        position: relative;
+        display: block;
         width: min(42vw, 390px);
-        padding: 0 0.62rem 0 0.82rem;
-        border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(255, 255, 255, 0.05);
         justify-self: center;
-        transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+        z-index: 3;
     }
 }
 
+.navSearchWrap {
+    width: 100%;
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0 0.68rem 0 0.82rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.05);
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
 .navSearchWrap:focus-within {
-    border-color: rgba(255, 143, 112, 0.45);
-    background: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 0 0 2px rgba(255, 143, 112, 0.12);
+    border-color: rgba(255, 143, 112, 0.58);
+    background: rgba(255, 255, 255, 0.11);
+    box-shadow: 0 0 0 3px rgba(255, 143, 112, 0.14);
+}
+
+.navSearchWrap:focus-within .navSearchIcon {
+    color: rgba(255, 228, 220, 0.9);
+}
+
+.navSearchWrap:focus-within .navSearchHint {
+    border-color: rgba(255, 143, 112, 0.26);
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 228, 220, 0.82);
 }
 
 .navSearchIcon {
@@ -146,6 +167,193 @@
     font-size: 0.62rem;
     font-weight: 700;
     line-height: 1;
+}
+
+.navSearchPanel {
+    position: absolute;
+    top: calc(100% + 0.75rem);
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(620px, calc(100vw - 2rem));
+    max-height: min(70vh, 640px);
+    overflow: auto;
+    border-radius: 26px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background:
+        linear-gradient(180deg, rgba(8, 10, 16, 0.96) 0%, rgba(12, 17, 28, 0.94) 100%);
+    box-shadow: 0 26px 54px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(20px);
+    padding: 0.75rem;
+}
+
+.navSearchPanelSection {
+    display: flex;
+    flex-direction: column;
+    gap: 0.78rem;
+}
+
+.navSearchPanelHeader {
+    padding: 0.1rem 0.2rem 0;
+    color: #ffd7c7;
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.navSearchPanelGrid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.72rem;
+}
+
+@media (min-width: 1080px) {
+    .navSearchPanelGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.navSearchPanelCard {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 0.78rem;
+    align-items: start;
+    padding: 0.72rem;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    text-decoration: none;
+    transition: transform 0.16s ease, border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.navSearchPanelCard:hover {
+    transform: translateY(-1px);
+    border-color: rgba(255, 143, 112, 0.28);
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.navSearchPanelCoverWrap {
+    position: relative;
+    width: 72px;
+    min-width: 72px;
+    aspect-ratio: 3 / 4;
+    border-radius: 14px;
+    overflow: hidden;
+    background: linear-gradient(135deg, rgba(255, 143, 112, 0.2), rgba(77, 130, 112, 0.24));
+}
+
+.navSearchPanelCover {
+    object-fit: cover;
+}
+
+.navSearchPanelCoverFallback {
+    width: 100%;
+    height: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 248, 244, 0.94);
+    font-size: 1.15rem;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+}
+
+.navSearchPanelBody {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.34rem;
+}
+
+.navSearchPanelTags {
+    display: flex;
+    align-items: center;
+    gap: 0.38rem;
+    flex-wrap: wrap;
+}
+
+.navSearchPanelTag,
+.navSearchPanelInteractive {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.3rem;
+    padding: 0 0.46rem;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.navSearchPanelTag {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(242, 246, 255, 0.86);
+}
+
+.navSearchPanelInteractive {
+    background: rgba(56, 189, 248, 0.16);
+    color: #bae6fd;
+}
+
+.navSearchPanelTitle {
+    margin: 0;
+    color: #f8fbff;
+    font-size: 0.96rem;
+    font-weight: 800;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.navSearchPanelAuthor {
+    margin: 0;
+    color: rgba(226, 232, 240, 0.72);
+    font-size: 0.8rem;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.navSearchPanelStatus {
+    margin: 0.08rem 0 0;
+    color: rgba(255, 228, 220, 0.82);
+    font-size: 0.76rem;
+    font-weight: 600;
+    line-height: 1.4;
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.navSearchPanelStatusDot {
+    width: 4px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.32);
+}
+
+.navSearchPanelState {
+    padding: 0.9rem 0.95rem 1rem;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.navSearchPanelStateTitle {
+    margin: 0;
+    color: #f8fbff;
+    font-size: 0.92rem;
+    font-weight: 700;
+}
+
+.navSearchPanelStateText {
+    margin: 0.3rem 0 0;
+    color: rgba(226, 232, 240, 0.7);
+    font-size: 0.79rem;
+    line-height: 1.55;
 }
 
 .pricingLink,
@@ -312,8 +520,12 @@
 }
 
 .mobileDrawerBrand {
-    transform: scale(0.92);
-    transform-origin: left center;
+    color: #f8fbff;
+    text-decoration: none;
+    font-size: 0.96rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1;
 }
 
 .mobileDrawerCloseBtn {

@@ -1414,7 +1414,7 @@ export default function StoryManagerPage() {
             <header className={`ffStudioTopbar ${styles.header}`}>
                 <div className="ffStudioTopbarInner">
                     <div className={`ffStudioTopbarContext ${styles.headerContext}`}>
-                        <BrandLogo href="/" size="md" className={styles.logo} withStudioLabel />
+                        <BrandLogo href="/" size="md" className={styles.logo} />
                         <span className={styles.headerDivider}>/</span>
                         <div className="ffStudioTopbarCopy">
                             <span className="ffStudioTopbarEyebrow">Story Studio</span>
@@ -1437,7 +1437,7 @@ export default function StoryManagerPage() {
             <header className={`ffStudioTopbar ${styles.header}`}>
                 <div className="ffStudioTopbarInner">
                     <div className={`ffStudioTopbarContext ${styles.headerContext}`}>
-                        <BrandLogo href="/" size="md" className={styles.logo} withStudioLabel />
+                        <BrandLogo href="/" size="md" className={styles.logo} />
                         <span className={styles.headerDivider}>/</span>
                         <div className="ffStudioTopbarCopy">
                             <span className="ffStudioTopbarEyebrow">Story Studio</span>
@@ -1499,7 +1499,7 @@ export default function StoryManagerPage() {
             <header className={`ffStudioTopbar ${styles.header}`}>
                 <div className="ffStudioTopbarInner">
                     <div className={`ffStudioTopbarContext ${styles.headerContext}`}>
-                        <BrandLogo href="/" size="md" className={styles.logo} withStudioLabel />
+                        <BrandLogo href="/" size="md" className={styles.logo} />
                         <span className={styles.headerDivider}>/</span>
                         <div className="ffStudioTopbarCopy">
                             <span className="ffStudioTopbarEyebrow">Story Studio</span>

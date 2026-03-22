@@ -1,36 +1,33 @@
 .root {
+  --brand-logo-size: 28px;
   --brand-logo-ink: #0f172a;
-  --brand-logo-accent: #f97316;
-  --brand-logo-glow: #fed7aa;
   display: inline-flex;
   align-items: center;
-  gap: 0.48rem;
   line-height: 1;
   vertical-align: middle;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .link {
   text-decoration: none;
 }
 
-.svg {
-  display: block;
-  flex-shrink: 0;
+.wordmark,
+.monogram {
+  display: inline-block;
+  color: var(--brand-logo-ink);
+  font-family: inherit;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
 }
 
-.studioLabel {
-  display: inline-flex;
-  align-items: center;
-  min-height: 1.6rem;
-  padding: 0.18rem 0.5rem;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--brand-logo-ink) 16%, transparent);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.82));
-  color: #475569;
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+.wordmark {
+  font-size: calc(var(--brand-logo-size) * 0.9);
+}
+
+.monogram {
+  font-size: calc(var(--brand-logo-size) * 0.82);
+  letter-spacing: -0.03em;
 }

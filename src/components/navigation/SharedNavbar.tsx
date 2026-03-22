@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type FormEvent, type MouseEvent, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type MouseEvent, type ReactNode, type RefObject } from 'react';
 import type { User } from '@supabase/supabase-js';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -17,7 +17,6 @@ import {
   Search,
 } from 'lucide-react';
 
-import { BrandLogo } from '@/components/brand/BrandLogo';
 import styles from '@/app/home.module.css';
 
 type SharedNavbarProps = {
@@ -34,6 +33,7 @@ type SharedNavbarProps = {
   searchPlaceholder?: string;
   searchAriaLabel?: string;
   showSearchShortcutHint?: boolean;
+  searchPanel?: ReactNode;
   onDashboardAccess: (event: MouseEvent<HTMLAnchorElement>) => void;
   isProfileMenuOpen: boolean;
   profileMenuRef: RefObject<HTMLDivElement | null>;
@@ -59,6 +59,7 @@ export function SharedNavbar({
   searchPlaceholder = 'ค้นหาเรื่องที่อยากอ่าน',
   searchAriaLabel = 'ค้นหาเรื่อง',
   showSearchShortcutHint = true,
+  searchPanel,
   onDashboardAccess,
   isProfileMenuOpen,
   profileMenuRef,
@@ -71,8 +72,13 @@ export function SharedNavbar({
 }: SharedNavbarProps) {
   const pathname = usePathname();
   const hasSearch = Boolean(onSearchSubmit && onSearchChange);
+  const hasSearchPanel = hasSearch && Boolean(searchPanel);
   const [mobileDrawerRoute, setMobileDrawerRoute] = useState<string | null>(null);
+  const [isSearchPanelOpen, setIsSearchPanelOpen] = useState(false);
+  const [searchPanelPathname, setSearchPanelPathname] = useState<string | null>(null);
   const isMobileDrawerOpen = mobileDrawerRoute === pathname;
+  const isSearchPanelVisible = hasSearchPanel && isSearchPanelOpen && searchPanelPathname === pathname;
+  const searchShellRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!isMobileDrawerOpen) return;
@@ -99,8 +105,42 @@ export function SharedNavbar({
     };
   }, [isMobileDrawerOpen]);
 
+  const closeSearchPanel = useCallback(() => {
+    setIsSearchPanelOpen(false);
+    setSearchPanelPathname(null);
+  }, []);
+
+  useEffect(() => {
+    if (!isSearchPanelVisible) return;
+
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeSearchPanel();
+      }
+    };
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (searchShellRef.current?.contains(target)) return;
+      closeSearchPanel();
+    };
+
+    document.addEventListener('keydown', handleEsc);
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => {
+      document.removeEventListener('keydown', handleEsc);
+      document.removeEventListener('mousedown', handlePointerDown);
+    };
+  }, [closeSearchPanel, isSearchPanelVisible]);
+
   const closeMobileDrawer = () => {
     setMobileDrawerRoute(null);
+  };
+
+  const handleSearchFormSubmit = (event: FormEvent<HTMLFormElement>) => {
+    closeSearchPanel();
+    onSearchSubmit?.(event);
   };
 
   const handleDashboardLinkClick = (event: MouseEvent<HTMLAnchorElement>) => {
@@ -116,7 +156,9 @@ export function SharedNavbar({
         aria-label="เมนูมือถือ"
       >
         <div className={styles.mobileDrawerHeader}>
-          <BrandLogo href="/" size="md" className={styles.mobileDrawerBrand} />
+          <Link href="/" className={styles.mobileDrawerBrand} onClick={closeMobileDrawer}>
+            FlowFic
+          </Link>
           <button
             type="button"
             className={styles.mobileDrawerCloseBtn}
@@ -196,22 +238,38 @@ export function SharedNavbar({
       data-gsap={navDataGsap}
     >
       <div className={styles.navLeft}>
-        <BrandLogo href="/" size="lg" className={styles.logo} />
+        <Link href="/" className={styles.logo}>
+          FlowFic
+        </Link>
       </div>
 
       {hasSearch && onSearchSubmit && onSearchChange && (
-        <form className={styles.navSearchWrap} onSubmit={onSearchSubmit}>
-          <Search size={16} className={styles.navSearchIcon} />
-          <input
-            ref={searchInputRef}
-            className={styles.navSearchInput}
-            placeholder={searchPlaceholder}
-            value={searchValue ?? ''}
-            onChange={(event) => onSearchChange(event.target.value)}
-            aria-label={searchAriaLabel}
-          />
-          {showSearchShortcutHint && <span className={styles.navSearchHint}>⌘K</span>}
-        </form>
+        <div className={styles.navSearchShell} ref={searchShellRef}>
+          <form className={styles.navSearchWrap} onSubmit={handleSearchFormSubmit}>
+            <Search size={16} className={styles.navSearchIcon} />
+            <input
+              ref={searchInputRef}
+              className={styles.navSearchInput}
+              placeholder={searchPlaceholder}
+              value={searchValue ?? ''}
+              onChange={(event) => onSearchChange(event.target.value)}
+              onFocus={() => {
+                if (hasSearchPanel) {
+                  setIsSearchPanelOpen(true);
+                  setSearchPanelPathname(pathname);
+                }
+              }}
+              aria-label={searchAriaLabel}
+            />
+            {showSearchShortcutHint && <span className={styles.navSearchHint}>⌘K</span>}
+          </form>
+
+          {isSearchPanelVisible && (
+            <div className={styles.navSearchPanel}>
+              {searchPanel}
+            </div>
+          )}
+        </div>
       )}
 
       <div className={styles.navRight}>

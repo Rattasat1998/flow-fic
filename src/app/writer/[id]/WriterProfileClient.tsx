@@ -261,7 +261,7 @@ export default function WriterProfileClient({ writerId }: WriterProfileClientPro
                 <nav className={`ffStudioTopbar ${styles.topbar}`}>
                     <div className="ffStudioTopbarInner">
                         <div className={`ffStudioTopbarContext ${styles.topbarContext}`}>
-                            <BrandLogo href="/" size="md" className={styles.topbarLogo} withStudioLabel />
+                            <BrandLogo href="/" size="md" className={styles.topbarLogo} />
                             <span className={styles.topbarDivider}>/</span>
                             <div className="ffStudioTopbarCopy">
                                 <span className="ffStudioTopbarEyebrow">Writer Profile</span>
@@ -289,7 +289,7 @@ export default function WriterProfileClient({ writerId }: WriterProfileClientPro
             <nav className={`ffStudioTopbar ${styles.topbar}`}>
                 <div className="ffStudioTopbarInner">
                     <div className={`ffStudioTopbarContext ${styles.topbarContext}`}>
-                        <BrandLogo href="/" size="md" className={styles.topbarLogo} withStudioLabel />
+                        <BrandLogo href="/" size="md" className={styles.topbarLogo} />
                         <span className={styles.topbarDivider}>/</span>
                         <div className="ffStudioTopbarCopy">
                             <span className="ffStudioTopbarEyebrow">Writer Profile</span>

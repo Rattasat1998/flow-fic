@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { createPortal } from 'react-dom';
 import {
     Heart,
     Eye,
@@ -107,6 +108,12 @@ type CharacterImageRow = {
 type StoryCoverRow = {
     cover_url: string | null;
     cover_wide_url: string | null;
+};
+
+type StoryActionMenuState = {
+    story: DashboardStory;
+    top: number;
+    right: number;
 };
 
 const STORIES_PER_PAGE = 20;
@@ -235,7 +242,7 @@ export default function DashboardPage() {
     const [isStoryInfoModalOpen, setIsStoryInfoModalOpen] = useState(false);
     const [selectedStory, setSelectedStory] = useState<DashboardStory | null>(null);
     const [isUpdatingStoryStatus, setIsUpdatingStoryStatus] = useState<Record<string, boolean>>({});
-    const [openStoryMenuId, setOpenStoryMenuId] = useState<string | null>(null);
+    const [openStoryMenu, setOpenStoryMenu] = useState<StoryActionMenuState | null>(null);
 
     useEffect(() => {
         if (isLoadingAuth) return;
@@ -549,12 +556,12 @@ export default function DashboardPage() {
     }, [storySummaryRows, userId]);
 
     useEffect(() => {
-        if (!openStoryMenuId && !isProfileMenuOpen) return;
+        if (!openStoryMenu && !isProfileMenuOpen) return;
 
         const handleClickOutside = (event: MouseEvent) => {
             const target = event.target as HTMLElement;
-            if (openStoryMenuId && !target.closest('[data-story-actions="true"]')) {
-                setOpenStoryMenuId(null);
+            if (openStoryMenu && !target.closest('[data-story-actions="true"]')) {
+                setOpenStoryMenu(null);
             }
             if (isProfileMenuOpen && profileMenuRef.current && !profileMenuRef.current.contains(target)) {
                 setIsProfileMenuOpen(false);
@@ -563,7 +570,23 @@ export default function DashboardPage() {
 
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [openStoryMenuId, isProfileMenuOpen]);
+    }, [openStoryMenu, isProfileMenuOpen]);
+
+    useEffect(() => {
+        if (!openStoryMenu) return;
+
+        const handleViewportChange = () => {
+            setOpenStoryMenu(null);
+        };
+
+        window.addEventListener('resize', handleViewportChange);
+        window.addEventListener('scroll', handleViewportChange, true);
+
+        return () => {
+            window.removeEventListener('resize', handleViewportChange);
+            window.removeEventListener('scroll', handleViewportChange, true);
+        };
+    }, [openStoryMenu]);
 
     const portfolioStoryCount = storySummaryRows.length;
 
@@ -757,7 +780,7 @@ export default function DashboardPage() {
         const confirmed = window.confirm(`ต้องการลบเรื่อง "${story.title}" ใช่หรือไม่?\nการลบนี้ไม่สามารถย้อนกลับได้`);
         if (!confirmed) return;
 
-        setOpenStoryMenuId(null);
+        setOpenStoryMenu(null);
 
         const [{ data: storyRow }, { data: chapterRows }, { data: characterRows }] = await Promise.all([
             supabase
@@ -850,6 +873,23 @@ export default function DashboardPage() {
         setPortfolioRefreshKey((prev) => prev + 1);
     };
 
+    const handleStoryMenuToggle = useCallback((event: ReactMouseEvent<HTMLButtonElement>, story: DashboardStory) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        const viewportPadding = 12;
+        const estimatedMenuHeight = 108;
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const top = spaceBelow >= estimatedMenuHeight
+            ? rect.bottom + 8
+            : Math.max(viewportPadding, rect.top - estimatedMenuHeight - 8);
+        const right = Math.max(viewportPadding, window.innerWidth - rect.right);
+
+        setOpenStoryMenu((prev) => (
+            prev?.story.id === story.id
+                ? null
+                : { story, top, right }
+        ));
+    }, []);
+
     const renderMetricValue = (value: number) => (isMetricsLoading ? '...' : formatCount(value));
 
     return (
@@ -871,72 +911,74 @@ export default function DashboardPage() {
 
             <div className={styles.pageShell}>
                 <div className={`ffPageContainer ${styles.content}`}>
-                    <section className={styles.welcomeSection}>
-                        <div className={styles.welcomeCopy}>
-                            <span className={styles.welcomeEyebrow}>Writer Overview</span>
-                            <h1 className={styles.greeting}>สวัสดี, {profile.pen_name}</h1>
-                            <p className={styles.subtitle}>{profile.bio || 'ภาพรวมผลงานและนิยายของคุณในสตูดิโอเขียนเรื่อง'}</p>
-                            <div className={styles.welcomePills}>
-                                <span className={styles.welcomePill}>ผลงานทั้งหมด {formatCount(portfolioStoryCount)} เรื่อง</span>
-                                <span className={styles.welcomePill}>เผยแพร่แล้ว {formatCount(publishedStoriesCount)} เรื่อง</span>
-                                <span className={styles.welcomePill}>จบแล้ว {formatCount(completedStoriesCount)} เรื่อง</span>
+                    <section className={styles.overviewPanel}>
+                        <div className={styles.welcomeSection}>
+                            <div className={styles.welcomeCopy}>
+                                <span className={styles.welcomeEyebrow}>Writer Overview</span>
+                                <h1 className={styles.greeting}>สวัสดี, {profile.pen_name}</h1>
+                                <p className={styles.subtitle}>{profile.bio || 'ภาพรวมผลงานและนิยายของคุณในสตูดิโอเขียนเรื่อง'}</p>
+                                <div className={styles.welcomePills}>
+                                    <span className={styles.welcomePill}>ผลงานทั้งหมด {formatCount(portfolioStoryCount)} เรื่อง</span>
+                                    <span className={styles.welcomePill}>เผยแพร่แล้ว {formatCount(publishedStoriesCount)} เรื่อง</span>
+                                    <span className={styles.welcomePill}>จบแล้ว {formatCount(completedStoriesCount)} เรื่อง</span>
+                                </div>
+                            </div>
+                            <div className={styles.welcomeActions}>
+                                <Link href="/story/create" className={styles.createBtn}>
+                                    <Plus size={14} /> แต่งเรื่องใหม่
+                                </Link>
+                                <button onClick={handleOpenProfileModal} className={styles.profileSettingsBtn}>
+                                    <Settings size={14} /> ตั้งค่าโปรไฟล์นักเขียน
+                                </button>
                             </div>
                         </div>
-                        <div className={styles.welcomeActions}>
-                            <Link href="/story/create" className={styles.createBtn}>
-                                <Plus size={14} /> แต่งเรื่องใหม่
-                            </Link>
-                            <button onClick={handleOpenProfileModal} className={styles.profileSettingsBtn}>
-                                <Settings size={14} /> ตั้งค่าโปรไฟล์นักเขียน
-                            </button>
+
+                        <div className={styles.statsGrid}>
+                            <div className={styles.statCard}>
+                                <div className={`${styles.statIconWrapper} ${styles.statToneAmber}`}>
+                                    <Eye size={24} />
+                                </div>
+                                <div className={styles.statInfo}>
+                                    <p className={styles.statLabel}>ยอดวิวรวม</p>
+                                    <h3 className={styles.statValue}>{renderMetricValue(totalViews)}</h3>
+                                    <p className={styles.statNote}>รวมทุกเรื่องที่เผยแพร่</p>
+                                </div>
+                            </div>
+
+                            <div className={styles.statCard}>
+                                <div className={`${styles.statIconWrapper} ${styles.statToneRose}`}>
+                                    <Heart size={24} />
+                                </div>
+                                <div className={styles.statInfo}>
+                                    <p className={styles.statLabel}>หัวใจทั้งหมด</p>
+                                    <h3 className={styles.statValue}>{renderMetricValue(totalLikes)}</h3>
+                                    <p className={styles.statNote}>สัญญาณตอบรับจากผู้อ่าน</p>
+                                </div>
+                            </div>
+
+                            <div className={styles.statCard}>
+                                <div className={`${styles.statIconWrapper} ${styles.statToneOrange}`}>
+                                    <Bookmark size={24} />
+                                </div>
+                                <div className={styles.statInfo}>
+                                    <p className={styles.statLabel}>เก็บเข้าชั้น</p>
+                                    <h3 className={styles.statValue}>{renderMetricValue(totalFavorites)}</h3>
+                                    <p className={styles.statNote}>จำนวนครั้งที่ถูกเซฟไว้</p>
+                                </div>
+                            </div>
+
+                            <div className={styles.statCard}>
+                                <div className={`${styles.statIconWrapper} ${styles.statToneBlue}`}>
+                                    <MessageSquare size={24} />
+                                </div>
+                                <div className={styles.statInfo}>
+                                    <p className={styles.statLabel}>คอมเมนต์</p>
+                                    <h3 className={styles.statValue}>{renderMetricValue(totalComments)}</h3>
+                                    <p className={styles.statNote}>บทสนทนาจากผู้อ่านทั้งหมด</p>
+                                </div>
+                            </div>
                         </div>
                     </section>
-
-                    <div className={styles.statsGrid}>
-                        <div className={styles.statCard}>
-                            <div className={`${styles.statIconWrapper} ${styles.statToneAmber}`}>
-                                <Eye size={24} />
-                            </div>
-                            <div className={styles.statInfo}>
-                                <p className={styles.statLabel}>ยอดวิวรวม</p>
-                                <h3 className={styles.statValue}>{renderMetricValue(totalViews)}</h3>
-                                <p className={styles.statNote}>รวมทุกเรื่องที่เผยแพร่</p>
-                            </div>
-                        </div>
-
-                        <div className={styles.statCard}>
-                            <div className={`${styles.statIconWrapper} ${styles.statToneRose}`}>
-                                <Heart size={24} />
-                            </div>
-                            <div className={styles.statInfo}>
-                                <p className={styles.statLabel}>หัวใจทั้งหมด</p>
-                                <h3 className={styles.statValue}>{renderMetricValue(totalLikes)}</h3>
-                                <p className={styles.statNote}>สัญญาณตอบรับจากผู้อ่าน</p>
-                            </div>
-                        </div>
-
-                        <div className={styles.statCard}>
-                            <div className={`${styles.statIconWrapper} ${styles.statToneOrange}`}>
-                                <Bookmark size={24} />
-                            </div>
-                            <div className={styles.statInfo}>
-                                <p className={styles.statLabel}>เก็บเข้าชั้น</p>
-                                <h3 className={styles.statValue}>{renderMetricValue(totalFavorites)}</h3>
-                                <p className={styles.statNote}>จำนวนครั้งที่ถูกเซฟไว้</p>
-                            </div>
-                        </div>
-
-                        <div className={styles.statCard}>
-                            <div className={`${styles.statIconWrapper} ${styles.statToneBlue}`}>
-                                <MessageSquare size={24} />
-                            </div>
-                            <div className={styles.statInfo}>
-                                <p className={styles.statLabel}>คอมเมนต์</p>
-                                <h3 className={styles.statValue}>{renderMetricValue(totalComments)}</h3>
-                                <p className={styles.statNote}>บทสนทนาจากผู้อ่านทั้งหมด</p>
-                            </div>
-                        </div>
-                    </div>
 
                     <div className={styles.mainGrid}>
                         <section className={styles.card}>
@@ -1071,34 +1113,13 @@ export default function DashboardPage() {
                                                                 type="button"
                                                                 className={styles.moreMenuBtn}
                                                                 title="เมนูเพิ่มเติม"
-                                                                onClick={() => {
-                                                                    setOpenStoryMenuId((prev) => (prev === story.id ? null : story.id));
+                                                                aria-expanded={openStoryMenu?.story.id === story.id}
+                                                                onClick={(event) => {
+                                                                    handleStoryMenuToggle(event, story);
                                                                 }}
                                                             >
                                                                 <MoreVertical size={18} />
                                                             </button>
-                                                            {openStoryMenuId === story.id && (
-                                                                <div className={styles.storyActionMenu}>
-                                                                    <button
-                                                                        type="button"
-                                                                        className={styles.storyActionMenuItem}
-                                                                        onClick={() => {
-                                                                            setSelectedStory(story);
-                                                                            setIsStoryInfoModalOpen(true);
-                                                                            setOpenStoryMenuId(null);
-                                                                        }}
-                                                                    >
-                                                                        ดูรายละเอียด
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        className={`${styles.storyActionMenuItem} ${styles.storyActionMenuItemDanger}`}
-                                                                        onClick={() => handleDeleteStory(story)}
-                                                                    >
-                                                                        ลบ
-                                                                    </button>
-                                                                </div>
-                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1294,6 +1315,34 @@ export default function DashboardPage() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {openStoryMenu && typeof document !== 'undefined' && createPortal(
+                <div
+                    className={`${styles.storyActionMenu} ${styles.storyActionMenuFloating}`}
+                    data-story-actions="true"
+                    style={{ top: openStoryMenu.top, right: openStoryMenu.right }}
+                >
+                    <button
+                        type="button"
+                        className={styles.storyActionMenuItem}
+                        onClick={() => {
+                            setSelectedStory(openStoryMenu.story);
+                            setIsStoryInfoModalOpen(true);
+                            setOpenStoryMenu(null);
+                        }}
+                    >
+                        ดูรายละเอียด
+                    </button>
+                    <button
+                        type="button"
+                        className={`${styles.storyActionMenuItem} ${styles.storyActionMenuItemDanger}`}
+                        onClick={() => handleDeleteStory(openStoryMenu.story)}
+                    >
+                        ลบ
+                    </button>
+                </div>,
+                document.body
             )}
         </main>
     );
