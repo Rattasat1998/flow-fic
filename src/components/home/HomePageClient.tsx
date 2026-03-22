@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import {
   PenTool,
   Heart,
@@ -30,6 +30,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { WalletLedgerPanel } from '@/components/profile/WalletLedgerPanel';
 import { useHomeGsapAnimations } from '@/components/home/useHomeGsapAnimations';
 import { SharedNavbar } from '@/components/navigation/SharedNavbar';
+import { StorySearchPanel } from '@/components/navigation/StorySearchPanel';
 import type {
   DiscoveryFilters,
   DiscoveryRailKey,
@@ -113,17 +114,77 @@ function railsFromPayload(payload: DiscoveryResponse, loading: boolean): HomeRai
   };
 }
 
-function resolveSearchPanelCategoryLabel(story: DiscoveryStory): string {
-  return getSubCategoryLabel(story.sub_category) || getMainCategoryLabel(story.main_category) || 'เรื่องแนะนำ';
-}
-
-function resolveSearchPanelCompletionLabel(story: DiscoveryStory): string {
-  return story.completion_status === 'completed' ? 'จบแล้ว' : 'กำลังอัปเดต';
-}
-
 type HomePageClientProps = {
   initialDiscovery: DiscoveryResponse;
 };
+
+function supportsCoverTilt(pointerType: string): boolean {
+  if (pointerType === 'touch') return false;
+  if (typeof window === 'undefined') return false;
+  return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function resetCoverTilt(node: HTMLDivElement): void {
+  node.dataset.tiltActive = 'false';
+  node.style.setProperty('--story-card-tilt-x', '0deg');
+  node.style.setProperty('--story-card-tilt-y', '0deg');
+  node.style.setProperty('--story-card-glare-x', '50%');
+  node.style.setProperty('--story-card-glare-y', '50%');
+  node.style.setProperty('--story-card-glare-opacity', '0');
+  node.style.setProperty('--story-card-aura-opacity', '0');
+}
+
+type StoryCoverTiltFrameProps = {
+  className: string;
+  children: ReactNode;
+};
+
+function StoryCoverTiltFrame({ className, children }: StoryCoverTiltFrameProps) {
+  const handlePointerEnter = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!supportsCoverTilt(event.pointerType)) return;
+    event.currentTarget.dataset.tiltActive = 'true';
+  }, []);
+
+  const handlePointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!supportsCoverTilt(event.pointerType)) return;
+
+    const node = event.currentTarget;
+    const rect = node.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+
+    const relativeX = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    const relativeY = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
+    const rotateX = (0.5 - relativeY) * 14;
+    const rotateY = (relativeX - 0.5) * 14;
+
+    node.dataset.tiltActive = 'true';
+    node.style.setProperty('--story-card-tilt-x', `${rotateX.toFixed(2)}deg`);
+    node.style.setProperty('--story-card-tilt-y', `${rotateY.toFixed(2)}deg`);
+    node.style.setProperty('--story-card-glare-x', `${(relativeX * 100).toFixed(2)}%`);
+    node.style.setProperty('--story-card-glare-y', `${(relativeY * 100).toFixed(2)}%`);
+    node.style.setProperty('--story-card-glare-opacity', '1');
+    node.style.setProperty('--story-card-aura-opacity', '1');
+  }, []);
+
+  const handlePointerLeave = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    resetCoverTilt(event.currentTarget);
+  }, []);
+
+  return (
+    <div
+      className={`${className} ${styles.storyCoverTiltFrame}`}
+      data-tilt-active="false"
+      onPointerEnter={handlePointerEnter}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
+      onPointerCancel={handlePointerLeave}
+    >
+      {children}
+      <div className={styles.storyCoverTiltGlare} aria-hidden="true" />
+      <div className={styles.storyCoverTiltAura} aria-hidden="true" />
+    </div>
+  );
+}
 
 export default function HomePageClient({ initialDiscovery }: HomePageClientProps) {
   const searchParams = useSearchParams();
@@ -606,87 +667,16 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
     && searchPanelStories.length === 0
     && (rails.new.loading || rails.popular.loading || rails.trending.loading);
 
-  const searchPanelContent = useMemo(() => {
-    const title = hasSearch ? 'ผลลัพธ์ที่ตรงกัน' : 'แนะนำตอนนี้';
-
-    if (isSearchPanelLoading) {
-      return (
-        <div className={styles.navSearchPanelSection}>
-          <div className={styles.navSearchPanelHeader}>{title}</div>
-          <div className={styles.navSearchPanelState}>
-            <p className={styles.navSearchPanelStateTitle}>กำลังโหลดเรื่องแนะนำ...</p>
-            <p className={styles.navSearchPanelStateText}>รอสักครู่ ระบบกำลังเตรียมรายการสำหรับคุณ</p>
-          </div>
-        </div>
-      );
-    }
-
-    if (searchPanelStories.length === 0) {
-      return (
-        <div className={styles.navSearchPanelSection}>
-          <div className={styles.navSearchPanelHeader}>{title}</div>
-          <div className={styles.navSearchPanelState}>
-            <p className={styles.navSearchPanelStateTitle}>
-              {hasSearch ? 'ไม่พบเรื่องที่ตรงกับคำค้นนี้' : 'ยังไม่มีเรื่องแนะนำตอนนี้'}
-            </p>
-            <p className={styles.navSearchPanelStateText}>
-              {hasSearch
-                ? `ลองค้นหาด้วยคำอื่นแทน "${searchQuery}"`
-                : 'เมื่อมีเรื่องเด่นในระบบ รายการแนะนำจะปรากฏที่นี่'}
-            </p>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className={styles.navSearchPanelSection}>
-        <div className={styles.navSearchPanelHeader}>{title}</div>
-        <div className={styles.navSearchPanelGrid}>
-          {searchPanelStories.map((story) => {
-            const coverUrl = story.cover_url || story.cover_wide_url;
-            const categoryLabel = resolveSearchPanelCategoryLabel(story);
-
-            return (
-              <Link key={`nav-search-${story.id}`} href={`/story/${story.id}`} className={styles.navSearchPanelCard}>
-                <div className={styles.navSearchPanelCoverWrap}>
-                  {coverUrl ? (
-                    <Image
-                      src={coverUrl}
-                      alt={story.title}
-                      className={styles.navSearchPanelCover}
-                      fill
-                      sizes="(max-width: 1079px) 72px, 88px"
-                    />
-                  ) : (
-                    <div className={styles.navSearchPanelCoverFallback}>
-                      {story.title.slice(0, 2)}
-                    </div>
-                  )}
-                </div>
-
-                <div className={styles.navSearchPanelBody}>
-                  <div className={styles.navSearchPanelTags}>
-                    <span className={styles.navSearchPanelTag}>{categoryLabel}</span>
-                    {story.path_mode === 'branching' && (
-                      <span className={styles.navSearchPanelInteractive}>Interactive</span>
-                    )}
-                  </div>
-                  <h3 className={styles.navSearchPanelTitle}>{story.title}</h3>
-                  <p className={styles.navSearchPanelAuthor}>{story.pen_name}</p>
-                  <p className={styles.navSearchPanelStatus}>
-                    {story.published_chapter_count.toLocaleString('th-TH')} ตอน
-                    <span className={styles.navSearchPanelStatusDot} />
-                    {resolveSearchPanelCompletionLabel(story)}
-                  </p>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }, [hasSearch, isSearchPanelLoading, searchPanelStories, searchQuery]);
+  const searchPanelContent = useMemo(
+    () => (
+      <StorySearchPanel
+        stories={searchPanelStories}
+        query={searchQuery}
+        isLoading={isSearchPanelLoading}
+      />
+    ),
+    [isSearchPanelLoading, searchPanelStories, searchQuery]
+  );
 
   const subCategoryToMainCategoryMap = useMemo(
     () => new Map(SUB_CATEGORIES.map((subCategory) => [subCategory.id, subCategory.mainCategoryId])),
@@ -942,7 +932,7 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
 
                   return (
                     <Link key={`trending-${story.id}`} href={`/story/${story.id}`} className={styles.trendingCard} data-gsap-card="trending">
-                      <div className={styles.trendingCoverWrap}>
+                      <StoryCoverTiltFrame className={styles.trendingCoverWrap}>
                         {story.cover_url || story.cover_wide_url ? (
                           <Image
                             src={story.cover_url || story.cover_wide_url || ''}
@@ -956,7 +946,7 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
                         )}
 
                         {index < 4 && <span className={styles.trendingRankBadge}>#{index + 1}</span>}
-                      </div>
+                      </StoryCoverTiltFrame>
 
                       <div className={styles.trendingBody}>
                         <h3 className={styles.trendingTitle}>{story.title}</h3>
@@ -1016,7 +1006,7 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
                             className={`${styles.mainCategoryShelfCard} ${styles.shelfGridCard}`}
                             data-gsap-card="grid-category"
                           >
-                            <div className={styles.mainCategoryShelfCoverWrap}>
+                            <StoryCoverTiltFrame className={styles.mainCategoryShelfCoverWrap}>
                               {story.cover_url || story.cover_wide_url ? (
                                 <Image
                                   src={story.cover_url || story.cover_wide_url || ''}
@@ -1028,7 +1018,7 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
                               ) : (
                                 <div className={styles.mainCategoryShelfCoverFallback}>{story.title.slice(0, 2)}</div>
                               )}
-                            </div>
+                            </StoryCoverTiltFrame>
 
                             <div className={styles.mainCategoryShelfBody}>
                               <h4 className={styles.mainCategoryShelfTitle}>{story.title}</h4>
@@ -1100,7 +1090,7 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
                           const isInteractiveStory = story.path_mode === 'branching';
                           return (
                             <Link key={`category-${group.id}-${story.id}`} href={`/story/${story.id}`} className={styles.mainCategoryShelfCard} data-gsap-card="main-category">
-                              <div className={styles.mainCategoryShelfCoverWrap}>
+                              <StoryCoverTiltFrame className={styles.mainCategoryShelfCoverWrap}>
                                 {story.cover_url || story.cover_wide_url ? (
                                   <Image
                                     src={story.cover_url || story.cover_wide_url || ''}
@@ -1112,7 +1102,7 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
                                 ) : (
                                   <div className={styles.mainCategoryShelfCoverFallback}>{story.title.slice(0, 2)}</div>
                                 )}
-                              </div>
+                              </StoryCoverTiltFrame>
 
                               <div className={styles.mainCategoryShelfBody}>
                                 <h4 className={styles.mainCategoryShelfTitle}>{story.title}</h4>
@@ -1184,7 +1174,7 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
                 <div className={styles.editorSideList}>
                   {editorSideStories.map((story) => (
                     <Link key={`editor-side-${story.id}`} href={`/story/${story.id}`} className={styles.editorSideCard} data-gsap-card="editor">
-                      <div className={styles.editorSideCoverWrap}>
+                      <StoryCoverTiltFrame className={styles.editorSideCoverWrap}>
                         {story.cover_url || story.cover_wide_url ? (
                           <Image
                             src={story.cover_url || story.cover_wide_url || ''}
@@ -1196,7 +1186,7 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
                         ) : (
                           <div className={styles.editorSideFallback}>{story.title.slice(0, 2)}</div>
                         )}
-                      </div>
+                      </StoryCoverTiltFrame>
                       <div className={styles.editorSideBody}>
                         <h4 className={styles.editorSideTitle}>{story.title}</h4>
                         <p className={styles.editorSideDesc}>{story.synopsis || `${story.pen_name} · เรื่องที่ไม่อยากให้พลาด`}</p>
@@ -1242,20 +1232,6 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
           </section>
         </div>
 
-        <footer className={styles.footer}>
-          <div className={styles.footerInner}>
-            <div className={styles.footerBrand}>
-              <span className={styles.footerBrandName}>FlowFic</span>
-              <p className={styles.footerCopy}>© 2026 FlowFic Anthology. สงวนลิขสิทธิ์ทั้งหมด</p>
-            </div>
-            <div className={styles.footerLinks}>
-              <Link href="/legal-contact-and-versioning">เกี่ยวกับเรา</Link>
-              <Link href="/terms">ข้อกำหนดการใช้งาน</Link>
-              <Link href="/privacy">นโยบายความเป็นส่วนตัว</Link>
-              <Link href="/billing-policies">ศูนย์ช่วยเหลือ</Link>
-            </div>
-          </div>
-        </footer>
       </div>
 
       {/* Profile Modal */}

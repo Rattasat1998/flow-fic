@@ -39,6 +39,8 @@ type DBStoryRow = {
     status: string;
     completion_status: string | null;
     created_at: string | null;
+    writing_style: string | null;
+    path_mode: string | null;
 };
 
 type StorySummaryRow = {
@@ -55,6 +57,8 @@ type UserProfile = {
 };
 
 type StoryStatus = 'draft' | 'published';
+type StoryWritingStyle = 'narrative' | 'chat';
+type StoryPathMode = 'linear' | 'branching';
 
 type StoryMetrics = {
     views: number;
@@ -74,10 +78,18 @@ type DashboardStory = {
     status: StoryStatus;
     completionStatus: string;
     createdAt: string | null;
+    writingStyle: StoryWritingStyle;
+    pathMode: StoryPathMode;
     viewsCount: number;
     likesCount: number;
     commentsCount: number;
     favoritesCount: number;
+};
+
+type StoryModeBadge = {
+    key: 'narrative' | 'chat' | 'interactive';
+    label: string;
+    className: string;
 };
 
 type DashboardMetricsRow = {
@@ -193,6 +205,32 @@ const isMissingWriterMetricsRpcError = (error: unknown) => {
     const combined = `${message} ${details} ${hint}`;
 
     return maybeError.code === 'PGRST202' || combined.includes('get_writer_dashboard_metrics');
+};
+
+const parseStoryWritingStyle = (value: string | null | undefined): StoryWritingStyle =>
+    value === 'chat' ? 'chat' : 'narrative';
+
+const parseStoryPathMode = (value: string | null | undefined): StoryPathMode =>
+    value === 'branching' ? 'branching' : 'linear';
+
+const getStoryModeBadges = (
+    story: Pick<DashboardStory, 'writingStyle' | 'pathMode'>
+): StoryModeBadge[] => {
+    const badges: StoryModeBadge[] = [
+        story.writingStyle === 'chat'
+            ? { key: 'chat', label: 'แชท', className: styles.badgeChatStyle }
+            : { key: 'narrative', label: 'บรรยาย', className: styles.badgeNarrativeStyle },
+    ];
+
+    if (story.pathMode === 'branching') {
+        badges.push({
+            key: 'interactive',
+            label: 'Interactive',
+            className: styles.badgeInteractive,
+        });
+    }
+
+    return badges;
 };
 
 export default function DashboardPage() {
@@ -385,7 +423,7 @@ export default function DashboardPage() {
             let query = supabase
                 .from('stories')
                 .select(
-                    'id, title, cover_url, cover_wide_url, category, main_category, pen_name, synopsis, status, completion_status, created_at',
+                    'id, title, cover_url, cover_wide_url, category, main_category, pen_name, synopsis, status, completion_status, created_at, writing_style, path_mode',
                     { count: 'exact' }
                 )
                 .eq('user_id', userId)
@@ -628,6 +666,8 @@ export default function DashboardPage() {
                     status: s.status === 'published' ? 'published' : 'draft',
                     completionStatus: s.completion_status || 'ongoing',
                     createdAt: s.created_at,
+                    writingStyle: parseStoryWritingStyle(s.writing_style),
+                    pathMode: parseStoryPathMode(s.path_mode),
                     viewsCount: metrics.views,
                     likesCount: metrics.likes,
                     commentsCount: metrics.comments,
@@ -1055,6 +1095,7 @@ export default function DashboardPage() {
                                                 month: 'short',
                                             })
                                             : 'ไม่ทราบ';
+                                        const storyModeBadges = getStoryModeBadges(story);
 
                                         return (
                                             <div key={story.id} className={styles.storyListItem}>
@@ -1067,6 +1108,11 @@ export default function DashboardPage() {
                                                             {story.type === 'fanfic' && <span className={styles.badgeFanfic}>Fanfic</span>}
                                                             {story.type === 'novel' && <span className={styles.badgeNovel}>Original</span>}
                                                             {story.type === 'cartoon' && <span className={styles.badgeCartoon}>Cartoon</span>}
+                                                            {storyModeBadges.map((badge) => (
+                                                                <span key={`${story.id}-${badge.key}`} className={badge.className}>
+                                                                    {badge.label}
+                                                                </span>
+                                                            ))}
                                                             {story.completionStatus === 'completed' ? (
                                                                 <span className={styles.badgeCompleted}>Completed</span>
                                                             ) : (
@@ -1254,6 +1300,11 @@ export default function DashboardPage() {
                                         {selectedStory.type === 'fanfic' && <span className={styles.badgeFanfic}>Fanfic</span>}
                                         {selectedStory.type === 'novel' && <span className={styles.badgeNovel}>Original</span>}
                                         {selectedStory.type === 'cartoon' && <span className={styles.badgeCartoon}>Cartoon</span>}
+                                        {getStoryModeBadges(selectedStory).map((badge) => (
+                                            <span key={`selected-${badge.key}`} className={badge.className}>
+                                                {badge.label}
+                                            </span>
+                                        ))}
                                         {selectedStory.status === 'draft' && <span className={styles.badgeDraft}>Draft</span>}
                                         {selectedStory.completionStatus === 'completed' ? (
                                             <span className={styles.badgeCompleted}>Completed</span>

@@ -2948,3 +2948,713 @@
         padding: 0 0.52rem;
     }
 }
+
+/* ===== Story Studio Dark Theme Overrides ===== */
+
+.main {
+    min-height: 100vh;
+    background:
+        radial-gradient(circle at top, rgba(249, 115, 22, 0.18), transparent 28%),
+        linear-gradient(180deg, #060913 0%, #0a1020 38%, #0d1528 100%);
+    color: #e5edf8;
+}
+
+.header {
+    background: rgba(6, 10, 20, 0.82);
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 12px 30px rgba(2, 6, 23, 0.18);
+    backdrop-filter: blur(18px);
+}
+
+.headerTitleInput {
+    color: #f8fafc;
+    background: rgba(15, 23, 42, 0.42);
+}
+
+.headerTitleInput:hover,
+.headerTitleInput:focus {
+    background: rgba(15, 23, 42, 0.8);
+}
+
+.headerTitleInput::placeholder,
+.editorMeta {
+    color: rgba(191, 208, 228, 0.72);
+}
+
+.statusBadge {
+    display: inline-flex;
+    align-items: center;
+}
+
+.draft,
+.published {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.35rem 0.72rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.draft {
+    background: rgba(249, 115, 22, 0.14);
+    border-color: rgba(249, 115, 22, 0.22);
+    color: #fdba74;
+}
+
+.published {
+    background: rgba(16, 185, 129, 0.14);
+    border-color: rgba(16, 185, 129, 0.22);
+    color: #6ee7b7;
+}
+
+.autoSaveIndicator {
+    color: #fbbf24;
+}
+
+.autoSaveIndicatorSaved {
+    color: #6ee7b7;
+}
+
+.headerPremiumControls {
+    background: rgba(15, 23, 42, 0.72);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: rgba(226, 232, 240, 0.88);
+}
+
+.headerPremiumToggle,
+.headerPremiumPrice {
+    color: rgba(226, 232, 240, 0.88);
+}
+
+.headerPremiumToggle input {
+    accent-color: #f97316;
+}
+
+.headerPremiumInput {
+    background: rgba(2, 6, 23, 0.56);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #f8fafc;
+}
+
+.revisionToggleBtn,
+.saveDraftBtn,
+.discardDraftBtn {
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(15, 23, 42, 0.72);
+    color: rgba(226, 232, 240, 0.9);
+}
+
+.revisionToggleBtn:hover:not(:disabled),
+.saveDraftBtn:hover:not(:disabled),
+.discardDraftBtn:hover:not(:disabled) {
+    background: rgba(15, 23, 42, 0.92);
+    border-color: rgba(249, 115, 22, 0.24);
+    color: #fdba74;
+}
+
+.publishBtn {
+    background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+    box-shadow: 0 16px 28px rgba(249, 115, 22, 0.24);
+}
+
+.publishBtn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%);
+    box-shadow: 0 18px 34px rgba(249, 115, 22, 0.3);
+}
+
+.editorWorkspace {
+    padding: 0 1rem 1rem;
+}
+
+.content {
+    background: linear-gradient(180deg, rgba(10, 17, 32, 0.88), rgba(5, 9, 19, 0.96));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 24px;
+    box-shadow:
+        0 28px 56px rgba(2, 6, 23, 0.24),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.contentChat {
+    padding-bottom: 0;
+}
+
+.povSelector,
+.soundSelector,
+.characterInlinePanel {
+    background: rgba(15, 23, 42, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 18px 34px rgba(2, 6, 23, 0.18);
+}
+
+.povSelector label,
+.soundSelector label,
+.characterInlineTitle,
+.povHelp,
+.soundHelp,
+.characterInlineName {
+    color: rgba(226, 232, 240, 0.78);
+}
+
+.povSelect,
+.soundSelect {
+    background: rgba(2, 6, 23, 0.56);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #f8fafc;
+}
+
+.povSelect:focus,
+.soundSelect:focus {
+    outline: none;
+    border-color: rgba(249, 115, 22, 0.34);
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.14);
+}
+
+.soundSelect:disabled {
+    background: rgba(15, 23, 42, 0.58);
+    color: rgba(148, 163, 184, 0.84);
+}
+
+.characterInlineItem:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.characterInlineAvatar {
+    background: rgba(249, 115, 22, 0.12);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #fdba74;
+}
+
+.chatInputBar {
+    background: rgba(6, 10, 20, 0.88);
+    border-top-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 -14px 30px rgba(2, 6, 23, 0.2);
+    backdrop-filter: blur(16px);
+}
+
+.trayCharBtn {
+    opacity: 0.72;
+}
+
+.trayCharBtn.active {
+    opacity: 1;
+}
+
+.trayCharAvatar,
+.trayAddAvatar,
+.activeCharBtn {
+    background: rgba(15, 23, 42, 0.84);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: rgba(226, 232, 240, 0.82);
+}
+
+.trayCharBtn.active .trayCharAvatar,
+.activeCharBtn:hover {
+    border-color: rgba(249, 115, 22, 0.34);
+    box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.14);
+}
+
+.trayCharName {
+    color: rgba(191, 208, 228, 0.78);
+}
+
+.trayCharBtn.active .trayCharName,
+.trayCharNameAccent {
+    color: #fdba74;
+}
+
+.trayAddBtn {
+    color: #fdba74;
+}
+
+.trayAddAvatar {
+    background: rgba(249, 115, 22, 0.12);
+}
+
+.trayAddBtn:hover .trayAddAvatar {
+    background: rgba(249, 115, 22, 0.18);
+}
+
+.imageUploadBtn,
+.unsplashBtn {
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(15, 23, 42, 0.72);
+    color: rgba(226, 232, 240, 0.84);
+}
+
+.imageUploadBtn:hover,
+.unsplashBtn:hover {
+    border-color: rgba(249, 115, 22, 0.24);
+    background: rgba(15, 23, 42, 0.92);
+    color: #fdba74;
+}
+
+.chatTextInput,
+.editInput {
+    background: rgba(2, 6, 23, 0.56);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #f8fafc;
+}
+
+.chatTextInput:focus,
+.editInput:focus,
+.unsplashSearchInput:focus,
+.branchingNarrativeInput:focus,
+.branchingChoiceInput:focus,
+.branchingTargetTitleInput:focus,
+.branchingChoiceSelect:focus,
+.branchInspectorInput:focus,
+.branchInspectorTextarea:focus,
+.branchInspectorSelect:focus {
+    outline: none;
+    border-color: rgba(249, 115, 22, 0.34);
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.14);
+}
+
+.chatTextInput::placeholder,
+.editInput::placeholder,
+.unsplashSearchInput::placeholder {
+    color: rgba(148, 163, 184, 0.8);
+}
+
+.sendBtn,
+.saveBtn,
+.unsplashSearchBtn,
+.recoveryRestoreBtn {
+    background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+    box-shadow: 0 14px 26px rgba(249, 115, 22, 0.24);
+}
+
+.sendBtn:hover:not(:disabled),
+.saveBtn:hover:not(:disabled),
+.unsplashSearchBtn:hover:not(:disabled),
+.recoveryRestoreBtn:hover {
+    background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%);
+    box-shadow: 0 16px 30px rgba(249, 115, 22, 0.28);
+}
+
+.sendBtn:disabled,
+.saveBtn:disabled,
+.unsplashSearchBtn:disabled {
+    box-shadow: none;
+}
+
+.modalOverlay,
+.branchMapModalOverlay,
+.revisionDrawerBackdrop {
+    background: rgba(2, 6, 23, 0.72);
+    backdrop-filter: blur(18px);
+}
+
+.modal,
+.revisionDrawer,
+.branchMapPropertiesPane {
+    background: linear-gradient(180deg, rgba(10, 17, 32, 0.97), rgba(5, 9, 19, 0.99));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 32px 80px rgba(2, 6, 23, 0.42);
+    color: #e5edf8;
+}
+
+.targetChapterModal {
+    background: linear-gradient(180deg, rgba(10, 17, 32, 0.98), rgba(5, 9, 19, 0.995));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 32px 80px rgba(2, 6, 23, 0.46);
+}
+
+.modalHeader,
+.modalFooter {
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.modalTitle,
+.editField label,
+.revisionDrawerHeader h3,
+.branchPaneHeader h3,
+.branchInspectorHeader h4,
+.branchPopoverHeader h4,
+.noticeTitle {
+    color: #f8fafc;
+}
+
+.editField label,
+.branchInspectorField span,
+.branchPopoverField span,
+.revisionDrawerHeader span,
+.noticeMessage {
+    color: rgba(226, 232, 240, 0.72);
+}
+
+.editInput,
+.branchingNarrativeInput,
+.branchingChoiceInput,
+.branchingTargetTitleInput,
+.branchingChoiceSelect,
+.branchInspectorInput,
+.branchInspectorTextarea,
+.branchInspectorSelect,
+.unsplashSearchInput {
+    background: rgba(2, 6, 23, 0.56);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #f8fafc;
+}
+
+.branchingChoiceSelect option,
+.branchInspectorSelect option,
+.povSelect option,
+.soundSelect option,
+.editInput option {
+    background: #0b1222;
+    color: #f8fafc;
+}
+
+.cancelBtn,
+.unsplashPickerBtn,
+.targetChapterOpenTabBtn,
+.branchPaneExpandBtn,
+.branchingAddBtn,
+.branchInspectorActionBtn,
+.revisionRestoreBtn,
+.revisionDrawerCloseBtn,
+.iconBtn {
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(15, 23, 42, 0.72);
+    color: rgba(226, 232, 240, 0.9);
+}
+
+.cancelBtn:hover,
+.unsplashPickerBtn:hover,
+.targetChapterOpenTabBtn:hover,
+.branchPaneExpandBtn:hover,
+.branchingAddBtn:hover:not(:disabled),
+.branchInspectorActionBtn:hover:not(:disabled),
+.revisionRestoreBtn:hover:not(:disabled),
+.revisionDrawerCloseBtn:hover,
+.iconBtn:hover {
+    background: rgba(15, 23, 42, 0.92);
+    border-color: rgba(249, 115, 22, 0.24);
+    color: #fdba74;
+    transform: none;
+    opacity: 1;
+}
+
+.branchInspectorActionDanger,
+.branchingRemoveBtn {
+    border-color: rgba(248, 113, 113, 0.24);
+    background: rgba(127, 29, 29, 0.24);
+    color: #fca5a5;
+}
+
+.branchInspectorActionDanger:hover:not(:disabled),
+.branchingRemoveBtn:hover {
+    border-color: rgba(248, 113, 113, 0.34);
+    background: rgba(127, 29, 29, 0.34);
+    color: #fecaca;
+}
+
+.unsplashModal {
+    max-width: 920px;
+}
+
+.targetChapterModalBody {
+    background: rgba(2, 6, 23, 0.62);
+}
+
+.targetChapterEditorFrame {
+    background: #050913;
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.unsplashError,
+.branchingError,
+.branchIssueText {
+    color: #fca5a5;
+}
+
+.unsplashEmpty,
+.branchShortcutHint,
+.branchPaneHeader span,
+.revisionEmpty,
+.revisionTitle,
+.revisionChangeSummary,
+.branchGraphEdgeLabel {
+    color: rgba(191, 208, 228, 0.72);
+}
+
+.noticeDialog {
+    background: linear-gradient(180deg, rgba(10, 17, 32, 0.97), rgba(5, 9, 19, 0.99));
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 28px 56px rgba(2, 6, 23, 0.36);
+}
+
+.noticeSuccess {
+    border-left-color: #fb923c;
+}
+
+.noticeError {
+    border-left-color: #f87171;
+}
+
+.noticeSuccess .noticeIcon {
+    color: #fdba74;
+}
+
+.noticeError .noticeIcon {
+    color: #fca5a5;
+}
+
+.noticeClose {
+    background: rgba(15, 23, 42, 0.72);
+    color: rgba(226, 232, 240, 0.8);
+}
+
+.noticeClose:hover {
+    background: rgba(15, 23, 42, 0.92);
+    color: #fdba74;
+}
+
+.recoveryBanner {
+    background: linear-gradient(135deg, rgba(120, 53, 15, 0.86), rgba(249, 115, 22, 0.22));
+    border-bottom-color: rgba(249, 115, 22, 0.22);
+}
+
+.recoveryText strong {
+    color: #fed7aa;
+}
+
+.recoveryText span {
+    color: rgba(255, 237, 213, 0.82);
+}
+
+.recoveryDismissBtn {
+    border-color: rgba(251, 146, 60, 0.28);
+    color: #fed7aa;
+}
+
+.recoveryDismissBtn:hover {
+    background: rgba(251, 146, 60, 0.14);
+}
+
+.revisionItem,
+.revisionDiffPreview > div,
+.branchSummaryItem,
+.branchPaneCard,
+.branchingPanel,
+.branchingTreeRoot,
+.branchingTreeSection,
+.branchingNarrativeNode,
+.branchingChoiceTreeNode,
+.branchTargetCard,
+.branchInspectorEmpty {
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.82), rgba(8, 12, 24, 0.96));
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 18px 34px rgba(2, 6, 23, 0.16);
+}
+
+.branchingWorkflowHint,
+.branchingTreeRootBadge,
+.branchGraphAddBtn {
+    background: rgba(249, 115, 22, 0.14);
+    border-color: rgba(249, 115, 22, 0.24);
+    color: #fdba74;
+}
+
+.branchingEndingNotice,
+.branchPopoverIssues {
+    background: rgba(120, 53, 15, 0.28);
+    border-color: rgba(251, 146, 60, 0.26);
+    color: #fed7aa;
+}
+
+.branchSummaryItem span,
+.branchingHeader p,
+.branchingTreeNodeLabel,
+.branchGraphNodeSubtitle,
+.branchTargetMeta span,
+.revisionMeta span,
+.revisionDiffPreview span {
+    color: rgba(191, 208, 228, 0.72);
+}
+
+.branchSummaryItem strong,
+.branchingHeader h3,
+.branchingTreeRootTitle,
+.branchingTreeSectionHeader h4,
+.branchGraphNodeLabel,
+.branchTargetTitle,
+.revisionMeta strong,
+.branchPopoverInfo {
+    color: #f8fafc;
+}
+
+.branchingNarrativeInput,
+.branchingChoiceInput,
+.branchingTargetTitleInput,
+.branchingChoiceSelect,
+.branchPopoverInfo,
+.branchInspectorInput,
+.branchInspectorTextarea,
+.branchInspectorSelect {
+    background: rgba(2, 6, 23, 0.56);
+}
+
+.branchingTreeSectionHeader span,
+.branchPopoverField span,
+.branchPopoverInfo,
+.branchShortcutHint {
+    color: rgba(191, 208, 228, 0.72);
+}
+
+.branchGraphCanvas,
+.branchGraphNode,
+.branchGraphNodePopover,
+.branchGraphNodeTargetDropdown {
+    background: linear-gradient(180deg, rgba(10, 17, 32, 0.92), rgba(5, 9, 19, 0.98));
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.branchGraphCanvas {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.branchGraphEdge {
+    stroke: rgba(148, 163, 184, 0.52);
+}
+
+.branchGraphEdgeMissing {
+    stroke: #fb923c;
+}
+
+.branchGraphEdgeActive {
+    stroke: #f97316;
+}
+
+.branchGraphNodeKindCurrent {
+    border-left-color: #cbd5e1;
+}
+
+.branchGraphNodeKindChoice {
+    border-left-color: #fb923c;
+}
+
+.branchGraphNodeKindTarget {
+    border-left-color: #fbbf24;
+}
+
+.branchGraphNodeKindEnding {
+    border-left-color: #94a3b8;
+}
+
+.branchGraphNodeStatusReady,
+.branchGraphNodeStatusDraft_target,
+.branchGraphNodeStatusPublished_target {
+    background: rgba(15, 23, 42, 0.92);
+}
+
+.branchGraphNodeStatusMissing_target,
+.branchGraphNodeStatusMissing_text {
+    background: rgba(120, 53, 15, 0.22);
+    border-color: rgba(251, 146, 60, 0.26);
+}
+
+.branchGraphNodeSelected {
+    border-color: rgba(249, 115, 22, 0.34);
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.14);
+}
+
+.branchGraphNodeInlineInput {
+    background: rgba(2, 6, 23, 0.72);
+    border-color: rgba(249, 115, 22, 0.34);
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.14);
+    color: #f8fafc;
+}
+
+.branchGraphDropdownItem:hover {
+    background: rgba(249, 115, 22, 0.14);
+    color: #fdba74;
+}
+
+.branchGraphDropdownEmpty {
+    color: rgba(148, 163, 184, 0.84);
+}
+
+.branchGraphNodePopover::before {
+    background: rgba(10, 17, 32, 0.98);
+    border-left-color: rgba(255, 255, 255, 0.08);
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.branchShortcutHint kbd {
+    background: rgba(15, 23, 42, 0.86);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #f8fafc;
+}
+
+.stateScreen,
+.loadingScreen {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+.stateCard {
+    width: min(560px, 100%);
+    padding: 2rem 1.75rem;
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(180deg, rgba(10, 17, 32, 0.88), rgba(5, 9, 19, 0.96));
+    box-shadow: 0 28px 56px rgba(2, 6, 23, 0.28);
+    text-align: center;
+}
+
+.stateCard h2 {
+    margin: 0 0 0.45rem;
+    color: #f8fafc;
+}
+
+.stateCard p {
+    margin: 0;
+    color: rgba(226, 232, 240, 0.72);
+    line-height: 1.65;
+}
+
+.requiredMark {
+    color: #fb7185;
+}
+
+@media (max-width: 980px) {
+    .header {
+        padding: 0.9rem 1rem;
+    }
+
+    .content {
+        border-radius: 20px;
+    }
+}
+
+@media (max-width: 768px) {
+    .content {
+        padding: 1rem;
+    }
+
+    .chatInputBar {
+        margin-left: -1rem;
+        margin-right: -1rem;
+        padding: 0.55rem 1rem 0.85rem;
+    }
+
+    .branchMapModalOverlay,
+    .modalOverlay,
+    .revisionDrawerBackdrop {
+        padding: 0.85rem;
+    }
+
+    .stateCard {
+        padding: 1.5rem 1.15rem;
+    }
+}

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { SiteFooter } from "@/components/layout/SiteFooter";
 import { WebVitalsReporter } from "@/components/perf/WebVitalsReporter";
 import {
   DEFAULT_SITE_DESCRIPTION,
@@ -63,19 +63,7 @@ export default function RootLayout({
           <WebVitalsReporter />
           <div className="appShell">
             <div className="appContent">{children}</div>
-            <footer className="appFooter">
-              <div className="appFooterInner">
-                <div className="appFooterLinks">
-                  <Link href="/terms">ข้อกำหนดและเงื่อนไข</Link>
-                  <Link href="/privacy">นโยบายความเป็นส่วนตัว</Link>
-                  <Link href="/billing-policies">ศูนย์นโยบาย</Link>
-                  <Link href="/cookie-tracking-notice">คุกกี้</Link>
-                  <Link href="/data-deletion">การลบข้อมูล</Link>
-                  <Link href="/legal-contact-and-versioning">ติดต่อทางกฎหมาย</Link>
-                </div>
-                <p className="appFooterCopy">© {new Date().getFullYear()} FlowFic</p>
-              </div>
-            </footer>
+            <SiteFooter />
           </div>
         </AuthProvider>
       </body>

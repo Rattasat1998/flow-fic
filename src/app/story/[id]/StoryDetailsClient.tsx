@@ -14,13 +14,12 @@ import {
     ChevronRight,
     Lock,
     X,
-    Mail,
-    Share2,
 } from 'lucide-react';
 import styles from './details.module.css';
 import { useTracking } from '@/hooks/useTracking';
 import { useFollow } from '@/hooks/useFollow';
 import { useAuth } from '@/contexts/AuthContext';
+import { StorySearchPanel } from '@/components/navigation/StorySearchPanel';
 import { ShareButton } from '@/components/share/ShareButton';
 import { SharedNavbar } from '@/components/navigation/SharedNavbar';
 import {
@@ -33,6 +32,7 @@ import {
     type StoredStoryProgress,
     writeStoredStoryProgress,
 } from '@/lib/readerProgress';
+import type { DiscoveryResponse, DiscoveryStory } from '@/types/discovery';
 
 interface StoryDetailsClientProps {
     storyId: string;
@@ -169,6 +169,39 @@ const resolveStoryTypeLabel = (category: string | null | undefined): string => {
 
 const resolveCompletionLabel = (completionStatus: string | null | undefined): string => {
     return completionStatus === 'completed' ? 'จบแล้ว' : 'กำลังอัปเดต';
+};
+
+const STORY_SEARCH_PANEL_LIMIT = 8;
+
+const compareSearchStoriesByPriority = (a: DiscoveryStory, b: DiscoveryStory): number => {
+    if (b.score_7d !== a.score_7d) return b.score_7d - a.score_7d;
+    if (b.total_view_count !== a.total_view_count) return b.total_view_count - a.total_view_count;
+
+    const createdAtA = a.created_at ? Date.parse(a.created_at) : 0;
+    const createdAtB = b.created_at ? Date.parse(b.created_at) : 0;
+    const safeCreatedAtA = Number.isNaN(createdAtA) ? 0 : createdAtA;
+    const safeCreatedAtB = Number.isNaN(createdAtB) ? 0 : createdAtB;
+    return safeCreatedAtB - safeCreatedAtA;
+};
+
+const buildStorySearchPanelQuery = (query: string): string => {
+    const params = new URLSearchParams();
+    if (query) params.set('q', query);
+    params.set('focusCore', 'false');
+    params.set('limit', String(STORY_SEARCH_PANEL_LIMIT));
+    return params.toString();
+};
+
+const collectStorySearchPanelStories = (payload: DiscoveryResponse, currentStoryId: string): DiscoveryStory[] => {
+    const uniqueStories = new Map<string, DiscoveryStory>();
+    [...payload.rails.trending.items, ...payload.rails.popular.items, ...payload.rails.new.items].forEach((story) => {
+        if (story.id === currentStoryId) return;
+        if (!uniqueStories.has(story.id)) uniqueStories.set(story.id, story);
+    });
+
+    return Array.from(uniqueStories.values())
+        .sort(compareSearchStoriesByPriority)
+        .slice(0, STORY_SEARCH_PANEL_LIMIT);
 };
 
 const formatThaiDate = (value: string): string => {
@@ -308,6 +341,8 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
     const [storyProgressVersion, setStoryProgressVersion] = useState<string | null>(null);
     const [isChapterListExpanded, setIsChapterListExpanded] = useState(false);
     const [topSearchInput, setTopSearchInput] = useState('');
+    const [topSearchStories, setTopSearchStories] = useState<DiscoveryStory[]>([]);
+    const [isTopSearchLoading, setIsTopSearchLoading] = useState(false);
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
     const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
     const [isAuthActionLoading, setIsAuthActionLoading] = useState(false);
@@ -699,7 +734,13 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
     }, [coinToast]);
 
     useEffect(() => {
-        setIsChapterListExpanded(false);
+        const timer = window.setTimeout(() => {
+            setIsChapterListExpanded(false);
+        }, 0);
+
+        return () => {
+            window.clearTimeout(timer);
+        };
     }, [storyId, dbStory?.path_mode, dbChapters.length]);
 
     useEffect(() => {
@@ -711,9 +752,16 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
 
     useEffect(() => {
         if (!user) return;
-        setIsAuthDialogOpen(false);
-        setAuthError(null);
-        setIsAuthActionLoading(false);
+
+        const timer = window.setTimeout(() => {
+            setIsAuthDialogOpen(false);
+            setAuthError(null);
+            setIsAuthActionLoading(false);
+        }, 0);
+
+        return () => {
+            window.clearTimeout(timer);
+        };
     }, [user]);
 
     useEffect(() => {
@@ -730,6 +778,49 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
 
         void fetchUnreadNotifications();
     }, [userId]);
+
+    const topSearchQuery = topSearchInput.trim();
+
+    useEffect(() => {
+        let isActive = true;
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => {
+            setIsTopSearchLoading(true);
+            setTopSearchStories([]);
+
+            const loadSearchStories = async () => {
+                try {
+                    const response = await fetch(`/api/discovery?${buildStorySearchPanelQuery(topSearchQuery)}`, {
+                        signal: controller.signal,
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`DISCOVERY_HTTP_${response.status}`);
+                    }
+
+                    const payload = await response.json() as DiscoveryResponse;
+                    if (!isActive || controller.signal.aborted) return;
+
+                    setTopSearchStories(collectStorySearchPanelStories(payload, storyId));
+                } catch (error) {
+                    if (!isActive || controller.signal.aborted) return;
+                    console.error('[StoryDetailsClient] search panel discovery failed:', error);
+                    setTopSearchStories([]);
+                } finally {
+                    if (!isActive || controller.signal.aborted) return;
+                    setIsTopSearchLoading(false);
+                }
+            };
+
+            void loadSearchStories();
+        }, topSearchQuery ? 140 : 0);
+
+        return () => {
+            isActive = false;
+            window.clearTimeout(timer);
+            controller.abort();
+        };
+    }, [storyId, topSearchQuery]);
 
     useEffect(() => {
         if (!isProfileMenuOpen) return;
@@ -761,6 +852,17 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
 
         setIsAuthDialogOpen(true);
     }, [isLoadingAuth, router, user]);
+
+    const searchPanelContent = useMemo(
+        () => (
+            <StorySearchPanel
+                stories={topSearchStories}
+                query={topSearchQuery}
+                isLoading={isTopSearchLoading}
+            />
+        ),
+        [isTopSearchLoading, topSearchQuery, topSearchStories]
+    );
 
     const handleTopSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -1084,6 +1186,7 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
                 searchValue={topSearchInput}
                 onSearchChange={setTopSearchInput}
                 onSearchSubmit={handleTopSearchSubmit}
+                searchPanel={searchPanelContent}
                 onDashboardAccess={handleDashboardAccess}
                 isProfileMenuOpen={isProfileMenuOpen}
                 profileMenuRef={profileMenuRef}
@@ -1272,29 +1375,6 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
 
                     </aside>
                 </div>
-
-                <footer className={styles.pageFooter}>
-                    <div className={styles.pageFooterInner}>
-                        <div className={styles.pageFooterBrand}>
-                            <span className={styles.pageFooterTitle}>FlowFic</span>
-                            <p className={styles.pageFooterCopy}>© 2024 FlowFic Anthology. สงวนลิขสิทธิ์</p>
-                        </div>
-                        <div className={styles.pageFooterLinks}>
-                            <Link href="/">เกี่ยวกับ</Link>
-                            <Link href="/terms">ข้อกำหนด</Link>
-                            <Link href="/privacy">ความเป็นส่วนตัว</Link>
-                            <Link href="/legal-contact-and-versioning">ช่วยเหลือ</Link>
-                        </div>
-                        <div className={styles.pageFooterIcons}>
-                            <a href="mailto:support@flow-fic.com" aria-label="ติดต่อฝ่ายช่วยเหลือ">
-                                <Mail size={15} />
-                            </a>
-                            <Link href="/" aria-label="แชร์ FlowFic">
-                                <Share2 size={15} />
-                            </Link>
-                        </div>
-                    </div>
-                </footer>
             </div>
 
             <div className="ffMobileActionBar">

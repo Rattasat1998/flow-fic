@@ -2077,7 +2077,7 @@ export default function StoryManagerPage() {
 
                             <div className={styles.editField}>
                                 <label>ประเภทผลงาน</label>
-                                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                <div className={styles.editOptionRow}>
                                     <button
                                         type="button"
                                         className={`${styles.editCategoryBtn} ${editForm.category === 'original' ? styles.editCategoryActive : ''}`}
@@ -2095,7 +2095,7 @@ export default function StoryManagerPage() {
                             {BRANCHING_FEATURE_ENABLED && (
                                 <div className={styles.editField}>
                                     <label>รูปแบบการเล่าเรื่อง</label>
-                                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                    <div className={styles.editOptionRow}>
                                         <button
                                             type="button"
                                             className={`${styles.editCategoryBtn} ${editForm.pathMode === 'branching' ? styles.editCategoryActive : ''}`}
@@ -2115,7 +2115,7 @@ export default function StoryManagerPage() {
                             )}
 
                             <div className={styles.editField}>
-                                <label>หมวดหมู่หลัก <span style={{ color: '#ef4444' }}>*</span></label>
+                                <label>หมวดหมู่หลัก <span className={styles.requiredMark}>*</span></label>
                                 <select
                                     className={styles.editInput}
                                     value={editForm.mainCategory}
@@ -2137,7 +2137,7 @@ export default function StoryManagerPage() {
 
                             {editForm.mainCategory && (
                                 <div className={styles.editField}>
-                                    <label>หมวดหมู่ <span style={{ color: '#ef4444' }}>*</span></label>
+                                    <label>หมวดหมู่ <span className={styles.requiredMark}>*</span></label>
                                     <select
                                         className={styles.editInput}
                                         value={editForm.subCategory}
@@ -2177,7 +2177,7 @@ export default function StoryManagerPage() {
                         </div>
 
                         {!isFromDB && (
-                            <p style={{ textAlign: 'center', color: '#f59e0b', fontSize: '0.85rem', margin: '0.75rem 0 0' }}>
+                            <p className={styles.demoNotice}>
                                 ⚠️ นี่คือข้อมูลตัวอย่าง (Demo) ไม่สามารถแก้ไขได้
                             </p>
                         )}
@@ -2267,17 +2267,17 @@ export default function StoryManagerPage() {
                         </div>
 
                         <div className={styles.modalBody}>
-                            <div className={styles.editCoverContainer} style={{ aspectRatio: '1/1', width: '150px', height: '150px', margin: '0 auto 1.5rem', borderRadius: '50%' }}>
-                                <label className={styles.editCoverUpload} style={{ borderRadius: '50%' }}>
+                            <div className={`${styles.editCoverContainer} ${styles.charImageEditorShell}`}>
+                                <label className={`${styles.editCoverUpload} ${styles.charImageUploadRound}`}>
                                     {charForm.imageUrl ? (
-                                        <img src={charForm.imageUrl} alt="Character Preview" className={styles.editCoverPreview} style={{ borderRadius: '50%', objectFit: 'cover' }} />
+                                        <img src={charForm.imageUrl} alt="Character Preview" className={`${styles.editCoverPreview} ${styles.charImagePreviewRound}`} />
                                     ) : (
-                                        <div className={styles.editCoverPlaceholder} style={{ borderRadius: '50%' }}>
+                                        <div className={`${styles.editCoverPlaceholder} ${styles.charImagePlaceholderRound}`}>
                                             <ImageIcon size={24} />
-                                            <span style={{ fontSize: '0.75rem', marginTop: '4px' }}>รูปตัวละคร</span>
+                                            <span className={styles.charImageLabel}>รูปตัวละคร</span>
                                         </div>
                                     )}
-                                    <div className={styles.editCoverOverlay} style={{ borderRadius: '50%' }}>
+                                    <div className={`${styles.editCoverOverlay} ${styles.charImageUploadRound}`}>
                                         <Upload size={20} />
                                     </div>
                                     <input
@@ -2290,7 +2290,7 @@ export default function StoryManagerPage() {
                             </div>
 
                             <div className={styles.editField}>
-                                <label>ชื่อตัวละคร <span style={{ color: '#ef4444' }}>*</span></label>
+                                <label>ชื่อตัวละคร <span className={styles.requiredMark}>*</span></label>
                                 <input
                                     type="text"
                                     value={charForm.name}
@@ -2301,7 +2301,7 @@ export default function StoryManagerPage() {
                                 />
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                            <div className={styles.charFormGrid}>
                                 <div className={styles.editField}>
                                     <label>อายุ</label>
                                     <input
@@ -2353,7 +2353,7 @@ export default function StoryManagerPage() {
             {/* Custom Confirm Modal */}
             {deleteConfirm.isOpen && (
                 <div className={styles.modalOverlay} onClick={() => setDeleteConfirm(prev => ({ ...prev, isOpen: false }))}>
-                    <div className={styles.modal} onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+                    <div className={`${styles.modal} ${styles.confirmModal}`} onClick={e => e.stopPropagation()}>
                         <div className={styles.modalHeader}>
                             <h2 className={styles.modalTitle}>{deleteConfirm.title}</h2>
                             <button className={styles.iconBtn} onClick={() => setDeleteConfirm(prev => ({ ...prev, isOpen: false }))}>
@@ -2361,13 +2361,12 @@ export default function StoryManagerPage() {
                             </button>
                         </div>
                         <div className={styles.modalBody}>
-                            <p style={{ margin: 0, color: '#475569' }}>{deleteConfirm.message}</p>
+                            <p className={styles.confirmMessage}>{deleteConfirm.message}</p>
                         </div>
                         <div className={styles.modalFooter}>
                             <button className={styles.cancelBtn} onClick={() => setDeleteConfirm(prev => ({ ...prev, isOpen: false }))}>ยกเลิก</button>
                             <button
-                                className={styles.saveBtn}
-                                style={{ backgroundColor: '#ef4444' }}
+                                className={`${styles.saveBtn} ${styles.dangerBtn}`}
                                 onClick={deleteConfirm.onConfirm}
                             >
                                 <X size={16} /> ยืนยันการลบ

@@ -2048,3 +2048,412 @@
         flex: 1;
     }
 }
+
+/* ===== Story Studio Dark Theme Overrides ===== */
+
+.main {
+    background:
+        radial-gradient(circle at top, rgba(249, 115, 22, 0.18), transparent 28%),
+        linear-gradient(180deg, #060913 0%, #0a1020 40%, #0d1528 100%);
+    color: #e5edf8;
+}
+
+.stateCard {
+    background: linear-gradient(180deg, rgba(10, 17, 32, 0.84), rgba(6, 10, 20, 0.96));
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 24px 48px rgba(2, 6, 23, 0.34);
+}
+
+.stateTitle,
+.heroSummaryValue,
+.sectionTitle,
+.storyStatusLabel,
+.chapterTitle,
+.charName,
+.branchOverviewTitle,
+.branchOverviewItemTitle {
+    color: #f8fafc;
+}
+
+.stateDescription,
+.sectionDescription,
+.storyStatusHint,
+.chapterMetaItem,
+.chapterMetricText,
+.charDetail,
+.emptyStateText,
+.branchOverviewSubtitle,
+.branchOverviewItemMeta {
+    color: rgba(226, 232, 240, 0.72);
+}
+
+.heroSummaryStrip,
+.storyStatusPanel,
+.sectionShell {
+    background: linear-gradient(180deg, rgba(10, 17, 32, 0.88), rgba(5, 9, 19, 0.96));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow:
+        0 24px 48px rgba(2, 6, 23, 0.26),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.heroSummaryItem,
+.storyStatusRow {
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.heroSummaryLabel,
+.sectionEyebrow,
+.chapterNumber {
+    color: rgba(148, 163, 184, 0.84);
+}
+
+.storyStatusBtn,
+.iconBtn,
+.editCharBtn,
+.chapterEditBtn {
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(15, 23, 42, 0.72);
+    color: rgba(226, 232, 240, 0.88);
+    box-shadow: none;
+}
+
+.storyStatusBtn:hover:not(:disabled),
+.iconBtn:hover,
+.editCharBtn:hover,
+.chapterEditBtn:hover {
+    border-color: rgba(249, 115, 22, 0.26);
+    background: rgba(15, 23, 42, 0.94);
+    color: #fdba74;
+}
+
+.storyStatusActive {
+    background: rgba(249, 115, 22, 0.18);
+    border-color: rgba(249, 115, 22, 0.3);
+    color: #fdba74;
+}
+
+.chapterDeleteBtn,
+.deleteCharBtn {
+    border-color: rgba(248, 113, 113, 0.2);
+    background: rgba(127, 29, 29, 0.22);
+    color: #fca5a5;
+}
+
+.chapterDeleteBtn:hover,
+.deleteCharBtn:hover {
+    border-color: rgba(248, 113, 113, 0.3);
+    background: rgba(127, 29, 29, 0.34);
+    color: #fecaca;
+}
+
+.completedNotice,
+.chapterPremiumNote {
+    color: #fbbf24;
+}
+
+.chapterItem,
+.characterCard,
+.branchOverviewCard,
+.branchOverviewItem {
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.84), rgba(8, 12, 24, 0.96));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 18px 34px rgba(2, 6, 23, 0.2);
+}
+
+.chapterItem:hover,
+.characterCard:hover,
+.branchOverviewItem:hover {
+    border-color: rgba(249, 115, 22, 0.24);
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(10, 17, 32, 0.98));
+    box-shadow: 0 22px 42px rgba(2, 6, 23, 0.3);
+}
+
+.branchOverviewCardEntry,
+.branchOverviewCardHub,
+.branchOverviewCardTarget {
+    border-color: rgba(249, 115, 22, 0.22);
+    background:
+        radial-gradient(circle at top right, rgba(249, 115, 22, 0.16), transparent 42%),
+        linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(8, 12, 24, 0.98));
+}
+
+.branchOverviewCount {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #f8fafc;
+}
+
+.chapterCharacterAvatar {
+    border-color: rgba(255, 255, 255, 0.14);
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.14), rgba(15, 23, 42, 0.88));
+    box-shadow: 0 10px 18px rgba(2, 6, 23, 0.26);
+}
+
+.chapterCharacterFallback {
+    color: #fdba74;
+}
+
+.chapterCharacterItem:hover .chapterCharacterAvatar,
+.chapterCharacterItem:focus-visible .chapterCharacterAvatar {
+    border-color: rgba(249, 115, 22, 0.34);
+    box-shadow: 0 12px 24px rgba(249, 115, 22, 0.16);
+}
+
+.chapterCharacterTooltip {
+    background: rgba(2, 6, 23, 0.96);
+    box-shadow: 0 18px 32px rgba(2, 6, 23, 0.38);
+}
+
+.chapterCharacterTooltip::after {
+    background: rgba(2, 6, 23, 0.96);
+}
+
+.publishedBadge {
+    background: rgba(16, 185, 129, 0.16);
+    color: #6ee7b7;
+    border-color: rgba(16, 185, 129, 0.24);
+}
+
+.draftBadge {
+    background: rgba(148, 163, 184, 0.12);
+    color: #cbd5e1;
+    border-color: rgba(148, 163, 184, 0.18);
+}
+
+.pendingDraftBadge {
+    background: rgba(249, 115, 22, 0.14);
+    color: #fdba74;
+    border-color: rgba(249, 115, 22, 0.22);
+}
+
+.emptyState {
+    background: rgba(5, 10, 20, 0.52);
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.emptyStateIcon {
+    color: rgba(251, 146, 60, 0.7);
+}
+
+.modalOverlay {
+    background: rgba(2, 6, 23, 0.74);
+    backdrop-filter: blur(18px);
+}
+
+.modal {
+    background: linear-gradient(180deg, rgba(10, 17, 32, 0.97), rgba(5, 9, 19, 0.99));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #e5edf8;
+    box-shadow: 0 32px 80px rgba(2, 6, 23, 0.44);
+}
+
+.modalHeader,
+.modalFooter {
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.modalTitle,
+.editHeroText h3,
+.editField label {
+    color: #f8fafc;
+}
+
+.editHeroBackdrop {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: #0a1020;
+}
+
+.editHeroShade {
+    background:
+        linear-gradient(180deg, rgba(2, 6, 23, 0.08) 0%, rgba(2, 6, 23, 0.82) 100%),
+        linear-gradient(90deg, rgba(2, 6, 23, 0.88) 0%, rgba(2, 6, 23, 0.16) 72%);
+}
+
+.editHeroPoster {
+    border-color: rgba(255, 255, 255, 0.14);
+    box-shadow: 0 18px 34px rgba(2, 6, 23, 0.34);
+}
+
+.editHeroPosterEmpty,
+.editHeroText p,
+.editFieldHint,
+.confirmMessage {
+    color: rgba(226, 232, 240, 0.72);
+}
+
+.editCoverUpload,
+.editWideCoverUpload {
+    background: rgba(15, 23, 42, 0.72);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+.editCoverUpload:hover,
+.editWideCoverUpload:hover {
+    border-color: rgba(249, 115, 22, 0.28);
+    box-shadow: 0 18px 34px rgba(249, 115, 22, 0.12);
+}
+
+.editCoverPlaceholder {
+    color: rgba(203, 213, 225, 0.76);
+}
+
+.editCoverOverlay {
+    background: linear-gradient(180deg, rgba(2, 6, 23, 0.16), rgba(2, 6, 23, 0.84));
+    color: #f8fafc;
+}
+
+.editInput,
+.editTextarea,
+.unsplashSearchInput {
+    background: rgba(2, 6, 23, 0.54);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #f8fafc;
+}
+
+.editInput::placeholder,
+.editTextarea::placeholder,
+.unsplashSearchInput::placeholder {
+    color: rgba(148, 163, 184, 0.8);
+}
+
+.editInput:focus,
+.editTextarea:focus,
+.unsplashSearchInput:focus {
+    border-color: rgba(249, 115, 22, 0.34);
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.14);
+}
+
+.editInput option {
+    background: #0b1222;
+    color: #f8fafc;
+}
+
+.editCategoryBtn,
+.unsplashPickerBtn,
+.clearCoverBtn,
+.cancelBtn {
+    background: rgba(15, 23, 42, 0.72);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: rgba(226, 232, 240, 0.9);
+}
+
+.editCategoryBtn:hover,
+.unsplashPickerBtn:hover,
+.clearCoverBtn:hover,
+.cancelBtn:hover {
+    background: rgba(15, 23, 42, 0.94);
+    border-color: rgba(249, 115, 22, 0.24);
+    color: #fdba74;
+}
+
+.editCategoryActive {
+    background: rgba(249, 115, 22, 0.18);
+    border-color: rgba(249, 115, 22, 0.3);
+    color: #fdba74;
+}
+
+.saveBtn {
+    background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+    box-shadow: 0 16px 28px rgba(249, 115, 22, 0.24);
+}
+
+.saveBtn:hover:not(:disabled) {
+    box-shadow: 0 18px 34px rgba(249, 115, 22, 0.3);
+}
+
+.dangerBtn {
+    background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+    box-shadow: 0 16px 28px rgba(239, 68, 68, 0.24);
+}
+
+.dangerBtn:hover:not(:disabled) {
+    box-shadow: 0 18px 34px rgba(239, 68, 68, 0.3);
+}
+
+.unsplashError {
+    color: #fca5a5;
+}
+
+.unsplashEmpty {
+    color: rgba(226, 232, 240, 0.68);
+}
+
+.unsplashCard {
+    background: rgba(15, 23, 42, 0.74);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 16px 28px rgba(2, 6, 23, 0.18);
+}
+
+.unsplashCard:hover {
+    border-color: rgba(249, 115, 22, 0.24);
+    box-shadow: 0 20px 34px rgba(2, 6, 23, 0.26);
+}
+
+.unsplashCredit {
+    color: rgba(226, 232, 240, 0.72);
+}
+
+.editOptionRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.requiredMark {
+    color: #fb7185;
+}
+
+.demoNotice {
+    margin: 0.75rem 0 0;
+    color: #fbbf24;
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+.charImageEditorShell {
+    width: 150px;
+    height: 150px;
+    margin: 0 auto 1.5rem;
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
+}
+
+.charImageUploadRound,
+.charImagePreviewRound,
+.charImagePlaceholderRound {
+    border-radius: 50%;
+}
+
+.charImagePreviewRound {
+    object-fit: cover;
+}
+
+.charImageLabel {
+    margin-top: 4px;
+    font-size: 0.75rem;
+}
+
+.charFormGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.confirmModal {
+    max-width: 400px;
+}
+
+.confirmMessage {
+    margin: 0;
+}
+
+@media (max-width: 720px) {
+    .charFormGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .editOptionRow {
+        flex-direction: column;
+    }
+}

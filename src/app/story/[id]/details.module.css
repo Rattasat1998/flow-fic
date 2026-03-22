@@ -961,80 +961,6 @@
     justify-content: center;
 }
 
-.pageFooter {
-    width: 100%;
-    margin: 3.2rem 0 0;
-    border-top: 1px solid rgba(148, 163, 184, 0.18);
-    padding: 1.6rem 0 0.4rem;
-}
-
-.pageFooterInner {
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    align-items: center;
-    gap: 1rem;
-}
-
-.pageFooterBrand {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-}
-
-.pageFooterTitle {
-    font-size: 1.95rem;
-    line-height: 1;
-    color: #f8fafc;
-    font-family: Georgia, 'Times New Roman', serif;
-    font-style: italic;
-    font-weight: 700;
-}
-
-.pageFooterCopy {
-    margin: 0;
-    font-size: 0.75rem;
-    color: rgba(148, 163, 184, 0.86);
-}
-
-.pageFooterLinks {
-    display: flex;
-    align-items: center;
-    gap: 1.2rem;
-}
-
-.pageFooterLinks a {
-    color: rgba(148, 163, 184, 0.92);
-    font-size: 0.84rem;
-    text-decoration: none;
-}
-
-.pageFooterLinks a:hover {
-    color: #ffffff;
-}
-
-.pageFooterIcons {
-    display: flex;
-    align-items: center;
-    gap: 0.52rem;
-}
-
-.pageFooterIcons a {
-    width: 31px;
-    height: 31px;
-    border-radius: 999px;
-    border: 1px solid rgba(148, 163, 184, 0.24);
-    color: rgba(203, 213, 225, 0.9);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    text-decoration: none;
-}
-
-.pageFooterIcons a:hover {
-    border-color: rgba(251, 146, 60, 0.46);
-    color: #fdba74;
-}
-
 .authDialogCard {
     width: min(420px, 100%);
     border-radius: 20px;
@@ -1584,19 +1510,6 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .pageFooter {
-        margin-top: 2.6rem;
-    }
-
-    .pageFooterInner {
-        grid-template-columns: 1fr;
-        gap: 0.8rem;
-    }
-
-    .pageFooterLinks {
-        gap: 0.8rem;
-        flex-wrap: wrap;
-    }
 }
 
 @media (max-width: 520px) {
@@ -1657,9 +1570,6 @@
 .relatedMeta,
 .relatedStat,
 .relatedEmpty,
-.pageFooterCopy,
-.pageFooterLinks a,
-.pageFooterIcons a,
 .authDialogMessage,
 .coinDialogDesc,
 .coinDialogBalance {

@@ -2585,12 +2585,14 @@ export default function EditChapterPage() {
 
     if (authError) {
         return (
-            <main className={styles.main}>
+            <main className={`${styles.main} ffStudioShell`}>
                 <header className={styles.header}>
                 </header>
-                <div className={blockStyles.content} style={{ textAlign: 'center', padding: '4rem 2rem', color: '#64748b' }}>
-                    <h2>ไม่มีสิทธิ์เข้าถึง</h2>
-                    <p>คุณไม่สามารถแก้ไขตอนนี้ได้ เนื่องจากคุณไม่ใช่เจ้าของเรื่อง</p>
+                <div className={styles.stateScreen}>
+                    <div className={styles.stateCard}>
+                        <h2>ไม่มีสิทธิ์เข้าถึง</h2>
+                        <p>คุณไม่สามารถแก้ไขตอนนี้ได้ เนื่องจากคุณไม่ใช่เจ้าของเรื่อง</p>
+                    </div>
                 </div>
             </main>
         );
@@ -2598,14 +2600,16 @@ export default function EditChapterPage() {
 
     if (isLoading) {
         return (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-                <Loader2 className={styles.spinner} size={40} />
-            </div>
+            <main className={`${styles.main} ffStudioShell`}>
+                <div className={styles.loadingScreen}>
+                    <Loader2 className={styles.spinner} size={40} />
+                </div>
+            </main>
         );
     }
 
     return (
-        <main className={styles.main}>
+        <main className={`${styles.main} ffStudioShell`}>
             <header className={styles.header}>
                 <div className={styles.headerLeft}>
                     <div className={styles.statusBadge}>
@@ -2776,61 +2780,73 @@ export default function EditChapterPage() {
                                 const assignedChar = characters.find(c => c.id === block.characterId);
                                 const isPOV = block.characterId === povCharacterId && povCharacterId !== null;
                                 const isSystem = !block.characterId;
+                                const rowClassName = [
+                                    blockStyles.blockRow,
+                                    blockStyles.chatRow,
+                                    isSystem ? blockStyles.chatRowSystem : '',
+                                    isPOV ? blockStyles.chatRowPov : '',
+                                ].filter(Boolean).join(' ');
+                                const bubbleColumnClassName = [
+                                    blockStyles.blockContent,
+                                    blockStyles.chatBubbleColumn,
+                                    isSystem ? blockStyles.chatBubbleColumnSystem : '',
+                                    isPOV ? blockStyles.chatBubbleColumnPov : '',
+                                ].filter(Boolean).join(' ');
+                                const speakerClassName = [
+                                    blockStyles.chatSpeakerName,
+                                    isPOV ? blockStyles.chatSpeakerNamePov : '',
+                                ].filter(Boolean).join(' ');
+                                const bubbleWrapClassName = [
+                                    blockStyles.chatBubbleWrap,
+                                    isPOV ? blockStyles.chatBubbleWrapPov : '',
+                                ].filter(Boolean).join(' ');
+                                const imageBubbleClassName = [
+                                    blockStyles.chatImageBubble,
+                                    isSystem ? '' : isPOV ? blockStyles.chatImageBubblePov : blockStyles.chatImageBubbleOther,
+                                ].filter(Boolean).join(' ');
+                                const textBubbleClassName = [
+                                    blockStyles.blockTextarea,
+                                    blockStyles.chatTextBubble,
+                                    isSystem
+                                        ? blockStyles.chatTextBubbleSystem
+                                        : isPOV
+                                            ? blockStyles.chatTextBubblePov
+                                            : blockStyles.chatTextBubbleOther,
+                                ].filter(Boolean).join(' ');
+                                const chatActionClassName = [
+                                    blockStyles.blockActions,
+                                    blockStyles.chatBlockActions,
+                                    isPOV ? blockStyles.chatBlockActionsPov : '',
+                                ].filter(Boolean).join(' ');
 
                                 return (
-                                    <div key={block.id} className={`${blockStyles.blockRow}`} style={{ position: 'relative', padding: '0.25rem', justifyContent: isSystem ? 'center' : (isPOV ? 'flex-end' : 'flex-start') }}>
+                                    <div key={block.id} className={rowClassName}>
                                         {!isPOV && !isSystem && (
                                             <div className={blockStyles.blockAvatar}>
                                                 {assignedChar?.image_url ? (
                                                     <img src={assignedChar.image_url} alt={assignedChar.name} />
                                                 ) : (
-                                                    <span style={{ fontSize: '1.25rem' }}>?</span>
+                                                    <span className={blockStyles.chatAvatarFallback}>?</span>
                                                 )}
                                             </div>
                                         )}
 
-                                        <div className={blockStyles.blockContent} style={{ maxWidth: isSystem ? '80%' : '50%', flexGrow: 0, width: isSystem ? 'auto' : 'fit-content', display: 'flex', flexDirection: 'column', alignItems: isPOV ? 'flex-end' : 'flex-start' }}>
+                                        <div className={bubbleColumnClassName}>
                                             {!isSystem && assignedChar && (
-                                                <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.2rem', marginLeft: isPOV ? 0 : '0.5rem', marginRight: isPOV ? '0.5rem' : 0 }}>{assignedChar.name}</div>
+                                                <div className={speakerClassName}>{assignedChar.name}</div>
                                             )}
 
-                                            <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: isPOV ? 'flex-end' : 'flex-start' }}>
+                                            <div className={bubbleWrapClassName}>
                                                 {block.type === 'image' && block.imageUrl ? (
                                                     <img
                                                         src={block.imageUrl}
                                                         alt="Chat Image"
-                                                        style={{
-                                                            maxWidth: '240px',
-                                                            maxHeight: '300px',
-                                                            borderRadius: '12px',
-                                                            objectFit: 'contain',
-                                                            display: 'block',
-                                                            backgroundColor: isSystem ? 'transparent' : isPOV ? '#3b82f6' : 'white',
-                                                            padding: '4px',
-                                                            border: isSystem ? 'none' : `0.75px solid ${isPOV ? '#3b82f6' : '#e2e8f0'}`
-                                                        }}
+                                                        className={imageBubbleClassName}
                                                     />
                                                 ) : (
                                                     <textarea
                                                         id={`textarea-${block.id}`}
-                                                        className={blockStyles.blockTextarea}
-                                                        style={{
-                                                            backgroundColor: isSystem ? 'transparent' : isPOV ? '#3b82f6' : 'white',
-                                                            color: isSystem ? '#64748b' : isPOV ? 'white' : '#1e293b',
-                                                            borderColor: isSystem ? 'transparent' : isPOV ? '#3b82f6' : '#e2e8f0',
-                                                            borderWidth: isSystem ? 0 : '0.75px',
-                                                            borderRadius: '18px',
-                                                            borderBottomRightRadius: isPOV && !isSystem ? '4px' : '18px',
-                                                            borderTopLeftRadius: !isPOV && !isSystem ? '4px' : '18px',
-                                                            textAlign: isSystem ? 'center' : 'left',
-                                                            minHeight: 'auto',
-                                                            padding: '0.6rem 0.9rem',
-                                                            boxShadow: isSystem ? 'none' : '0 1px 1px rgba(0,0,0,0.04)',
-                                                            width: 'auto',
-                                                            minWidth: '60px',
-                                                            maxWidth: '100%',
-                                                            fieldSizing: 'content',
-                                                        }}
+                                                        className={textBubbleClassName}
                                                         value={block.text}
                                                         onChange={(e) => {
                                                             updateBlock(block.id, { text: e.target.value });
@@ -2842,7 +2858,7 @@ export default function EditChapterPage() {
                                                         rows={1}
                                                     />
                                                 )}
-                                                <div className={blockStyles.blockActions} style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', right: isPOV ? 'calc(100% + 8px)' : 'auto', left: !isPOV ? 'calc(100% + 8px)' : 'auto', paddingTop: 0, minWidth: 'max-content' }}>
+                                                <div className={chatActionClassName}>
                                                     <button className={blockStyles.actionBtn} onClick={() => moveBlockUp(block.id)} title="เลื่อนขึ้น">
                                                         <ChevronUp size={14} />
                                                     </button>
@@ -2863,7 +2879,7 @@ export default function EditChapterPage() {
                                                             updateBlock(block.id, { characterId: null });
                                                         }
                                                     }} title="เปลี่ยนคนพูด (คลิกวนลูป)">
-                                                        <span style={{ fontSize: '10px', fontWeight: 'bold' }}>👤</span>
+                                                        <span className={blockStyles.chatSwitchIcon}>👤</span>
                                                     </button>
                                                 </div>
                                             </div>
@@ -2874,7 +2890,7 @@ export default function EditChapterPage() {
                                                 {assignedChar?.image_url ? (
                                                     <img src={assignedChar.image_url} alt={assignedChar?.name || ''} />
                                                 ) : (
-                                                    <span style={{ fontSize: '1.25rem' }}>?</span>
+                                                    <span className={blockStyles.chatAvatarFallback}>?</span>
                                                 )}
                                             </div>
                                         )}
@@ -2914,7 +2930,7 @@ export default function EditChapterPage() {
                                     <div className={styles.trayAddAvatar}>
                                         <Plus size={16} />
                                     </div>
-                                    <span className={styles.trayCharName} style={{ color: 'var(--primary)' }}>เพิ่มตัว</span>
+                                    <span className={`${styles.trayCharName} ${styles.trayCharNameAccent}`}>เพิ่มตัว</span>
                                 </button>
                             </div>
 
@@ -2984,7 +3000,7 @@ export default function EditChapterPage() {
                                         {/* Character Avatar Wrapper */}
                                         {!isImageBlock && (
                                             <div
-                                                style={{ position: 'relative' }}
+                                                className={blockStyles.avatarAnchor}
                                                 ref={(node) => {
                                                     charSelectorAnchorRefs.current[block.id] = node;
                                                 }}
@@ -3008,7 +3024,7 @@ export default function EditChapterPage() {
                                                     {assignedChar?.image_url ? (
                                                         <img src={assignedChar.image_url} alt={assignedChar.name} />
                                                     ) : (
-                                                        <span style={{ fontSize: '1.25rem' }}>?</span>
+                                                        <span className={blockStyles.avatarFallback}>?</span>
                                                     )}
                                                 </div>
 
@@ -3068,7 +3084,7 @@ export default function EditChapterPage() {
                                                     <div className={blockStyles.blockImageWrapper}>
                                                         <img src={block.imageUrl} alt="Narrative image" className={blockStyles.blockImage} />
                                                     </div>
-                                                    <div className={blockStyles.blockActions} style={{ opacity: 1 }}>
+                                                    <div className={`${blockStyles.blockActions} ${blockStyles.imageActionsVisible}`}>
                                                         <button className={blockStyles.actionBtn} onClick={() => moveBlockUp(block.id)} title="เลื่อนขึ้น">
                                                             <ChevronUp size={16} />
                                                         </button>
@@ -3635,7 +3651,7 @@ export default function EditChapterPage() {
                                 </button>
 
                                 <div className={styles.editField}>
-                                    <label>ชื่อตัวละคร <span style={{ color: '#ef4444' }}>*</span></label>
+                                    <label>ชื่อตัวละคร <span className={styles.requiredMark}>*</span></label>
                                     <input
                                         type="text"
                                         value={quickCharForm.name}

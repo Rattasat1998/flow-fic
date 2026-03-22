@@ -328,372 +328,387 @@ function CreateTextForm() {
     };
 
     const mobileSubmitLabel = isSubmitting ? 'กำลังสร้าง...' : 'สร้างผลงาน';
+    const writingStyleLabel = writingStyle === 'chat' ? 'แชท' : 'บรรยาย';
+    const storyFormatLabel = storyFormat === 'single' ? 'ตอนเดียวจบ' : 'หลายตอน';
 
     return (
         <main className={styles.main}>
-            <header className={styles.header}>
-                <h1>สร้างผลงานใหม่</h1>
-            </header>
+            <div className={styles.shell}>
+                <header className={styles.header}>
+                    <p className={styles.eyebrow}>Writer Setup</p>
+                    <h1 className={styles.pageTitle}>ข้อมูลผลงานใหม่</h1>
+                    <p className={styles.pageIntro}>
+                        กรอกข้อมูลสำคัญของเรื่องให้พร้อมก่อนเข้าสู่แดชบอร์ดนักเขียน คุณสามารถกลับมาแก้รายละเอียดเพิ่มเติมได้ภายหลัง
+                    </p>
+                    <div className={styles.metaRow}>
+                        <span className={styles.metaPill}>สไตล์ {writingStyleLabel}</span>
+                        <span className={styles.metaPill}>รูปแบบ {storyFormatLabel}</span>
+                    </div>
+                </header>
 
-            <div className={styles.container}>
-                <form ref={formRef} onSubmit={handleSubmit} className={styles.formContainer}>
-                    <div className={styles.card}>
-                        <h2 className={styles.cardTitle}>
-                            ข้อมูลผลงาน ({writingStyle === 'chat' ? 'แชท' : 'บรรยาย'})
-                        </h2>
+                <div className={styles.container}>
+                    <form ref={formRef} onSubmit={handleSubmit} className={styles.formContainer}>
+                        <div className={styles.card}>
+                            <h2 className={styles.cardTitle}>
+                                ข้อมูลผลงาน ({writingStyleLabel})
+                            </h2>
+                            <p className={styles.cardLead}>
+                                ตั้งชื่อเรื่อง เลือกภาพปก และระบุหมวดหมู่ให้พร้อมสำหรับการเปิดหน้าเรื่องครั้งแรก
+                            </p>
 
-                        <div className={styles.formGroup}>
-                            <label>พรีวิวภาพหน้าปกหน้าแรก</label>
-                            <div className={styles.heroCoverPreview}>
-                                <div
-                                    className={styles.heroCoverBackdrop}
-                                    style={
-                                        coverWideImage || coverImage
-                                            ? { backgroundImage: `url(${coverWideImage || coverImage})` }
-                                            : {}
-                                    }
-                                >
-                                    <div className={styles.heroCoverOverlay} />
-                                    <div className={styles.heroCoverContent}>
-                                        <div className={styles.heroCoverPoster}>
-                                            {coverImage ? (
-                                                <div
-                                                    className={styles.heroCoverPosterImg}
-                                                    style={{ backgroundImage: `url(${coverImage})` }}
-                                                    aria-label="Cover preview"
-                                                    role="img"
-                                                />
-                                            ) : (
-                                                <div className={styles.heroCoverPosterEmpty}>COVER</div>
-                                            )}
-                                        </div>
-                                        <div className={styles.heroCoverText}>
-                                            <h3>{title.trim() || 'ตัวอย่างชื่อเรื่อง'}</h3>
-                                            <p>{penName.trim() || 'นามปากกา'}</p>
+                            <div className={styles.formGroup}>
+                                <label>พรีวิวภาพหน้าปกหน้าแรก</label>
+                                <div className={styles.heroCoverPreview}>
+                                    <div
+                                        className={styles.heroCoverBackdrop}
+                                        style={
+                                            coverWideImage || coverImage
+                                                ? { backgroundImage: `url(${coverWideImage || coverImage})` }
+                                                : {}
+                                        }
+                                    >
+                                        <div className={styles.heroCoverOverlay} />
+                                        <div className={styles.heroCoverContent}>
+                                            <div className={styles.heroCoverPoster}>
+                                                {coverImage ? (
+                                                    <div
+                                                        className={styles.heroCoverPosterImg}
+                                                        style={{ backgroundImage: `url(${coverImage})` }}
+                                                        aria-label="Cover preview"
+                                                        role="img"
+                                                    />
+                                                ) : (
+                                                    <div className={styles.heroCoverPosterEmpty}>COVER</div>
+                                                )}
+                                            </div>
+                                            <div className={styles.heroCoverText}>
+                                                <h3>{title.trim() || 'ตัวอย่างชื่อเรื่อง'}</h3>
+                                                <p>{penName.trim() || 'นามปากกา'}</p>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div className={styles.formGroup}>
-                            <label>รูปภาพปก (800x800 px) <span className={styles.required}>*</span></label>
-                            <div
-                                className={styles.coverUpload}
-                                onClick={() => fileInputRef.current?.click()}
-                                style={coverImage ? { backgroundImage: `url(${coverImage})`, backgroundSize: 'cover', backgroundPosition: 'center', borderStyle: 'solid' } : {}}
-                            >
-                                {!coverImage && (
-                                    <>
-                                        <ImagePlus size={32} style={{ marginBottom: '0.5rem' }} />
-                                        <span style={{ fontSize: '0.85rem' }}>อัปโหลดหน้าปก</span>
-                                    </>
-                                )}
-                            </div>
-                            <input
-                                type="file"
-                                accept="image/*"
-                                ref={fileInputRef}
-                                style={{ display: 'none' }}
-                                onChange={handleImageUpload}
-                            />
-                            <div className={styles.coverActions}>
-                                <button
-                                    type="button"
-                                    className={styles.unsplashPickerBtn}
-                                    onClick={() => openUnsplashPicker('cover')}
-                                >
-                                    <Search size={15} />
-                                    เลือกรูปจาก Unsplash
-                                </button>
-                                {coverImage && (
-                                    <button
-                                        type="button"
-                                        className={styles.clearCoverBtn}
-                                        onClick={() => {
-                                            setCoverImage(null);
-                                            setCoverFile(null);
-                                        }}
-                                    >
-                                        ลบรูปปก
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className={styles.formGroup}>
-                            <label>รูปภาพปกแนวกว้างสำหรับหน้าแรก (แนะนำ 1600x900)</label>
-                            <div
-                                className={styles.wideCoverUpload}
-                                onClick={() => wideFileInputRef.current?.click()}
-                                style={coverWideImage ? { backgroundImage: `url(${coverWideImage})`, backgroundSize: 'cover', backgroundPosition: 'center', borderStyle: 'solid' } : {}}
-                            >
-                                {!coverWideImage && (
-                                    <>
-                                        <ImagePlus size={28} style={{ marginBottom: '0.5rem' }} />
-                                        <span style={{ fontSize: '0.85rem' }}>อัปโหลดปกแนวกว้าง</span>
-                                    </>
-                                )}
-                            </div>
-                            <input
-                                type="file"
-                                accept="image/*"
-                                ref={wideFileInputRef}
-                                style={{ display: 'none' }}
-                                onChange={handleWideImageUpload}
-                            />
-                            <div className={styles.coverActions}>
-                                <button
-                                    type="button"
-                                    className={styles.unsplashPickerBtn}
-                                    onClick={() => openUnsplashPicker('wide')}
-                                >
-                                    <Search size={15} />
-                                    เลือกภาพแนวกว้างจาก Unsplash
-                                </button>
-                                {coverWideImage && (
-                                    <button
-                                        type="button"
-                                        className={styles.clearCoverBtn}
-                                        onClick={() => {
-                                            setCoverWideImage(null);
-                                            setCoverWideFile(null);
-                                        }}
-                                    >
-                                        ลบรูปปกแนวกว้าง
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className={styles.formGroup}>
-                            <label htmlFor="title">ชื่อเรื่อง <span className={styles.required}>*</span></label>
-                            <input
-                                type="text"
-                                required
-                                placeholder="เช่น คดีฆาตกรรมห้องปิดตาย"
-                                value={title}
-                                onChange={e => setTitle(e.target.value)}
-                            />
-                        </div>
-
-                        <div className={styles.formGroup}>
-                            <label htmlFor="penName">นามปากกา <span className={styles.required}>*</span></label>
-                            <input
-                                type="text"
-                                required
-                                placeholder="นามปากกาของคุณ"
-                                value={penName}
-                                onChange={e => setPenName(e.target.value)}
-                            />
-                        </div>
-
-                        <div className={styles.formGroup}>
-                            <label>ประเภทผลงาน <span className={styles.required}>*</span></label>
-                            <div className={styles.categorySelector}>
-                                <button
-                                    type="button"
-                                    className={`${styles.categoryBtn} ${category === 'original' ? styles.activeCategory : ''}`}
-                                    onClick={() => setCategory('original')}
-                                >
-                                    เรื่องแต่งออริจินัล
-                                </button>
-                            </div>
-                            <span className={styles.hint}>เปิดให้สร้างเฉพาะเรื่องแต่งออริจินัลชั่วคราว</span>
-                        </div>
-
-                        {/* Category Taxonomy */}
-                        <div className={styles.formGroup}>
-                            <label>หมวดหมู่หลัก <span className={styles.required}>*</span></label>
-                            <select
-                                className={styles.select}
-                                value={mainCategory}
-                                onChange={(e) => {
-                                    setMainCategory(e.target.value);
-                                    setSubCategory(''); // Reset sub category when main changes
-                                }}
-                                required
-                            >
-                                <option value="" disabled>เลือกหมวดหมู่หลัก</option>
-                                {MAIN_CATEGORIES.map(cat => (
-                                    <option key={cat.id} value={cat.id}>{cat.label}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {mainCategory && (
                             <div className={styles.formGroup}>
-                                <label>หมวดหมู่ <span className={styles.required}>*</span></label>
-                                <div className={styles.categorySelectGroup}>
-                                    <select
-                                        className={styles.selectInput}
-                                        value={subCategory}
-                                        onChange={(e) => setSubCategory(e.target.value)}
-                                        required
+                                <label>รูปภาพปก (800x800 px) <span className={styles.required}>*</span></label>
+                                <div
+                                    className={styles.coverUpload}
+                                    onClick={() => fileInputRef.current?.click()}
+                                    style={coverImage ? { backgroundImage: `url(${coverImage})`, backgroundSize: 'cover', backgroundPosition: 'center', borderStyle: 'solid' } : {}}
+                                >
+                                    {!coverImage && (
+                                        <>
+                                            <ImagePlus size={32} style={{ marginBottom: '0.5rem' }} />
+                                            <span style={{ fontSize: '0.85rem' }}>อัปโหลดหน้าปก</span>
+                                        </>
+                                    )}
+                                </div>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    ref={fileInputRef}
+                                    style={{ display: 'none' }}
+                                    onChange={handleImageUpload}
+                                />
+                                <div className={styles.coverActions}>
+                                    <button
+                                        type="button"
+                                        className={styles.unsplashPickerBtn}
+                                        onClick={() => openUnsplashPicker('cover')}
                                     >
-                                        <option value="" disabled>เลือกหมวดหมู่ย่อย</option>
-                                        {SUB_CATEGORIES.filter(sub => sub.mainCategoryId === mainCategory).map(sub => (
-                                            <option key={sub.id} value={sub.id}>{sub.label}</option>
-                                        ))}
-                                    </select>
-
-                                    {subCategory && (
-                                        <div className={styles.subCategoryCard}>
-                                            <div className={styles.subCategoryTitle}>
-                                                {SUB_CATEGORIES.find(s => s.id === subCategory)?.label}
-                                            </div>
-                                            <div className={styles.subCategoryDesc}>
-                                                {SUB_CATEGORIES.find(s => s.id === subCategory)?.description}
-                                            </div>
-                                        </div>
+                                        <Search size={15} />
+                                        เลือกรูปจาก Unsplash
+                                    </button>
+                                    {coverImage && (
+                                        <button
+                                            type="button"
+                                            className={styles.clearCoverBtn}
+                                            onClick={() => {
+                                                setCoverImage(null);
+                                                setCoverFile(null);
+                                            }}
+                                        >
+                                            ลบรูปปก
+                                        </button>
                                     )}
                                 </div>
                             </div>
-                        )}
 
-                        {category === 'fanfic' && (
                             <div className={styles.formGroup}>
-                                <label>ชื่อด้อม / แฟนด้อม (Fandom) <span className={styles.required}>*</span></label>
+                                <label>รูปภาพปกแนวกว้างสำหรับหน้าแรก (แนะนำ 1600x900)</label>
+                                <div
+                                    className={styles.wideCoverUpload}
+                                    onClick={() => wideFileInputRef.current?.click()}
+                                    style={coverWideImage ? { backgroundImage: `url(${coverWideImage})`, backgroundSize: 'cover', backgroundPosition: 'center', borderStyle: 'solid' } : {}}
+                                >
+                                    {!coverWideImage && (
+                                        <>
+                                            <ImagePlus size={28} style={{ marginBottom: '0.5rem' }} />
+                                            <span style={{ fontSize: '0.85rem' }}>อัปโหลดปกแนวกว้าง</span>
+                                        </>
+                                    )}
+                                </div>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    ref={wideFileInputRef}
+                                    style={{ display: 'none' }}
+                                    onChange={handleWideImageUpload}
+                                />
+                                <div className={styles.coverActions}>
+                                    <button
+                                        type="button"
+                                        className={styles.unsplashPickerBtn}
+                                        onClick={() => openUnsplashPicker('wide')}
+                                    >
+                                        <Search size={15} />
+                                        เลือกภาพแนวกว้างจาก Unsplash
+                                    </button>
+                                    {coverWideImage && (
+                                        <button
+                                            type="button"
+                                            className={styles.clearCoverBtn}
+                                            onClick={() => {
+                                                setCoverWideImage(null);
+                                                setCoverWideFile(null);
+                                            }}
+                                        >
+                                            ลบรูปปกแนวกว้าง
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className={styles.formGroup}>
+                                <label htmlFor="title">ชื่อเรื่อง <span className={styles.required}>*</span></label>
                                 <input
                                     type="text"
                                     required
-                                    placeholder="เช่น Harry Potter, ชินจัง จอมแก่น, Genshin Impact"
-                                    value={fandom}
-                                    onChange={e => setFandom(e.target.value)}
+                                    placeholder="เช่น คดีฆาตกรรมห้องปิดตาย"
+                                    value={title}
+                                    onChange={e => setTitle(e.target.value)}
                                 />
                             </div>
-                        )}
 
-                        <div className={styles.formGroup}>
-                            <label>แท็ก (Tags)</label>
-                            <div className={styles.tagInputGroup}>
-                                {tagItems.length > 0 && (
-                                    <div className={styles.tagChipList}>
-                                        {tagItems.map((tag) => (
-                                            <span key={tag} className={styles.tagChip}>
-                                                <span>{tag}</span>
-                                                <button
-                                                    type="button"
-                                                    className={styles.tagChipRemove}
-                                                    onClick={() => removeTagItem(tag)}
-                                                    aria-label={`ลบแท็ก ${tag}`}
-                                                >
-                                                    <X size={12} />
-                                                </button>
-                                            </span>
-                                        ))}
-                                    </div>
-                                )}
+                            <div className={styles.formGroup}>
+                                <label htmlFor="penName">นามปากกา <span className={styles.required}>*</span></label>
                                 <input
                                     type="text"
-                                    className={styles.tagInputField}
-                                    placeholder="พิมพ์แท็กแล้วกด Enter หรือคั่นด้วย comma"
-                                    value={tagInputValue}
-                                    onChange={e => setTagInputValue(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            commitTagInput();
-                                            return;
-                                        }
-
-                                        if (e.key === ',' && tagInputValue.trim().length > 0) {
-                                            e.preventDefault();
-                                            commitTagInput();
-                                            return;
-                                        }
-
-                                        if (e.key === 'Backspace' && tagInputValue.trim().length === 0 && tagItems.length > 0) {
-                                            e.preventDefault();
-                                            setTagItems((prev) => prev.slice(0, -1));
-                                        }
-                                    }}
+                                    required
+                                    placeholder="นามปากกาของคุณ"
+                                    value={penName}
+                                    onChange={e => setPenName(e.target.value)}
                                 />
-                                <p className={styles.tagInputHint}>
-                                    กด Enter เพื่อเพิ่มแท็ก และสามารถวางหลายแท็กคั่นด้วย comma ได้
-                                </p>
+                            </div>
+
+                            <div className={styles.formGroup}>
+                                <label>ประเภทผลงาน <span className={styles.required}>*</span></label>
+                                <div className={styles.categorySelector}>
+                                    <button
+                                        type="button"
+                                        className={`${styles.categoryBtn} ${category === 'original' ? styles.activeCategory : ''}`}
+                                        onClick={() => setCategory('original')}
+                                    >
+                                        เรื่องแต่งออริจินัล
+                                    </button>
+                                </div>
+                                <span className={styles.hint}>เปิดให้สร้างเฉพาะเรื่องแต่งออริจินัลชั่วคราว</span>
+                            </div>
+
+                            <div className={styles.formGroup}>
+                                <label>หมวดหมู่หลัก <span className={styles.required}>*</span></label>
+                                <select
+                                    className={styles.select}
+                                    value={mainCategory}
+                                    onChange={(e) => {
+                                        setMainCategory(e.target.value);
+                                        setSubCategory('');
+                                    }}
+                                    required
+                                >
+                                    <option value="" disabled>เลือกหมวดหมู่หลัก</option>
+                                    {MAIN_CATEGORIES.map(cat => (
+                                        <option key={cat.id} value={cat.id}>{cat.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {mainCategory && (
+                                <div className={styles.formGroup}>
+                                    <label>หมวดหมู่ <span className={styles.required}>*</span></label>
+                                    <div className={styles.categorySelectGroup}>
+                                        <select
+                                            className={styles.selectInput}
+                                            value={subCategory}
+                                            onChange={(e) => setSubCategory(e.target.value)}
+                                            required
+                                        >
+                                            <option value="" disabled>เลือกหมวดหมู่ย่อย</option>
+                                            {SUB_CATEGORIES.filter(sub => sub.mainCategoryId === mainCategory).map(sub => (
+                                                <option key={sub.id} value={sub.id}>{sub.label}</option>
+                                            ))}
+                                        </select>
+
+                                        {subCategory && (
+                                            <div className={styles.subCategoryCard}>
+                                                <div className={styles.subCategoryTitle}>
+                                                    {SUB_CATEGORIES.find(s => s.id === subCategory)?.label}
+                                                </div>
+                                                <div className={styles.subCategoryDesc}>
+                                                    {SUB_CATEGORIES.find(s => s.id === subCategory)?.description}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {category === 'fanfic' && (
+                                <div className={styles.formGroup}>
+                                    <label>ชื่อด้อม / แฟนด้อม (Fandom) <span className={styles.required}>*</span></label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="เช่น Harry Potter, ชินจัง จอมแก่น, Genshin Impact"
+                                        value={fandom}
+                                        onChange={e => setFandom(e.target.value)}
+                                    />
+                                </div>
+                            )}
+
+                            <div className={styles.formGroup}>
+                                <label>แท็ก (Tags)</label>
+                                <div className={styles.tagInputGroup}>
+                                    {tagItems.length > 0 && (
+                                        <div className={styles.tagChipList}>
+                                            {tagItems.map((tag) => (
+                                                <span key={tag} className={styles.tagChip}>
+                                                    <span>{tag}</span>
+                                                    <button
+                                                        type="button"
+                                                        className={styles.tagChipRemove}
+                                                        onClick={() => removeTagItem(tag)}
+                                                        aria-label={`ลบแท็ก ${tag}`}
+                                                    >
+                                                        <X size={12} />
+                                                    </button>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                    <input
+                                        type="text"
+                                        className={styles.tagInputField}
+                                        placeholder="พิมพ์แท็กแล้วกด Enter หรือคั่นด้วย comma"
+                                        value={tagInputValue}
+                                        onChange={e => setTagInputValue(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                commitTagInput();
+                                                return;
+                                            }
+
+                                            if (e.key === ',' && tagInputValue.trim().length > 0) {
+                                                e.preventDefault();
+                                                commitTagInput();
+                                                return;
+                                            }
+
+                                            if (e.key === 'Backspace' && tagInputValue.trim().length === 0 && tagItems.length > 0) {
+                                                e.preventDefault();
+                                                setTagItems((prev) => prev.slice(0, -1));
+                                            }
+                                        }}
+                                    />
+                                    <p className={styles.tagInputHint}>
+                                        กด Enter เพื่อเพิ่มแท็ก และสามารถวางหลายแท็กคั่นด้วย comma ได้
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className={styles.formGroup}>
+                                <label>ระดับเนื้อหา (Age Rating) <span className={styles.required}>*</span></label>
+                                <select
+                                    value={rating}
+                                    onChange={e => setRating(e.target.value)}
+                                    className={styles.select}
+                                >
+                                    <option value="all">เหมาะสมกับผู้อ่านทุกวัย (All Ages)</option>
+                                    <option value="13+">เนื้อหาเหมาะสมกับผู้อ่านอายุ 13 ปีขึ้นไป (13+)</option>
+                                    <option value="18+">เนื้อหาเหมาะสมกับผู้อ่านอายุ 18 ปีขึ้นไป (18+)</option>
+                                </select>
+                            </div>
+
+                            <div className={styles.formGroup}>
+                                <label>โครงสร้างเส้นเรื่อง <span className={styles.required}>*</span></label>
+                                <div className={styles.categorySelector}>
+                                    <button
+                                        type="button"
+                                        className={`${styles.categoryBtn} ${pathMode === 'branching' ? styles.activeCategory : ''}`}
+                                        onClick={() => setPathMode('branching')}
+                                        disabled={storyFormat === 'single' || !isBranchingFeatureEnabled}
+                                    >
+                                        เส้นทางแตกแขนงข้ามตอน
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`${styles.categoryBtn} ${pathMode === 'linear' ? styles.activeCategory : ''}`}
+                                        onClick={() => setPathMode('linear')}
+                                    >
+                                        เส้นเดียวตามลำดับตอน
+                                    </button>
+                                </div>
+                                {storyFormat === 'single' && (
+                                    <small className={styles.helperText}>งานเขียนตอนเดียวจบจะใช้โหมดเส้นเดียวอัตโนมัติ</small>
+                                )}
+                                {!isBranchingFeatureEnabled && (
+                                    <small className={styles.helperText}>โหมดเส้นทางแตกแขนงถูกปิดชั่วคราวโดยระบบ</small>
+                                )}
+                            </div>
+
+                            <div className={styles.formGroup}>
+                                <label>คำโปรย / เรื่องย่อ</label>
+                                <textarea
+                                    required
+                                    className={styles.textarea}
+                                    placeholder="เขียนคำโปรยให้น่าสนใจ..."
+                                    rows={4}
+                                    value={synopsis}
+                                    onChange={e => setSynopsis(e.target.value)}
+                                />
                             </div>
                         </div>
 
-                        <div className={styles.formGroup}>
-                            <label>ระดับเนื้อหา (Age Rating) <span className={styles.required}>*</span></label>
-                            <select
-                                value={rating}
-                                onChange={e => setRating(e.target.value)}
-                                className={styles.select}
-                            >
-                                <option value="all">เหมาะสมกับผู้อ่านทุกวัย (All Ages)</option>
-                                <option value="13+">เนื้อหาเหมาะสมกับผู้อ่านอายุ 13 ปีขึ้นไป (13+)</option>
-                                <option value="18+">เนื้อหาเหมาะสมกับผู้อ่านอายุ 18 ปีขึ้นไป (18+)</option>
-                            </select>
-                        </div>
+                        <div className={styles.card}>
+                            <h2 className={styles.cardTitle}>ตั้งค่าเรื่อง</h2>
+                            <p className={styles.cardLead}>
+                                กำหนดประสบการณ์ของผู้อ่านเบื้องต้นก่อนเริ่มเขียนตอนแรก
+                            </p>
 
-                        <div className={styles.formGroup}>
-                            <label>โครงสร้างเส้นเรื่อง <span className={styles.required}>*</span></label>
-                            <div className={styles.categorySelector}>
-                                <button
-                                    type="button"
-                                    className={`${styles.categoryBtn} ${pathMode === 'branching' ? styles.activeCategory : ''}`}
-                                    onClick={() => setPathMode('branching')}
-                                    disabled={storyFormat === 'single' || !isBranchingFeatureEnabled}
-                                >
-                                    เส้นทางแตกแขนงข้ามตอน
-                                </button>
-                                <button
-                                    type="button"
-                                    className={`${styles.categoryBtn} ${pathMode === 'linear' ? styles.activeCategory : ''}`}
-                                    onClick={() => setPathMode('linear')}
-                                >
-                                    เส้นเดียวตามลำดับตอน
-                                </button>
+                            <div className={styles.settingsList}>
+                                <label className={styles.checkboxLabel}>
+                                    <input type="checkbox" checked={settings.allowComments} onChange={() => handleSettingChange('allowComments')} />
+                                    อนุญาตให้ผู้อ่านแสดงความเห็น
+                                </label>
+
+                                <label className={styles.checkboxLabel}>
+                                    <input type="checkbox" checked={settings.hideHeartCount} onChange={() => handleSettingChange('hideHeartCount')} />
+                                    ซ่อนจำนวนหัวใจ
+                                </label>
                             </div>
-                            {storyFormat === 'single' && (
-                                <small style={{ color: '#64748b' }}>งานเขียนตอนเดียวจบจะใช้โหมดเส้นเดียวอัตโนมัติ</small>
+                        </div>
+
+                        <button type="submit" className={styles.submitBtn} disabled={isSubmitting}>
+                            {isSubmitting ? (
+                                <><Loader2 size={18} className={styles.spinner} /> กำลังสร้าง...</>
+                            ) : (
+                                <><Save size={18} /> เริ่มแต่งเรื่องเลย!</>
                             )}
-                            {!isBranchingFeatureEnabled && (
-                                <small style={{ color: '#64748b' }}>โหมดเส้นทางแตกแขนงถูกปิดชั่วคราวโดยระบบ</small>
-                            )}
-                        </div>
-
-                        <div className={styles.formGroup}>
-                            <label>คำโปรย / เรื่องย่อ</label>
-                            <textarea
-                                required
-                                className={styles.textarea}
-                                placeholder="เขียนคำโปรยให้น่าสนใจ..."
-                                rows={4}
-                                value={synopsis}
-                                onChange={e => setSynopsis(e.target.value)}
-                            />
-                        </div>
-                    </div>
-
-                    <div className={styles.card}>
-                        <h2 className={styles.cardTitle}>ตั้งค่าเรื่อง</h2>
-
-                        <div className={styles.settingsList}>
-                            <label className={styles.checkboxLabel}>
-                                <input type="checkbox" checked={settings.allowComments} onChange={() => handleSettingChange('allowComments')} />
-                                อนุญาตให้ผู้อ่านแสดงความเห็น
-                            </label>
-
-                            <label className={styles.checkboxLabel}>
-                                <input type="checkbox" checked={settings.hideHeartCount} onChange={() => handleSettingChange('hideHeartCount')} />
-                                ซ่อนจำนวนหัวใจ
-                            </label>
-                        </div>
-                    </div>
-
-
-
-                    <button type="submit" className={styles.submitBtn} disabled={isSubmitting}>
-                        {isSubmitting ? (
-                            <><Loader2 size={18} className={styles.spinner} /> กำลังสร้าง...</>
-                        ) : (
-                            <><Save size={18} /> เริ่มแต่งเรื่องเลย!</>
-                        )}
-                    </button>
-                </form>
+                        </button>
+                    </form>
+                </div>
             </div>
             <div className="ffMobileActionBar">
                 <div className="ffMobileActionInner">
@@ -785,7 +800,7 @@ function CreateTextForm() {
 
 export default function CreateTextPage() {
     return (
-        <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>}>
+        <Suspense fallback={<div className={styles.loadingFallback}>Loading...</div>}>
             <CreateTextForm />
         </Suspense>
     );
