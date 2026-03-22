@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type FormEvent, type MouseEvent, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from 'react';
 import type { User } from '@supabase/supabase-js';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -34,7 +34,7 @@ type SharedNavbarProps = {
   searchAriaLabel?: string;
   showSearchShortcutHint?: boolean;
   searchPanel?: ReactNode;
-  onDashboardAccess: (event: MouseEvent<HTMLAnchorElement>) => void;
+  onDashboardAccess: (event: ReactMouseEvent<HTMLAnchorElement>) => void;
   isProfileMenuOpen: boolean;
   profileMenuRef: RefObject<HTMLDivElement | null>;
   onToggleProfileMenu: () => void;
@@ -143,7 +143,7 @@ export function SharedNavbar({
     onSearchSubmit?.(event);
   };
 
-  const handleDashboardLinkClick = (event: MouseEvent<HTMLAnchorElement>) => {
+  const handleDashboardLinkClick = (event: ReactMouseEvent<HTMLAnchorElement>) => {
     onDashboardAccess(event);
     closeMobileDrawer();
   };
