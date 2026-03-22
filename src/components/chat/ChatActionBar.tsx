@@ -6,11 +6,12 @@ import styles from './chat-action-bar.module.css';
 interface ChatActionBarProps {
     onNextLine: () => void;
     hasMore: boolean;
-    onCloseChapter?: () => void;
     secondaryActions?: React.ReactNode;
 }
 
-export function ChatActionBar({ onNextLine, hasMore, onCloseChapter, secondaryActions }: ChatActionBarProps) {
+export function ChatActionBar({ onNextLine, hasMore, secondaryActions }: ChatActionBarProps) {
+    if (!hasMore) return null;
+
     return (
         <div className={styles.container}>
             {secondaryActions && (
@@ -19,22 +20,12 @@ export function ChatActionBar({ onNextLine, hasMore, onCloseChapter, secondaryAc
                 </div>
             )}
             <div className={styles.inputArea}>
-                {hasMore ? (
-                    <button
-                        className={styles.nextBtn}
-                        onClick={onNextLine}
-                    >
-                        <>แตะเพื่ออ่านต่อ <ChevronRight size={20} /></>
-                    </button>
-                ) : (
-                    <button
-                        className={styles.nextBtn}
-                        onClick={onCloseChapter}
-                        disabled={!onCloseChapter}
-                    >
-                        ปิดตอน
-                    </button>
-                )}
+                <button
+                    className={styles.nextBtn}
+                    onClick={onNextLine}
+                >
+                    <>แตะเพื่ออ่านต่อ <ChevronRight size={20} /></>
+                </button>
             </div>
         </div>
     );

@@ -132,7 +132,9 @@
 }
 
 :global(.theme-light) .playerBubble {
-    background: linear-gradient(135deg, #1cc6ac 0%, #0ea5e9 100%);
+    background: #3b82f6;
+    color: white;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
 }
 
 :global(.theme-light) .characterName {
@@ -159,8 +161,9 @@
 }
 
 :global(.theme-pink) .playerBubble {
-    background: linear-gradient(135deg, #ec4899 0%, #f472b6 100%);
-    box-shadow: 0 2px 12px rgba(236, 72, 153, 0.25);
+    background: #3b82f6;
+    color: white;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
 }
 
 :global(.theme-pink) .characterName {
@@ -187,8 +190,9 @@
 }
 
 :global(.theme-mint) .playerBubble {
-    background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
-    box-shadow: 0 2px 12px rgba(52, 211, 153, 0.25);
+    background: #3b82f6;
+    color: white;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
 }
 
 :global(.theme-mint) .characterName {
@@ -214,8 +218,9 @@
 }
 
 :global(.theme-midnight) .playerBubble {
-    background: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);
-    box-shadow: 0 2px 12px rgba(99, 102, 241, 0.3);
+    background: #3b82f6;
+    color: white;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
 }
 
 :global(.theme-midnight) .characterName {

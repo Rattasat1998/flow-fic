@@ -176,7 +176,7 @@ function PricingContent() {
     return (
         <main className={styles.main}>
             <header className={styles.header}>
-                <div className={styles.headerContent}>
+                <div className={`ffPageContainer ${styles.headerContent}`}>
                     <div className={styles.balanceBadge}>
                         <Coins size={16} className={styles.coinIcon} />
                         <span className={styles.balanceAmount}>
@@ -186,118 +186,120 @@ function PricingContent() {
                 </div>
             </header>
 
-            <div className={styles.container}>
-                <div className={styles.pageTitle}>
-                    <h1>เติมเหรียญ & สมัครวีไอพี</h1>
-                    <p>เติมเหรียญเพื่อปลดล็อกตอนพิเศษ หรือสมัคร VIP เพื่ออ่านตอนพรีเมียมได้ทันที</p>
-                </div>
+            <div className="ffPageContainer">
+                <div className={styles.container}>
+                    <div className={styles.pageTitle}>
+                        <h1>เติมเหรียญ & สมัครวีไอพี</h1>
+                        <p>เติมเหรียญเพื่อปลดล็อกตอนพิเศษ หรือสมัคร VIP เพื่ออ่านตอนพรีเมียมได้ทันที</p>
+                    </div>
 
-                {/* Subscription Section (The Killer Feature) */}
-                <section className={styles.vipSection}>
-                    <div className={styles.vipCard}>
-                        <div className={styles.vipHeader}>
-                            <div className={styles.vipTitleGroup}>
-                                <Sparkles size={24} className={styles.vipIcon} />
-                                <h2>FlowFic VIP Pass</h2>
+                    {/* Subscription Section (The Killer Feature) */}
+                    <section className={styles.vipSection}>
+                        <div className={styles.vipCard}>
+                            <div className={styles.vipHeader}>
+                                <div className={styles.vipTitleGroup}>
+                                    <Sparkles size={24} className={styles.vipIcon} />
+                                    <h2>FlowFic VIP Pass</h2>
+                                </div>
+                                <div className={styles.vipPrice}>
+                                    <span className={styles.currency}>฿</span>
+                                    <span className={styles.amount}>{VIP_MONTHLY_PRICE_THB}</span>
+                                    <span className={styles.period}>/เดือน</span>
+                                </div>
                             </div>
-                            <div className={styles.vipPrice}>
-                                <span className={styles.currency}>฿</span>
-                                <span className={styles.amount}>{VIP_MONTHLY_PRICE_THB}</span>
-                                <span className={styles.period}>/เดือน</span>
-                            </div>
+
+                            <p className={styles.vipDesc}>สิทธิ์หลักของแพ็กเกจนี้คืออ่านตอนพรีเมียมแบบไม่ต้องใช้เหรียญ</p>
+
+                            <ul className={styles.featureList}>
+                                <li>
+                                    <div className={styles.featureIcon}><Check size={16} /></div>
+                                    <span>อ่านตอนที่ติดเหรียญได้ทันที เมื่อสถานะสมาชิกเป็น <strong>active</strong></span>
+                                </li>
+                                <li>
+                                    <div className={styles.featureIcon}><Check size={16} /></div>
+                                    <span>ปลดล็อกตอนพรีเมียมผ่าน VIP โดยไม่หักเหรียญจาก Wallet</span>
+                                </li>
+                                <li>
+                                    <div className={styles.featureIcon}><Check size={16} /></div>
+                                    <span>ต่ออายุรายเดือนผ่าน Stripe และระบบซิงก์สิทธิ์อัตโนมัติ</span>
+                                </li>
+                                <li>
+                                    <div className={styles.featureIcon}><Check size={16} /></div>
+                                    <span>มีสถานะสิทธิ์บนหน้า Pricing ให้ตรวจสอบได้แบบเรียลไทม์</span>
+                                </li>
+                            </ul>
+
+                            <p className={styles.vipFootnote}>
+                                หมายเหตุ: ฟีเจอร์แชทไม่จำกัด, AI Voice Call และสิทธิ์ไม่มีโฆษณา ยังไม่เปิดใช้งานในระบบปัจจุบัน
+                            </p>
+
+                            <button
+                                className={styles.subscribeBtn}
+                                onClick={() => startCheckout({ kind: 'vip' }, 'vip')}
+                                disabled={isCheckoutLoading !== null}
+                            >
+                                {isVipActive
+                                    ? 'VIP ใช้งานอยู่'
+                                    : isCheckoutLoading === 'vip'
+                                        ? 'กำลังสร้างรายการ...'
+                                        : 'สมัคร VIP เลย!'}
+                            </button>
+                        </div>
+                    </section>
+
+                    <hr className={styles.divider} />
+
+                    {/* Coin Packages Section */}
+                    <section className={styles.coinsSection}>
+                        <div className={styles.sectionTitle}>
+                            <h2>เติมเหรียญ Flow Coins</h2>
+                            <p>ใช้สำหรับปลดล็อกตอนพิเศษ (NC, ตอนจบลับ) หรือส่งของขวัญให้ผู้แต่ง รองรับทั้งบัตรและ QR PromptPay</p>
                         </div>
 
-                        <p className={styles.vipDesc}>สิทธิ์หลักของแพ็กเกจนี้คืออ่านตอนพรีเมียมแบบไม่ต้องใช้เหรียญ</p>
+                        <div className={styles.coinsGrid}>
+                            {COIN_PACKAGES.map((pkg) => (
+                                <div key={pkg.id} className={`${styles.coinCard} ${pkg.popular ? styles.popularCard : ''}`}>
+                                    {pkg.popular && <div className={styles.popularBadge}>ยอดนิยม</div>}
 
-                        <ul className={styles.featureList}>
-                            <li>
-                                <div className={styles.featureIcon}><Check size={16} /></div>
-                                <span>อ่านตอนที่ติดเหรียญได้ทันที เมื่อสถานะสมาชิกเป็น <strong>active</strong></span>
-                            </li>
-                            <li>
-                                <div className={styles.featureIcon}><Check size={16} /></div>
-                                <span>ปลดล็อกตอนพรีเมียมผ่าน VIP โดยไม่หักเหรียญจาก Wallet</span>
-                            </li>
-                            <li>
-                                <div className={styles.featureIcon}><Check size={16} /></div>
-                                <span>ต่ออายุรายเดือนผ่าน Stripe และระบบซิงก์สิทธิ์อัตโนมัติ</span>
-                            </li>
-                            <li>
-                                <div className={styles.featureIcon}><Check size={16} /></div>
-                                <span>มีสถานะสิทธิ์บนหน้า Pricing ให้ตรวจสอบได้แบบเรียลไทม์</span>
-                            </li>
-                        </ul>
+                                    <div className={styles.coinAmount}>
+                                        <Coins size={28} className={styles.coinIconLg} />
+                                        <h3>{getCoinPackageTotalCoins(pkg)}</h3>
+                                    </div>
 
-                        <p className={styles.vipFootnote}>
-                            หมายเหตุ: ฟีเจอร์แชทไม่จำกัด, AI Voice Call และสิทธิ์ไม่มีโฆษณา ยังไม่เปิดใช้งานในระบบปัจจุบัน
-                        </p>
+                                    {pkg.bonus > 0 ? (
+                                        <div className={styles.bonusText}>+ โบนัส {pkg.bonus} เหรียญ</div>
+                                    ) : (
+                                        <div className={styles.noBonus}>ไม่มีโบนัส</div>
+                                    )}
 
-                        <button
-                            className={styles.subscribeBtn}
-                            onClick={() => startCheckout({ kind: 'vip' }, 'vip')}
-                            disabled={isCheckoutLoading !== null}
-                        >
-                            {isVipActive
-                                ? 'VIP ใช้งานอยู่'
-                                : isCheckoutLoading === 'vip'
-                                    ? 'กำลังสร้างรายการ...'
-                                    : 'สมัคร VIP เลย!'}
-                        </button>
-                    </div>
-                </section>
-
-                <hr className={styles.divider} />
-
-                {/* Coin Packages Section */}
-                <section className={styles.coinsSection}>
-                    <div className={styles.sectionTitle}>
-                        <h2>เติมเหรียญ Flow Coins</h2>
-                        <p>ใช้สำหรับปลดล็อกตอนพิเศษ (NC, ตอนจบลับ) หรือส่งของขวัญให้ผู้แต่ง รองรับทั้งบัตรและ QR PromptPay</p>
-                    </div>
-
-                    <div className={styles.coinsGrid}>
-                        {COIN_PACKAGES.map((pkg) => (
-                            <div key={pkg.id} className={`${styles.coinCard} ${pkg.popular ? styles.popularCard : ''}`}>
-                                {pkg.popular && <div className={styles.popularBadge}>ยอดนิยม</div>}
-
-                                <div className={styles.coinAmount}>
-                                    <Coins size={28} className={styles.coinIconLg} />
-                                    <h3>{getCoinPackageTotalCoins(pkg)}</h3>
+                                    <div className={styles.purchaseActions}>
+                                        <button
+                                            className={styles.purchaseBtn}
+                                            onClick={() => startCheckout(
+                                                { kind: 'coins', packageId: pkg.id, paymentMethod: 'card' },
+                                                `coins-${pkg.id}-card`
+                                            )}
+                                            disabled={isCheckoutLoading !== null}
+                                        >
+                                            {isCheckoutLoading === `coins-${pkg.id}-card` ? 'กำลังสร้างรายการ...' : `บัตร ฿${pkg.priceThb}`}
+                                        </button>
+                                        <button
+                                            className={styles.purchaseBtnSecondary}
+                                            onClick={() => startCheckout(
+                                                { kind: 'coins', packageId: pkg.id, paymentMethod: 'promptpay' },
+                                                `coins-${pkg.id}-promptpay`
+                                            )}
+                                            disabled={isCheckoutLoading !== null}
+                                        >
+                                            {isCheckoutLoading === `coins-${pkg.id}-promptpay` ? 'กำลังสร้าง QR...' : `QR PromptPay ฿${pkg.priceThb}`}
+                                        </button>
+                                    </div>
                                 </div>
+                            ))}
+                        </div>
+                    </section>
 
-                                {pkg.bonus > 0 ? (
-                                    <div className={styles.bonusText}>+ โบนัส {pkg.bonus} เหรียญ</div>
-                                ) : (
-                                    <div className={styles.noBonus}>ไม่มีโบนัส</div>
-                                )}
-
-                                <div className={styles.purchaseActions}>
-                                    <button
-                                        className={styles.purchaseBtn}
-                                        onClick={() => startCheckout(
-                                            { kind: 'coins', packageId: pkg.id, paymentMethod: 'card' },
-                                            `coins-${pkg.id}-card`
-                                        )}
-                                        disabled={isCheckoutLoading !== null}
-                                    >
-                                        {isCheckoutLoading === `coins-${pkg.id}-card` ? 'กำลังสร้างรายการ...' : `บัตร ฿${pkg.priceThb}`}
-                                    </button>
-                                    <button
-                                        className={styles.purchaseBtnSecondary}
-                                        onClick={() => startCheckout(
-                                            { kind: 'coins', packageId: pkg.id, paymentMethod: 'promptpay' },
-                                            `coins-${pkg.id}-promptpay`
-                                        )}
-                                        disabled={isCheckoutLoading !== null}
-                                    >
-                                        {isCheckoutLoading === `coins-${pkg.id}-promptpay` ? 'กำลังสร้าง QR...' : `QR PromptPay ฿${pkg.priceThb}`}
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </section>
-
+                </div>
             </div>
 
             {checkoutDialogState && (

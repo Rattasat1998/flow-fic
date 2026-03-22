@@ -123,16 +123,20 @@ export default function NotificationsPage() {
         return (
             <main className={styles.main}>
                 <header className={styles.header}>
-                    <div className={styles.headerLeft}>
-                        <h1 className={styles.title}>
-                            <Bell size={20} /> การแจ้งเตือน
-                        </h1>
+                    <div className={`ffPageContainer ${styles.headerInner}`}>
+                        <div className={styles.headerLeft}>
+                            <h1 className={styles.title}>
+                                <Bell size={20} /> การแจ้งเตือน
+                            </h1>
+                        </div>
                     </div>
                 </header>
-                <div className={styles.loginPrompt}>
-                    <Bell size={40} />
-                    <p>กรุณาเข้าสู่ระบบเพื่อดูการแจ้งเตือน</p>
-                    <Link href="/" className={styles.loginBtn}>เข้าสู่ระบบ</Link>
+                <div className={`ffPageContainer ${styles.contentShell}`}>
+                    <div className={styles.loginPrompt}>
+                        <Bell size={40} />
+                        <p>กรุณาเข้าสู่ระบบเพื่อดูการแจ้งเตือน</p>
+                        <Link href="/" className={styles.loginBtn}>เข้าสู่ระบบ</Link>
+                    </div>
                 </div>
             </main>
         );
@@ -142,76 +146,80 @@ export default function NotificationsPage() {
         <main className={styles.main}>
             {/* Header */}
             <header className={styles.header}>
-                <div className={styles.headerLeft}>
-                    <h1 className={styles.title}>
-                        <Bell size={20} /> การแจ้งเตือน
-                        {unreadCount > 0 && (
-                            <span style={{ fontSize: '0.8rem', color: '#3b82f6', marginLeft: '0.35rem' }}>
-                                ({unreadCount})
-                            </span>
-                        )}
-                    </h1>
+                <div className={`ffPageContainer ${styles.headerInner}`}>
+                    <div className={styles.headerLeft}>
+                        <h1 className={styles.title}>
+                            <Bell size={20} /> การแจ้งเตือน
+                            {unreadCount > 0 && (
+                                <span style={{ fontSize: '0.8rem', color: '#3b82f6', marginLeft: '0.35rem' }}>
+                                    ({unreadCount})
+                                </span>
+                            )}
+                        </h1>
+                    </div>
+                    {unreadCount > 0 && (
+                        <button className={styles.markAllBtn} onClick={markAllRead}>
+                            <CheckCheck size={14} /> อ่านแล้วทั้งหมด
+                        </button>
+                    )}
                 </div>
-                {unreadCount > 0 && (
-                    <button className={styles.markAllBtn} onClick={markAllRead}>
-                        <CheckCheck size={14} /> อ่านแล้วทั้งหมด
-                    </button>
-                )}
             </header>
 
             {/* Content */}
-            {isLoading ? (
-                <div className={styles.loadingState}>
-                    <Loader2 size={20} className={styles.spinner} />
-                    กำลังโหลดการแจ้งเตือน...
-                </div>
-            ) : notifications.length === 0 ? (
-                <div className={styles.emptyState}>
-                    <div className={styles.emptyIcon}>🔔</div>
-                    <div className={styles.emptyTitle}>ยังไม่มีการแจ้งเตือน</div>
-                    <div className={styles.emptyDesc}>เมื่อคุณติดตามเรื่องและมีตอนใหม่ จะแสดงที่นี่</div>
-                </div>
-            ) : (
-                <div className={styles.list}>
-                    {notifications.map((notif) => {
-                        const inner = (
-                            <>
-                                <div className={styles.itemIcon}>
-                                    {notif.type === 'new_chapter' ? '📖' : '🔔'}
-                                </div>
-                                <div className={styles.itemBody}>
-                                    <div className={styles.itemTitle}>{notif.title}</div>
-                                    {notif.body && <div className={styles.itemDesc}>{notif.body}</div>}
-                                    <div className={styles.itemTime}>{timeAgo(notif.created_at)}</div>
-                                </div>
-                            </>
-                        );
+            <div className={`ffPageContainer ${styles.contentShell}`}>
+                {isLoading ? (
+                    <div className={styles.loadingState}>
+                        <Loader2 size={20} className={styles.spinner} />
+                        กำลังโหลดการแจ้งเตือน...
+                    </div>
+                ) : notifications.length === 0 ? (
+                    <div className={styles.emptyState}>
+                        <div className={styles.emptyIcon}>🔔</div>
+                        <div className={styles.emptyTitle}>ยังไม่มีการแจ้งเตือน</div>
+                        <div className={styles.emptyDesc}>เมื่อคุณติดตามเรื่องและมีตอนใหม่ จะแสดงที่นี่</div>
+                    </div>
+                ) : (
+                    <div className={styles.list}>
+                        {notifications.map((notif) => {
+                            const inner = (
+                                <>
+                                    <div className={styles.itemIcon}>
+                                        {notif.type === 'new_chapter' ? '📖' : '🔔'}
+                                    </div>
+                                    <div className={styles.itemBody}>
+                                        <div className={styles.itemTitle}>{notif.title}</div>
+                                        {notif.body && <div className={styles.itemDesc}>{notif.body}</div>}
+                                        <div className={styles.itemTime}>{timeAgo(notif.created_at)}</div>
+                                    </div>
+                                </>
+                            );
 
-                        if (notif.link) {
+                            if (notif.link) {
+                                return (
+                                    <Link
+                                        key={notif.id}
+                                        href={notif.link}
+                                        className={`${styles.item} ${!notif.is_read ? styles.itemUnread : ''}`}
+                                        onClick={() => handleItemClick(notif)}
+                                    >
+                                        {inner}
+                                    </Link>
+                                );
+                            }
+
                             return (
-                                <Link
+                                <div
                                     key={notif.id}
-                                    href={notif.link}
                                     className={`${styles.item} ${!notif.is_read ? styles.itemUnread : ''}`}
                                     onClick={() => handleItemClick(notif)}
                                 >
                                     {inner}
-                                </Link>
+                                </div>
                             );
-                        }
-
-                        return (
-                            <div
-                                key={notif.id}
-                                className={`${styles.item} ${!notif.is_read ? styles.itemUnread : ''}`}
-                                onClick={() => handleItemClick(notif)}
-                            >
-                                {inner}
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
+                        })}
+                    </div>
+                )}
+            </div>
         </main>
     );
 }

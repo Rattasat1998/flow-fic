@@ -18,7 +18,7 @@ export const MAIN_CATEGORIES: MainCategory[] = [
     { id: 'mystery', label: 'สืบสวน/ลึกลับ/สยองขวัญ' },
     { id: 'romance', label: 'นิยายรัก' },
     { id: 'fantasy', label: 'แฟนตาซี/Sci-Fi/ไลท์โนเวล' },
-    { id: 'social', label: 'สะท้อนสังคม/แนวกทางเลือก/เยาวชน' },
+    { id: 'social', label: 'สะท้อนสังคม/แนวทางเลือก/เยาวชน' },
     { id: 'boy_love', label: 'Boy Love' },
     { id: 'girl_love', label: 'Girl Love' }
 ];

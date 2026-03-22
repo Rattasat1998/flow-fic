@@ -2,98 +2,46 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Search,
-  Menu,
   PenTool,
-  Bookmark,
   Heart,
   Settings,
-  LogOut,
   Upload,
   X,
-  Bell,
-  SlidersHorizontal,
-  RotateCcw,
-  Sparkles,
-  Flame,
-  Rocket,
+  ArrowRight,
+  ChevronRight,
+  Star,
   AlertCircle,
   Inbox,
-  Coins,
-  Eye,
   List,
+  Eye,
 } from 'lucide-react';
 import styles from '@/app/home.module.css';
 import { supabase } from '@/lib/supabase';
-import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import {
-  CORE_MAIN_CATEGORY_ID,
   MAIN_CATEGORIES,
+  SUB_CATEGORIES,
   getMainCategoryLabel,
   getSubCategoryLabel,
 } from '@/lib/categories';
 import { useAuth } from '@/contexts/AuthContext';
 import { WalletLedgerPanel } from '@/components/profile/WalletLedgerPanel';
-import { BrandLogo } from '@/components/brand/BrandLogo';
-import { useTracking } from '@/hooks/useTracking';
+import { useHomeGsapAnimations } from '@/components/home/useHomeGsapAnimations';
+import { SharedNavbar } from '@/components/navigation/SharedNavbar';
 import type {
-  DiscoveryCategoryFilter,
-  DiscoveryCompletionFilter,
   DiscoveryFilters,
-  DiscoveryLengthFilter,
   DiscoveryRailKey,
   DiscoveryResponse,
   DiscoveryStory,
-  DiscoverySubCategoryFilter,
 } from '@/types/discovery';
 
 const DISCOVERY_LIMIT = 12;
 const DISCOVERY_CACHE_PREFIX = 'ff_home_discovery::';
 const DISCOVERY_CACHE_TTL_MS = 5 * 60 * 1000;
-const DISCOVERY_CORE_FOCUS_ENABLED = FEATURE_FLAGS.discoveryCoreFocus;
-const DEFAULT_DISCOVERY_CATEGORY: DiscoveryCategoryFilter = 'all';
-const DEFAULT_DISCOVERY_SUB_CATEGORY: DiscoverySubCategoryFilter = 'all';
-const DEFAULT_DISCOVERY_COMPLETION: DiscoveryCompletionFilter = 'all';
-const DEFAULT_DISCOVERY_LENGTH: DiscoveryLengthFilter = 'all';
-const DEFAULT_DISCOVERY_FOCUS_CORE = false;
 const HERO_ROTATION_MS = 7000;
 const HERO_STORY_LIMIT = 5;
-const FILTER_CHANGE_TRACK_SAMPLE_RATE = 0.35;
-const VALID_COMPLETIONS = new Set<DiscoveryCompletionFilter>(['all', 'ongoing', 'completed']);
-const VALID_LENGTHS = new Set<DiscoveryLengthFilter>(['all', 'short', 'medium', 'long']);
-
-const COMPLETION_FILTERS: Array<{ id: DiscoveryCompletionFilter; label: string }> = [
-  { id: 'all', label: 'ทั้งหมด' },
-  { id: 'ongoing', label: 'ยังไม่จบ' },
-  { id: 'completed', label: 'จบแล้ว' },
-];
-
-const LENGTH_FILTERS: Array<{ id: DiscoveryLengthFilter; label: string }> = [
-  { id: 'all', label: 'ทุกความยาว' },
-  { id: 'short', label: 'สั้น (1-5 ตอน)' },
-  { id: 'medium', label: 'กลาง (6-20 ตอน)' },
-  { id: 'long', label: 'ยาว (21+ ตอน)' },
-];
-
-const SUB_CATEGORY_FILTERS: Array<{ id: DiscoverySubCategoryFilter; label: string }> = [
-  { id: 'all', label: 'ทั้งหมดในหมวดสืบสวน/สยอง' },
-  { id: 'mystery_horror', label: 'สยองขวัญ' },
-  { id: 'mystery_detective', label: 'สืบสวน' },
-];
-
-const RAILS: Array<{
-  key: DiscoveryRailKey;
-  title: string;
-  eyebrow: string;
-  emptyLabel: string;
-}> = [
-  { key: 'trending', title: 'Trending Now', eyebrow: 'กำลังมาแรง', emptyLabel: 'ยังไม่มีเรื่องกำลังมาแรงที่ตรงกับตัวกรองนี้' },
-  { key: 'popular', title: 'ยอดฮิตของสัปดาห์นี้', eyebrow: 'ยอดนิยม', emptyLabel: 'ยังไม่มีเรื่องยอดนิยมที่ตรงกับตัวกรองนี้' },
-  { key: 'new', title: 'มาใหม่ล่าสุด', eyebrow: 'มาใหม่', emptyLabel: 'ยังไม่มีเรื่องใหม่ที่ตรงกับตัวกรองนี้' },
-];
 
 type HomeRailState = {
   items: DiscoveryStory[];
@@ -102,18 +50,6 @@ type HomeRailState = {
 };
 
 type HomeRailsState = Record<DiscoveryRailKey, HomeRailState>;
-
-type HomeFilterInput = Pick<
-  DiscoveryFilters,
-  'q' | 'category' | 'subCategory' | 'completion' | 'length' | 'focusCore'
->;
-
-type HomeNavTabConfig = {
-  id: 'mystery_all' | 'mystery_horror' | 'mystery_detective';
-  label: string;
-  category: DiscoveryCategoryFilter;
-  subCategory: DiscoverySubCategoryFilter;
-};
 
 type UserProfile = {
   pen_name: string;
@@ -126,46 +62,12 @@ type DiscoveryCacheEntry = {
   payload: DiscoveryResponse;
 };
 
-const HOME_NAV_TABS: HomeNavTabConfig[] = [
-  {
-    id: 'mystery_all',
-    label: 'สยอง/สืบสวน',
-    category: CORE_MAIN_CATEGORY_ID,
-    subCategory: 'all',
-  },
-  {
-    id: 'mystery_horror',
-    label: 'สยองขวัญ',
-    category: CORE_MAIN_CATEGORY_ID,
-    subCategory: 'mystery_horror',
-  },
-  {
-    id: 'mystery_detective',
-    label: 'สืบสวน',
-    category: CORE_MAIN_CATEGORY_ID,
-    subCategory: 'mystery_detective',
-  },
-];
-
-const isModifiedLinkClick = (event: React.MouseEvent<HTMLAnchorElement>) =>
-  event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0;
-
 function createInitialRails(loading: boolean): HomeRailsState {
   return {
     new: { items: [], error: null, loading },
     popular: { items: [], error: null, loading },
     trending: { items: [], error: null, loading },
   };
-}
-
-function formatGeneratedAt(value: string | null): string {
-  if (!value) return '';
-  return new Date(value).toLocaleString('th-TH', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }
 
 function buildApiQueryFromFilters(filters: DiscoveryFilters): string {
@@ -180,29 +82,15 @@ function buildApiQueryFromFilters(filters: DiscoveryFilters): string {
   return params.toString();
 }
 
-function parseFiltersFromSearch(search: string): DiscoveryFilters {
-  const params = new URLSearchParams(search);
-  const completionRaw = (params.get('completion') || DEFAULT_DISCOVERY_COMPLETION).trim() as DiscoveryCompletionFilter;
-  const lengthRaw = (params.get('length') || DEFAULT_DISCOVERY_LENGTH).trim() as DiscoveryLengthFilter;
-  const focusRaw = (params.get('focusCore') || '').trim().toLowerCase();
-  const categoryRaw = (params.get('category') || DEFAULT_DISCOVERY_CATEGORY).trim();
-  const subCategoryRaw = (params.get('subCategory') || DEFAULT_DISCOVERY_SUB_CATEGORY).trim();
+function compareStoriesByShelfPriority(a: DiscoveryStory, b: DiscoveryStory): number {
+  if (b.score_7d !== a.score_7d) return b.score_7d - a.score_7d;
+  if (b.total_view_count !== a.total_view_count) return b.total_view_count - a.total_view_count;
 
-  return {
-    q: (params.get('q') || '').trim().slice(0, 120),
-    category: categoryRaw || DEFAULT_DISCOVERY_CATEGORY,
-    subCategory: subCategoryRaw || DEFAULT_DISCOVERY_SUB_CATEGORY,
-    completion: VALID_COMPLETIONS.has(completionRaw) ? completionRaw : DEFAULT_DISCOVERY_COMPLETION,
-    length: VALID_LENGTHS.has(lengthRaw) ? lengthRaw : DEFAULT_DISCOVERY_LENGTH,
-    focusCore: FEATURE_FLAGS.discoveryCoreFocus
-      ? (focusRaw === 'false' || focusRaw === '0'
-        ? false
-        : focusRaw === 'true' || focusRaw === '1'
-          ? true
-          : DEFAULT_DISCOVERY_FOCUS_CORE)
-      : false,
-    limit: DISCOVERY_LIMIT,
-  };
+  const createdAtA = a.created_at ? Date.parse(a.created_at) : 0;
+  const createdAtB = b.created_at ? Date.parse(b.created_at) : 0;
+  const safeCreatedAtA = Number.isNaN(createdAtA) ? 0 : createdAtA;
+  const safeCreatedAtB = Number.isNaN(createdAtB) ? 0 : createdAtB;
+  return safeCreatedAtB - safeCreatedAtA;
 }
 
 function railsFromPayload(payload: DiscoveryResponse, loading: boolean): HomeRailsState {
@@ -226,25 +114,31 @@ function railsFromPayload(payload: DiscoveryResponse, loading: boolean): HomeRai
 }
 
 type HomePageClientProps = {
-  initialFilters: DiscoveryFilters;
   initialDiscovery: DiscoveryResponse;
 };
 
-export default function HomePageClient({ initialFilters, initialDiscovery }: HomePageClientProps) {
-  const router = useRouter();
+export default function HomePageClient({ initialDiscovery }: HomePageClientProps) {
   const searchParams = useSearchParams();
   const { user, isLoading: isLoadingAuth, signInWithFacebook, signInWithGoogle, signOut } = useAuth();
   const userId = user?.id ?? null;
-  const { trackEvent } = useTracking({ autoPageView: true, pagePath: '/' });
 
   const [authError, setAuthError] = useState<string | null>(null);
   const [isDashboardAuthDialogOpen, setIsDashboardAuthDialogOpen] = useState(false);
+  const [dashboardAuthDialogTitle, setDashboardAuthDialogTitle] = useState('เข้าสู่ระบบก่อนเข้าแดชบอร์ดนักเขียน');
   const [dashboardAuthDialogMessage, setDashboardAuthDialogMessage] = useState<string | null>(null);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [walletCoinBalance, setWalletCoinBalance] = useState<number | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const homeRootRef = useRef<HTMLElement | null>(null);
+  const navbarRef = useRef<HTMLElement | null>(null);
+  const heroSectionRef = useRef<HTMLElement | null>(null);
+  const trendingSectionRef = useRef<HTMLElement | null>(null);
+  const mainCategoryMapSectionRef = useRef<HTMLElement | null>(null);
+  const editorSectionRef = useRef<HTMLElement | null>(null);
+  const writerCtaSectionRef = useRef<HTMLElement | null>(null);
+  const subCategoryRailRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Profile Settings State
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -254,137 +148,41 @@ export default function HomePageClient({ initialFilters, initialDiscovery }: Hom
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const viewMode = (searchParams.get('view') || '').trim().toLowerCase();
+  const selectedGridCategoryId = (searchParams.get('category') || '').trim();
+  const selectedLegacyGridShelfId = (searchParams.get('shelf') || '').trim();
+  const searchSeedFromQuery = (searchParams.get('q') || '').trim().slice(0, 120);
   const initialApiQuery = useMemo(
-    () => buildApiQueryFromFilters({ ...initialFilters, limit: DISCOVERY_LIMIT }),
-    [initialFilters]
+    () =>
+      buildApiQueryFromFilters({
+        q: '',
+        category: 'all',
+        subCategory: 'all',
+        completion: 'all',
+        length: 'all',
+        focusCore: false,
+        limit: DISCOVERY_LIMIT,
+      }),
+    []
   );
   const serverPrefetchQueryRef = useRef<string | null>(initialApiQuery);
 
-  const [urlFilters, setUrlFilters] = useState<DiscoveryFilters>({
-    ...initialFilters,
-    limit: DISCOVERY_LIMIT,
-  });
-
-  const [searchInput, setSearchInput] = useState(urlFilters.q);
+  const [searchInput, setSearchInput] = useState(searchSeedFromQuery);
   const [rails, setRails] = useState<HomeRailsState>(() => railsFromPayload(initialDiscovery, false));
-  const [generatedAt, setGeneratedAt] = useState<string | null>(initialDiscovery.generatedAt);
   const [heroIndex, setHeroIndex] = useState(0);
-  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
-
-  const buildDiscoveryUrl = useCallback(
-    (next: HomeFilterInput) => {
-      const params = new URLSearchParams();
-      const trimmedQ = next.q.trim();
-
-      if (trimmedQ) params.set('q', trimmedQ);
-      else params.delete('q');
-
-      if (next.category === 'all') params.set('category', 'all');
-      else params.set('category', next.category);
-
-      if (next.subCategory !== 'all') params.set('subCategory', next.subCategory);
-      else params.delete('subCategory');
-
-      if (next.completion !== 'all') params.set('completion', next.completion);
-      else params.delete('completion');
-
-      if (next.length !== 'all') params.set('length', next.length);
-      else params.delete('length');
-
-      params.set('focusCore', next.focusCore ? 'true' : 'false');
-
-      params.delete('limit');
-
-      const query = params.toString();
-      return query ? `/?${query}` : '/';
-    },
-    []
-  );
-
-  const navigateWithFilters = useCallback(
-    (next: HomeFilterInput) => {
-      const normalizedNext: DiscoveryFilters = {
-        q: next.q.trim(),
-        category: next.category,
-        subCategory: next.subCategory,
-        completion: next.completion,
-        length: next.length,
-        focusCore: next.focusCore,
-        limit: DISCOVERY_LIMIT,
-      };
-
-      setUrlFilters(normalizedNext);
-      const url = buildDiscoveryUrl(normalizedNext);
-      router.replace(url, { scroll: false });
-    },
-    [buildDiscoveryUrl, router]
-  );
-
-  const trackFilterChange = useCallback(
-    (next: Partial<{
-      q: string;
-      category: DiscoveryCategoryFilter;
-      subCategory: DiscoverySubCategoryFilter;
-      completion: DiscoveryCompletionFilter;
-      length: DiscoveryLengthFilter;
-      focusCore: boolean;
-    }>) => {
-      if (Math.random() > FILTER_CHANGE_TRACK_SAMPLE_RATE) return;
-
-      const merged = {
-        q: next.q ?? urlFilters.q,
-        category: next.category ?? urlFilters.category,
-        subCategory: next.subCategory ?? urlFilters.subCategory,
-        completion: next.completion ?? urlFilters.completion,
-        length: next.length ?? urlFilters.length,
-        focusCore: next.focusCore ?? urlFilters.focusCore,
-      };
-
-      trackEvent('filter_change', '/', {
-        metadata: {
-          search_query: merged.q || undefined,
-          category_filter: merged.category,
-          sub_category_filter: merged.subCategory !== 'all' ? merged.subCategory : undefined,
-          completion_filter: merged.completion,
-          length_filter: merged.length,
-          focus_core: merged.focusCore,
-        },
-      });
-    },
-    [trackEvent, urlFilters]
-  );
 
   useEffect(() => {
-    setSearchInput(urlFilters.q);
-  }, [urlFilters.q]);
+    document.body.classList.add('home-dark-premium-body');
+    return () => {
+      document.body.classList.remove('home-dark-premium-body');
+    };
+  }, []);
 
   useEffect(() => {
-    setUrlFilters(parseFiltersFromSearch(searchParams.toString()));
-  }, [searchParams]);
+    setSearchInput(searchSeedFromQuery);
+  }, [searchSeedFromQuery]);
 
-  useEffect(() => {
-    const normalizedInput = searchInput.trim();
-    if (normalizedInput === urlFilters.q) return;
-
-    const timer = window.setTimeout(() => {
-      navigateWithFilters({
-        q: normalizedInput,
-        category: urlFilters.category,
-        subCategory: urlFilters.subCategory,
-        completion: urlFilters.completion,
-        length: urlFilters.length,
-        focusCore: urlFilters.focusCore,
-      });
-
-      trackFilterChange({ q: normalizedInput });
-    }, 300);
-
-    return () => window.clearTimeout(timer);
-  }, [searchInput, urlFilters, navigateWithFilters, trackFilterChange]);
-
-  const apiQuery = useMemo(() => {
-    return buildApiQueryFromFilters(urlFilters);
-  }, [urlFilters]);
+  const apiQuery = initialApiQuery;
 
   const cacheKey = useMemo(() => `${DISCOVERY_CACHE_PREFIX}${apiQuery || 'default'}`, [apiQuery]);
 
@@ -412,7 +210,6 @@ export default function HomePageClient({ initialFilters, initialDiscovery }: Hom
           loading: false,
         },
       });
-      setGeneratedAt(payload.generatedAt);
     };
 
     const loadDiscovery = async () => {
@@ -452,7 +249,6 @@ export default function HomePageClient({ initialFilters, initialDiscovery }: Hom
 
       if (!hasFreshCache) {
         setRails(createInitialRails(true));
-        setGeneratedAt(null);
       }
 
       try {
@@ -661,6 +457,7 @@ export default function HomePageClient({ initialFilters, initialDiscovery }: Hom
 
   const handleCloseDashboardAuthDialog = () => {
     setIsDashboardAuthDialogOpen(false);
+    setDashboardAuthDialogTitle('เข้าสู่ระบบก่อนเข้าแดชบอร์ดนักเขียน');
     setDashboardAuthDialogMessage(null);
     setAuthError(null);
   };
@@ -669,6 +466,7 @@ export default function HomePageClient({ initialFilters, initialDiscovery }: Hom
     if (isLoadingAuth) {
       event.preventDefault();
       setAuthError(null);
+      setDashboardAuthDialogTitle('กำลังตรวจสอบสถานะการเข้าสู่ระบบ');
       setDashboardAuthDialogMessage('กำลังตรวจสอบสถานะการเข้าสู่ระบบ กรุณาลองอีกครั้ง');
       setIsDashboardAuthDialogOpen(true);
       return;
@@ -684,124 +482,19 @@ export default function HomePageClient({ initialFilters, initialDiscovery }: Hom
 
     event.preventDefault();
     setAuthError(null);
+    setDashboardAuthDialogTitle('เข้าสู่ระบบก่อนเข้าแดชบอร์ดนักเขียน');
     setDashboardAuthDialogMessage('เข้าสู่ระบบเพื่อดูสถิติ จัดการเรื่อง และตั้งค่าการเผยแพร่ในแดชบอร์ดนักเขียน');
     setIsDashboardAuthDialogOpen(true);
     setIsProfileMenuOpen(false);
   };
 
-  const handleSelectCategory = (category: DiscoveryCategoryFilter) => {
-    const nextSubCategory: DiscoverySubCategoryFilter = category === CORE_MAIN_CATEGORY_ID ? urlFilters.subCategory : 'all';
-    navigateWithFilters({
-      q: urlFilters.q,
-      category,
-      subCategory: nextSubCategory,
-      completion: urlFilters.completion,
-      length: urlFilters.length,
-      focusCore: category === CORE_MAIN_CATEGORY_ID ? urlFilters.focusCore : false,
-    });
-
-    trackFilterChange({
-      category,
-      subCategory: nextSubCategory,
-      focusCore: category === CORE_MAIN_CATEGORY_ID ? urlFilters.focusCore : false,
-    });
+  const handleOpenLoginDialog = () => {
+    setAuthError(null);
+    setDashboardAuthDialogTitle('เข้าสู่ระบบ FlowFic');
+    setDashboardAuthDialogMessage('เข้าสู่ระบบเพื่อบันทึกชั้นหนังสือ กดหัวใจ และปลดล็อกฟีเจอร์นักเขียน');
+    setIsDashboardAuthDialogOpen(true);
+    setIsProfileMenuOpen(false);
   };
-
-  const handleSelectSubCategory = (subCategory: DiscoverySubCategoryFilter) => {
-    navigateWithFilters({
-      q: urlFilters.q,
-      category: CORE_MAIN_CATEGORY_ID,
-      subCategory,
-      completion: urlFilters.completion,
-      length: urlFilters.length,
-      focusCore: DEFAULT_DISCOVERY_FOCUS_CORE,
-    });
-
-    trackFilterChange({
-      category: CORE_MAIN_CATEGORY_ID,
-      subCategory,
-      focusCore: DEFAULT_DISCOVERY_FOCUS_CORE,
-    });
-  };
-
-  const handleSelectCompletion = (completion: DiscoveryCompletionFilter) => {
-    navigateWithFilters({
-      q: urlFilters.q,
-      category: urlFilters.category,
-      subCategory: urlFilters.subCategory,
-      completion,
-      length: urlFilters.length,
-      focusCore: urlFilters.focusCore,
-    });
-
-    trackFilterChange({ completion });
-  };
-
-  const handleSelectLength = (length: DiscoveryLengthFilter) => {
-    navigateWithFilters({
-      q: urlFilters.q,
-      category: urlFilters.category,
-      subCategory: urlFilters.subCategory,
-      completion: urlFilters.completion,
-      length,
-      focusCore: urlFilters.focusCore,
-    });
-
-    trackFilterChange({ length });
-  };
-
-  const handleNavbarTabClick = useCallback(
-    (
-      event: React.MouseEvent<HTMLAnchorElement>,
-      target: Pick<HomeNavTabConfig, 'category' | 'subCategory'>
-    ) => {
-      if (event.defaultPrevented || isModifiedLinkClick(event)) return;
-
-      event.preventDefault();
-
-      navigateWithFilters({
-        q: urlFilters.q,
-        category: target.category,
-        subCategory: target.subCategory,
-        completion: urlFilters.completion,
-        length: urlFilters.length,
-        focusCore: DEFAULT_DISCOVERY_FOCUS_CORE,
-      });
-
-      trackFilterChange({
-        category: target.category,
-        subCategory: target.subCategory,
-        focusCore: DEFAULT_DISCOVERY_FOCUS_CORE,
-      });
-    },
-    [navigateWithFilters, trackFilterChange, urlFilters.completion, urlFilters.length, urlFilters.q]
-  );
-
-  const homeNavTabs = useMemo(
-    () =>
-      HOME_NAV_TABS.map((tab) => ({
-        ...tab,
-        href: buildDiscoveryUrl({
-          q: urlFilters.q,
-          category: tab.category,
-          subCategory: tab.subCategory,
-          completion: urlFilters.completion,
-          length: urlFilters.length,
-          focusCore: DEFAULT_DISCOVERY_FOCUS_CORE,
-        }),
-        isActive:
-          urlFilters.category === tab.category
-          && urlFilters.subCategory === tab.subCategory,
-      })),
-    [
-      buildDiscoveryUrl,
-      urlFilters.category,
-      urlFilters.completion,
-      urlFilters.length,
-      urlFilters.q,
-      urlFilters.subCategory,
-    ]
-  );
 
   const heroStories = useMemo(() => {
     const candidates = [...rails.trending.items, ...rails.popular.items, ...rails.new.items];
@@ -837,16 +530,6 @@ export default function HomePageClient({ initialFilters, initialDiscovery }: Hom
     return () => window.clearInterval(intervalId);
   }, [heroStories.length]);
 
-  const heroMetaLine = useMemo(() => {
-    if (!heroStory) return '';
-
-    const completionLabel = heroStory.completion_status === 'completed' ? 'จบแล้ว' : 'กำลังอัปเดต';
-    const chapterLabel = `${heroStory.published_chapter_count.toLocaleString('th-TH')} ตอน`;
-    const pathLabel = heroStory.path_mode === 'branching' ? 'Interactive' : 'Linear';
-
-    return `${completionLabel} · ${chapterLabel} · ${pathLabel}`;
-  }, [heroStory]);
-
   const heroInfoPills = useMemo(() => {
     if (!heroStory) return [];
 
@@ -854,531 +537,619 @@ export default function HomePageClient({ initialFilters, initialDiscovery }: Hom
     const mainCategoryLabel = getMainCategoryLabel(heroStory.main_category);
     const subCategoryLabel = getSubCategoryLabel(heroStory.sub_category);
 
-    return [typeLabel, mainCategoryLabel, subCategoryLabel].filter(Boolean) as string[];
+    return [typeLabel, mainCategoryLabel, subCategoryLabel].filter(Boolean).slice(0, 2) as string[];
   }, [heroStory]);
+  const normalizedSearch = searchInput.trim().toLowerCase();
+  const hasSearch = normalizedSearch.length > 0;
 
-  const selectedCategoryLabel = useMemo(() => {
-    if (urlFilters.category === 'all') return null;
-    return getMainCategoryLabel(urlFilters.category);
-  }, [urlFilters.category]);
+  const matchesSearch = useCallback(
+    (story: DiscoveryStory) => {
+      if (!hasSearch) return true;
 
-  const selectedSubCategoryLabel = useMemo(() => {
-    if (urlFilters.subCategory === 'all') return null;
-    return getSubCategoryLabel(urlFilters.subCategory);
-  }, [urlFilters.subCategory]);
+      const mainCategoryLabel = getMainCategoryLabel(story.main_category).toLowerCase();
+      const subCategoryLabel = getSubCategoryLabel(story.sub_category).toLowerCase();
+      const haystack = [
+        story.title,
+        story.pen_name,
+        story.synopsis || '',
+        mainCategoryLabel,
+        subCategoryLabel,
+      ]
+        .join(' ')
+        .toLowerCase();
 
-  const activeFilterPills = useMemo(() => {
-    const pills: Array<{ id: string; label: string }> = [];
+      return haystack.includes(normalizedSearch);
+    },
+    [hasSearch, normalizedSearch]
+  );
 
-    if (urlFilters.q) pills.push({ id: 'q', label: `ค้นหา: "${urlFilters.q}"` });
-    if (urlFilters.category !== DEFAULT_DISCOVERY_CATEGORY && selectedCategoryLabel) {
-      pills.push({ id: 'category', label: `หมวด: ${selectedCategoryLabel}` });
-    }
-    if (selectedSubCategoryLabel) pills.push({ id: 'subCategory', label: `ประเภทย่อย: ${selectedSubCategoryLabel}` });
-    if (urlFilters.completion !== DEFAULT_DISCOVERY_COMPLETION) {
-      const completionLabel =
-        COMPLETION_FILTERS.find((item) => item.id === urlFilters.completion)?.label || urlFilters.completion;
-      pills.push({ id: 'completion', label: `สถานะ: ${completionLabel}` });
-    }
-    if (urlFilters.length !== DEFAULT_DISCOVERY_LENGTH) {
-      const lengthLabel = LENGTH_FILTERS.find((item) => item.id === urlFilters.length)?.label || urlFilters.length;
-      pills.push({ id: 'length', label: `ความยาว: ${lengthLabel}` });
-    }
-    if (DISCOVERY_CORE_FOCUS_ENABLED && urlFilters.focusCore !== DEFAULT_DISCOVERY_FOCUS_CORE) {
-      pills.push({ id: 'focusCore', label: 'ปิดโฟกัสคอร์หลัก' });
-    }
+  const trendingStories = useMemo(
+    () => rails.trending.items.filter(matchesSearch),
+    [matchesSearch, rails.trending.items]
+  );
+  const trendingLoading = rails.trending.loading;
+  const trendingError = rails.trending.error;
 
-    return pills;
-  }, [
-    urlFilters.q,
-    urlFilters.category,
-    urlFilters.completion,
-    urlFilters.length,
-    urlFilters.focusCore,
-    selectedCategoryLabel,
-    selectedSubCategoryLabel,
-  ]);
-
-  const hasActiveFilters = activeFilterPills.length > 0;
-  const filterToggleLabel = isFilterPanelOpen
-    ? 'ซ่อนฟิลเตอร์'
-    : hasActiveFilters
-      ? `ฟิลเตอร์ (${activeFilterPills.length})`
-      : 'ฟิลเตอร์';
-
-  const handleResetFilters = () => {
-    setSearchInput('');
-    navigateWithFilters({
-      q: '',
-      category: DEFAULT_DISCOVERY_CATEGORY,
-      subCategory: DEFAULT_DISCOVERY_SUB_CATEGORY,
-      completion: DEFAULT_DISCOVERY_COMPLETION,
-      length: DEFAULT_DISCOVERY_LENGTH,
-      focusCore: DEFAULT_DISCOVERY_FOCUS_CORE,
+  const unifiedStories = useMemo(() => {
+    const uniqueStories = new Map<string, DiscoveryStory>();
+    [...rails.trending.items, ...rails.popular.items, ...rails.new.items].forEach((story) => {
+      if (!uniqueStories.has(story.id)) uniqueStories.set(story.id, story);
     });
+    return Array.from(uniqueStories.values());
+  }, [rails]);
 
-    trackFilterChange({
-      q: '',
-      category: DEFAULT_DISCOVERY_CATEGORY,
-      subCategory: DEFAULT_DISCOVERY_SUB_CATEGORY,
-      completion: DEFAULT_DISCOVERY_COMPLETION,
-      length: DEFAULT_DISCOVERY_LENGTH,
-      focusCore: DEFAULT_DISCOVERY_FOCUS_CORE,
+  const searchableStories = useMemo(
+    () => unifiedStories.filter(matchesSearch),
+    [matchesSearch, unifiedStories]
+  );
+
+  const subCategoryToMainCategoryMap = useMemo(
+    () => new Map(SUB_CATEGORIES.map((subCategory) => [subCategory.id, subCategory.mainCategoryId])),
+    []
+  );
+
+  const filteredPopularStories = useMemo(
+    () => rails.popular.items.filter(matchesSearch),
+    [matchesSearch, rails.popular.items]
+  );
+
+  const filteredNewStories = useMemo(
+    () => rails.new.items.filter(matchesSearch),
+    [matchesSearch, rails.new.items]
+  );
+
+  const editorFeaturedStory = useMemo(
+    () => filteredPopularStories[0] ?? filteredNewStories[0] ?? trendingStories[0] ?? null,
+    [filteredNewStories, filteredPopularStories, trendingStories]
+  );
+
+  const editorSideStories = useMemo(() => {
+    const uniqueStories = new Map<string, DiscoveryStory>();
+    [...filteredNewStories, ...filteredPopularStories, ...trendingStories].forEach((story) => {
+      if (editorFeaturedStory && story.id === editorFeaturedStory.id) return;
+      if (!uniqueStories.has(story.id)) uniqueStories.set(story.id, story);
     });
-  };
+    return Array.from(uniqueStories.values()).slice(0, 2);
+  }, [editorFeaturedStory, filteredNewStories, filteredPopularStories, trendingStories]);
+
+  const mainCategoryShelves = useMemo(() => {
+    const storiesByMainCategory = new Map<string, Map<string, DiscoveryStory>>();
+
+    for (const story of searchableStories) {
+      const resolvedMainCategoryId =
+        story.main_category ||
+        (story.sub_category ? subCategoryToMainCategoryMap.get(story.sub_category) ?? null : null);
+
+      if (!resolvedMainCategoryId) continue;
+
+      if (!storiesByMainCategory.has(resolvedMainCategoryId)) {
+        storiesByMainCategory.set(resolvedMainCategoryId, new Map<string, DiscoveryStory>());
+      }
+
+      storiesByMainCategory.get(resolvedMainCategoryId)?.set(story.id, story);
+    }
+
+    return MAIN_CATEGORIES.map((mainCategory) => {
+      const stories = Array.from(storiesByMainCategory.get(mainCategory.id)?.values() ?? []).sort(
+        compareStoriesByShelfPriority
+      );
+
+      return {
+        id: mainCategory.id,
+        label: mainCategory.label,
+        stories,
+      };
+    }).filter((categoryShelf) => categoryShelf.stories.length > 0);
+  }, [searchableStories, subCategoryToMainCategoryMap]);
+
+  const setMainCategoryRailRef = useCallback((mainCategoryId: string, node: HTMLDivElement | null) => {
+    subCategoryRailRefs.current[mainCategoryId] = node;
+  }, []);
+
+  const handleScrollMainCategoryRail = useCallback((mainCategoryId: string) => {
+    const rail = subCategoryRailRefs.current[mainCategoryId];
+    if (!rail) return;
+    const scrollDelta = Math.max(rail.clientWidth * 0.8, 280);
+    rail.scrollBy({ left: scrollDelta, behavior: 'smooth' });
+  }, []);
+
+  const resolvedGridCategoryId = useMemo(() => {
+    if (selectedGridCategoryId) return selectedGridCategoryId;
+    if (!selectedLegacyGridShelfId) return '';
+    return subCategoryToMainCategoryMap.get(selectedLegacyGridShelfId) ?? '';
+  }, [selectedGridCategoryId, selectedLegacyGridShelfId, subCategoryToMainCategoryMap]);
+
+  const selectedGridCategory = useMemo(() => {
+    if (viewMode !== 'grid' || !resolvedGridCategoryId) return null;
+
+    const categoryMeta = MAIN_CATEGORIES.find((category) => category.id === resolvedGridCategoryId);
+    if (!categoryMeta) return null;
+
+    const categoryShelf = mainCategoryShelves.find((shelf) => shelf.id === resolvedGridCategoryId);
+    return {
+      id: categoryMeta.id,
+      label: categoryMeta.label,
+      stories: categoryShelf?.stories ?? [],
+    };
+  }, [mainCategoryShelves, resolvedGridCategoryId, viewMode]);
+
+  const isGridMode = viewMode === 'grid';
+
+  useHomeGsapAnimations({
+    rootRef: homeRootRef,
+    navbarRef,
+    heroRef: heroSectionRef,
+    trendingRef: trendingSectionRef,
+    mainCategoryMapRef: mainCategoryMapSectionRef,
+    editorRef: editorSectionRef,
+    writerCtaRef: writerCtaSectionRef,
+    isGridMode,
+  });
 
   return (
-        <main className={styles.main}>
-          {/* Top Navbar */}
-          <nav className={styles.navbar}>
-            <div className={styles.navLeft}>
-              <BrandLogo href="/" size="lg" className={styles.logo} />
-              <div className={styles.navLinks}>
-                {homeNavTabs.map((tab) => (
-                  <Link
-                    key={tab.id}
-                    href={tab.href}
-                    className={tab.isActive ? styles.activeLink : undefined}
-                    aria-current={tab.isActive ? 'page' : undefined}
-                    onClick={(event) => handleNavbarTabClick(event, tab)}
-                  >
-                    {tab.label}
-                  </Link>
-                ))}
-              </div>
-            </div>
-
-            <div className={styles.navSearchWrap}>
-              <Search size={16} className={styles.navSearchIcon} />
-              <input
-                ref={searchInputRef}
-                className={styles.navSearchInput}
-                placeholder="ค้นหาเรื่อง, คำโปรย, หรือนามปากกา"
-                value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
-              />
-              <span className={styles.navSearchHint}>⌘K</span>
-            </div>
-
-            <div className={styles.navRight}>
-              {user ? (
-                <Link href="/pricing" prefetch={false} className={styles.coinBalancePill}>
-                  <Coins size={15} />
-                  <span>{walletCoinBalance === null ? '...' : `${walletCoinBalance.toLocaleString('th-TH')} เหรียญ`}</span>
-                </Link>
-              ) : (
-                <Link href="/pricing" prefetch={false} className={styles.pricingLink}>
-                  แพ็กเกจ
-                </Link>
-              )}
-              <Link href="/dashboard" className={styles.dashboardLink} onClick={handleDashboardAccess}>
-                แดชบอร์ดนักเขียน
-              </Link>
-              {user && (
-                <Link href="/notifications" className={styles.notifBellBtn}>
-                  <Bell size={18} />
-                  {unreadNotifCount > 0 && (
-                    <span className={styles.notifBadge}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</span>
-                  )}
-                </Link>
-              )}
-
-              {isLoadingAuth ? (
-                <div className={styles.authLoading}>...</div>
-              ) : user ? (
-                <div className={styles.profileMenuWrapper} ref={profileMenuRef}>
-                  <div className={styles.profileAvatarBtn} onClick={() => setIsProfileMenuOpen((prev) => !prev)}>
-                    {user.user_metadata?.avatar_url ? (
-                      <img src={user.user_metadata.avatar_url} alt="Profile" className={styles.userAvatar} />
-                    ) : (
-                      <div className={styles.userAvatarPlaceholder}>
-                        {user.email?.charAt(0).toUpperCase() || 'U'}
-                      </div>
-                    )}
-                  </div>
-
-                  {isProfileMenuOpen && (
-                    <div className={styles.profileDropdown}>
-                      <div className={styles.profileDropdownHeader}>
-                        <div className={styles.profileDropdownAvatar}>
-                          {user.user_metadata?.avatar_url ? (
-                            <img
-                              src={user.user_metadata.avatar_url}
-                              alt=""
-                              style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
-                            />
-                          ) : (
-                            (user.email?.charAt(0) || 'U').toUpperCase()
-                          )}
-                        </div>
-                        <div className={styles.profileDropdownInfo}>
-                          <div className={styles.profileDropdownName}>
-                            {user.user_metadata?.full_name || user.email?.split('@')[0]}
-                          </div>
-                          <div className={styles.profileDropdownEmail}>{user.email || ''}</div>
-                        </div>
-                      </div>
-
-                      <div className={styles.profileDropdownDivider} />
-
-                      <Link href="/dashboard" className={styles.profileDropdownItem} onClick={handleDashboardAccess}>
-                        <PenTool size={16} /> แดชบอร์ดนักเขียน
-                      </Link>
-                      <Link href="/bookshelf" className={styles.profileDropdownItem} onClick={() => setIsProfileMenuOpen(false)}>
-                        <Bookmark size={16} /> ชั้นหนังสือ
-                      </Link>
-                      <Link href="/loves" className={styles.profileDropdownItem} onClick={() => setIsProfileMenuOpen(false)}>
-                        <Heart size={16} /> รักเลย
-                      </Link>
-                      <button
-                        className={styles.profileDropdownItem}
-                        onClick={() => {
-                          setIsProfileMenuOpen(false);
-                          handleOpenProfileModal();
-                        }}
-                      >
-                        <Settings size={16} /> ตั้งค่าโปรไฟล์
-                      </button>
-
-                      <div className={styles.profileDropdownDivider} />
-
-                      <button
-                        className={`${styles.profileDropdownItem} ${styles.profileDropdownLogout}`}
-                        onClick={handleSignOut}
-                      >
-                        <LogOut size={16} /> ออกจากระบบ
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className={styles.authButtons}>
-                  <button onClick={handleGoogleSignIn} className={`${styles.authBtn} ${styles.googleBtn}`}>
-                    <img
-                      src="/google-logo.svg"
-                      alt="G"
-                      className={styles.providerIcon}
-                      onError={(e) => (e.currentTarget.style.display = 'none')}
-                    />
-                    เข้าสู่ระบบด้วย Google
-                  </button>
-                  <button onClick={handleFacebookSignIn} className={`${styles.authBtn} ${styles.facebookBtn}`}>
-                    <img
-                      src="/facebook-logo.svg"
-                      alt="f"
-                      className={styles.providerIcon}
-                      onError={(e) => (e.currentTarget.style.display = 'none')}
-                    />
-                    Facebook
-                  </button>
-                </div>
-              )}
-
-              <button className={styles.mobileMenuBtn} type="button">
-                <Menu size={24} />
-              </button>
-            </div>
-          </nav>
-
-      <div className={styles.content}>
-        {authError && !isDashboardAuthDialogOpen && (
-          <div className={styles.emptyMyNovels} style={{ color: '#b00020' }}>
-            {authError}
-          </div>
-        )}
-
-        <section className={styles.heroSection}>
-          {heroStory ? (
-            <div className={styles.heroFrame}>
-              {heroStory.cover_wide_url || heroStory.cover_url ? (
-                <Image
-                  src={heroStory.cover_wide_url || heroStory.cover_url || ''}
-                  alt={heroStory.title}
-                  className={styles.heroBackdrop}
-                  fill
-                  priority={heroIndex === 0}
-                  sizes="(max-width: 768px) 100vw, 1200px"
-                />
-              ) : (
-                <div className={styles.heroBackdropFallback}>{heroStory.title}</div>
-              )}
-
-              <div className={styles.heroOverlay} />
-
-              <div className={styles.heroPosterOnly}>
-                <Link href={`/story/${heroStory.id}`} className={styles.heroStoryLink}>
-                  <div className={styles.heroVisualRow}>
-                    <div className={styles.heroPosterCard}>
-                      {heroStory.cover_url || heroStory.cover_wide_url ? (
-                        <Image
-                          src={heroStory.cover_url || heroStory.cover_wide_url || ''}
-                          alt={heroStory.title}
-                          className={styles.heroPosterImage}
-                          fill
-                          sizes="(max-width: 768px) 128px, 168px"
-                        />
-                      ) : (
-                        <div className={styles.heroPosterFallback}>NO COVER</div>
-                      )}
-                    </div>
-                    <div className={styles.heroStoryInfo}>
-                      <h1 className={styles.heroStoryTitle}>{heroStory.title}</h1>
-                      <p className={styles.heroStoryPen}>{heroStory.pen_name}</p>
-                      <p className={styles.heroStoryMeta}>{heroMetaLine}</p>
-                      {heroStory.synopsis && <p className={styles.heroStorySynopsis}>{heroStory.synopsis}</p>}
-                      {heroInfoPills.length > 0 && (
-                        <div className={styles.heroInfoPills}>
-                          {heroInfoPills.map((pill) => (
-                            <span key={pill} className={styles.heroInfoPill}>
-                              {pill}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </Link>
-              </div>
-
-              {heroStories.length > 1 && (
-                <div className={styles.heroDots}>
-                  {heroStories.map((story, index) => (
-                    <button
-                      key={story.id}
-                      type="button"
-                      aria-label={`ดูเรื่องเด่นลำดับที่ ${index + 1}`}
-                      className={`${styles.heroDot} ${index === heroIndex ? styles.activeHeroDot : ''}`}
-                      onClick={() => setHeroIndex(index)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className={styles.heroEmpty}>กำลังโหลดเรื่องแนะนำประจำวัน...</div>
-          )}
-        </section>
-
-        <section className={styles.quickControls}>
+    <main className={styles.main} ref={homeRootRef}>
+      <SharedNavbar
+        navRef={navbarRef}
+        navDataGsap="navbar"
+        user={user}
+        isLoadingAuth={isLoadingAuth}
+        coinBalance={walletCoinBalance}
+        unreadNotifCount={unreadNotifCount}
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        onSearchSubmit={(event) => event.preventDefault()}
+        searchInputRef={searchInputRef}
+        onDashboardAccess={handleDashboardAccess}
+        isProfileMenuOpen={isProfileMenuOpen}
+        profileMenuRef={profileMenuRef}
+        onToggleProfileMenu={() => setIsProfileMenuOpen((prev) => !prev)}
+        onCloseProfileMenu={() => setIsProfileMenuOpen(false)}
+        onOpenLogin={handleOpenLoginDialog}
+        onSignOut={handleSignOut}
+        lovesLabel="รักเลย"
+        profileExtraAction={(
           <button
             type="button"
-            className={styles.filterToggleBtn}
-            onClick={() => setIsFilterPanelOpen((prev) => !prev)}
+            className={styles.profileDropdownItem}
+            onClick={() => {
+              setIsProfileMenuOpen(false);
+              handleOpenProfileModal();
+            }}
           >
-            <SlidersHorizontal size={15} />
-            {filterToggleLabel}
+            <Settings size={16} /> ตั้งค่าโปรไฟล์
           </button>
-        </section>
+        )}
+      />
 
-        {isFilterPanelOpen && (
-          <section className={`${styles.section} ${styles.discoveryPanel}`}>
-            <div className={styles.discoveryPanelTop}>
-              <div className={styles.discoveryMeta}>อัปเดต: {formatGeneratedAt(generatedAt) || '-'}</div>
+      <div className={styles.pageShell}>
+        <div className={styles.content}>
+          {authError && !isDashboardAuthDialogOpen && (
+            <div className={styles.emptyMyNovels} style={{ color: '#ff9d9d' }}>
+              {authError}
+            </div>
+          )}
+
+          <section className={styles.heroSection} ref={heroSectionRef} data-gsap-section="hero">
+            {heroStory ? (
+              <div className={styles.heroFrame} data-gsap="hero-frame">
+                {heroStory.cover_wide_url || heroStory.cover_url ? (
+                  <Image
+                    src={heroStory.cover_wide_url || heroStory.cover_url || ''}
+                    alt={heroStory.title}
+                    className={styles.heroBackdrop}
+                    fill
+                    priority={heroIndex === 0}
+                    sizes="100vw"
+                  />
+                ) : (
+                  <div className={styles.heroBackdropFallback}>เรื่องเด่นประจำวัน</div>
+                )}
+
+                <div className={styles.heroOverlay} />
+
+                <div className={styles.heroContent}>
+                  <span className={styles.heroBadge} data-gsap-intro>เรื่องเด่นวันนี้</span>
+                  <h1 className={styles.heroStoryTitle} data-gsap-intro>{heroStory.title}</h1>
+                  <p className={styles.heroStoryPen} data-gsap-intro>โดย {heroStory.pen_name}</p>
+                  {heroStory.synopsis && <p className={styles.heroStorySynopsis} data-gsap-intro>{heroStory.synopsis}</p>}
+                  {heroInfoPills.length > 0 && (
+                    <div className={styles.heroInfoPills} data-gsap-intro>
+                      {heroInfoPills.map((pill, index) => (
+                        <span key={`${pill}-${index}`} className={styles.heroInfoPill}>
+                          {pill}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className={styles.heroActionRow} data-gsap-intro>
+                    <Link href={`/story/${heroStory.id}`} className={styles.heroCtaButton}>
+                      เริ่มอ่านเรื่องนี้
+                      <ArrowRight size={16} />
+                    </Link>
+                    <div className={styles.heroAuthorMeta}>
+                      <span>ผู้เขียน</span>
+                      <strong>{heroStory.pen_name}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                {heroStories.length > 1 && (
+                  <div className={styles.heroDots}>
+                    {heroStories.map((story, index) => (
+                      <button
+                        key={story.id}
+                        type="button"
+                        aria-label={`ดูเรื่องเด่นลำดับที่ ${index + 1}`}
+                        className={`${styles.heroDot} ${index === heroIndex ? styles.activeHeroDot : ''}`}
+                        onClick={() => setHeroIndex(index)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className={styles.heroEmpty}>กำลังโหลดเรื่องแนะนำ...</div>
+            )}
+          </section>
+
+          <section className={styles.trendingSection} ref={trendingSectionRef} data-gsap-section="trending">
+            <div className={styles.sectionHeader}>
+              <div className={styles.sectionHeaderLeft}>
+                <h2 className={styles.sectionHeadline}>กำลังมาแรง</h2>
+                <p className={styles.sectionSubhead}>เรื่องที่ผู้อ่านกำลังพูดถึงและเปิดอ่านมากที่สุดในตอนนี้</p>
+              </div>
+              <Link href="/" className={styles.sectionActionLink}>
+                ดูอันดับทั้งหมด
+                <ArrowRight size={16} />
+              </Link>
             </div>
 
-            <div className={styles.filterGroup}>
-              <div className={styles.filterGroupLabel}>หมวดหมู่หลัก</div>
-              <div className={styles.categoryFilters}>
-                <button
-                  className={`${styles.filterBtn} ${urlFilters.category === 'all' ? styles.activeFilter : ''}`}
-                  onClick={() => handleSelectCategory('all')}
-                  type="button"
-                >
-                  ทุกหมวด
-                </button>
-                {MAIN_CATEGORIES.map((category) => (
-                  <button
-                    key={category.id}
-                    className={`${styles.filterBtn} ${urlFilters.category === category.id ? styles.activeFilter : ''}`}
-                    onClick={() => handleSelectCategory(category.id)}
-                    type="button"
-                  >
-                    {category.label}
-                  </button>
+            {trendingLoading ? (
+              <div className={styles.trendingGrid}>
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div key={`trending-skeleton-${index}`} className={styles.storySkeleton} />
                 ))}
               </div>
-            </div>
-
-            {urlFilters.category === CORE_MAIN_CATEGORY_ID && (
-              <div className={styles.filterGroup}>
-                <div className={styles.filterGroupLabel}>โฟกัสย่อย (คอร์หลัก)</div>
-                <div className={styles.categoryFilters}>
-                  {SUB_CATEGORY_FILTERS.map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      className={`${styles.filterBtn} ${urlFilters.subCategory === option.id ? styles.activeFilter : ''}`}
-                      onClick={() => handleSelectSubCategory(option.id)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+            ) : trendingError ? (
+              <div className={`${styles.railStateCard} ${styles.railStateError}`}>
+                <AlertCircle size={18} />
+                <div>
+                  <p className={styles.railStateTitle}>โหลดข้อมูลไม่สำเร็จ</p>
+                  <p className={styles.railStateText}>{trendingError}</p>
                 </div>
               </div>
-            )}
-
-            <div className={styles.filterGrid}>
-              <div className={styles.filterGroup}>
-                <div className={styles.filterGroupLabel}>สถานะเรื่อง</div>
-                <div className={styles.categoryFilters}>
-                  {COMPLETION_FILTERS.map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      className={`${styles.filterBtn} ${urlFilters.completion === option.id ? styles.activeFilter : ''}`}
-                      onClick={() => handleSelectCompletion(option.id)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+            ) : trendingStories.length === 0 ? (
+              <div className={styles.railStateCard}>
+                <Inbox size={18} />
+                <div>
+                  <p className={styles.railStateTitle}>ยังไม่มีข้อมูล</p>
+                  <p className={styles.railStateText}>ยังไม่มีเรื่องกำลังมาแรงที่ตรงกับคำค้นปัจจุบัน</p>
                 </div>
               </div>
+            ) : (
+              <div className={styles.trendingGrid}>
+                {trendingStories.slice(0, 8).map((story, index) => {
+                  const isInteractiveStory = story.path_mode === 'branching';
+                  const likes = story.total_like_count ?? 0;
+                  const views = Math.max(1, story.total_view_count ?? 0);
+                  const score = Math.min(5, 4 + (likes / views) * 12).toFixed(1);
 
-              <div className={styles.filterGroup}>
-                <div className={styles.filterGroupLabel}>ความยาว</div>
-                <div className={styles.categoryFilters}>
-                  {LENGTH_FILTERS.map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      className={`${styles.filterBtn} ${urlFilters.length === option.id ? styles.activeFilter : ''}`}
-                      onClick={() => handleSelectLength(option.id)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
+                  return (
+                    <Link key={`trending-${story.id}`} href={`/story/${story.id}`} className={styles.trendingCard} data-gsap-card="trending">
+                      <div className={styles.trendingCoverWrap}>
+                        {story.cover_url || story.cover_wide_url ? (
+                          <Image
+                            src={story.cover_url || story.cover_wide_url || ''}
+                            alt={story.title}
+                            className={styles.trendingCover}
+                            fill
+                            sizes="(max-width: 767px) 47vw, (max-width: 1180px) 31vw, 320px"
+                          />
+                        ) : (
+                          <div className={styles.trendingCoverFallback}>{story.title.slice(0, 2)}</div>
+                        )}
 
-            {hasActiveFilters && (
-              <div className={styles.activeFiltersWrap}>
-                <div className={styles.activeFilters}>
-                  {activeFilterPills.map((pill) => (
-                    <span key={pill.id} className={styles.activeFilterPill}>
-                      {pill.label}
-                    </span>
-                  ))}
-                </div>
-                <button type="button" className={styles.resetFiltersBtn} onClick={handleResetFilters}>
-                  <RotateCcw size={14} />
-                  ล้างตัวกรอง
-                </button>
+                        {index < 4 && <span className={styles.trendingRankBadge}>#{index + 1}</span>}
+                      </div>
+
+                      <div className={styles.trendingBody}>
+                        <h3 className={styles.trendingTitle}>{story.title}</h3>
+                        <p className={styles.trendingAuthor}>{story.pen_name}</p>
+                        <div className={styles.trendingStats}>
+                          <span className={styles.trendingScore}>
+                            <Star size={12} />
+                            {score}
+                          </span>
+                          <span className={styles.trendingReads}>{(story.total_view_count ?? 0).toLocaleString('th-TH')} อ่าน</span>
+                        </div>
+                        <div className={styles.trendingMetaRow}>
+                          {isInteractiveStory ? (
+                            <span className={styles.posterModeChip}>Interactive</span>
+                          ) : (
+                            <span className={styles.posterMetric}>
+                              <List size={12} className={styles.posterMetricIcon} />
+                              {story.published_chapter_count.toLocaleString('th-TH')} ตอน
+                            </span>
+                          )}
+                          <span className={styles.posterMetric}>
+                            <Heart size={12} className={styles.posterMetricIcon} />
+                            {(story.total_like_count ?? 0).toLocaleString('th-TH')}
+                          </span>
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
               </div>
             )}
           </section>
-        )}
 
-        {RAILS.map((railConfig) => {
-          const railState = rails[railConfig.key];
-          const railIcon =
-            railConfig.key === 'new' ? (
-              <Sparkles size={14} />
-            ) : railConfig.key === 'popular' ? (
-              <Flame size={14} />
-            ) : (
-              <Rocket size={14} />
-            );
-
-          return (
-            <section className={`${styles.section} ${styles.railSection}`} key={railConfig.key}>
-              <div className={styles.railHeader}>
-                <div className={styles.railTitleGroup}>
-                  <span className={styles.railEyebrow}>
-                    {railIcon}
-                    {railConfig.eyebrow}
-                  </span>
-                  <h2 className={styles.sectionTitle}>{railConfig.title}</h2>
-                </div>
-                <span className={styles.railCountBadge}>{railState.items.length} เรื่อง</span>
-              </div>
-
-              {railState.loading ? (
-                <div className={styles.storiesRail}>
-                  {Array.from({ length: 6 }).map((_, index) => (
-                    <div key={`${railConfig.key}-skeleton-${index}`} className={styles.storySkeleton} />
-                  ))}
-                </div>
-              ) : railState.error ? (
-                <div className={`${styles.railStateCard} ${styles.railStateError}`}>
-                  <AlertCircle size={18} />
-                  <div>
-                    <p className={styles.railStateTitle}>โหลดข้อมูลไม่สำเร็จ</p>
-                    <p className={styles.railStateText}>{railState.error}</p>
+          <section className={styles.mainCategoryMapSection} ref={mainCategoryMapSectionRef} data-gsap-section="main-category-map">
+            {isGridMode ? (
+              selectedGridCategory ? (
+                <div className={styles.shelfGridModeSection} data-gsap-grid-mode>
+                  <div className={styles.shelfGridModeHeader}>
+                    <h3 className={styles.shelfGridModeTitle}>{selectedGridCategory.label}</h3>
                   </div>
+                  {selectedGridCategory.stories.length === 0 ? (
+                    <div className={styles.railStateCard}>
+                      <Inbox size={18} />
+                      <div>
+                        <p className={styles.railStateTitle}>ยังไม่มีเรื่องในหมวดนี้</p>
+                        <p className={styles.railStateText}>หมวดที่เลือกยังไม่มีเรื่องที่ตรงกับคำค้นปัจจุบัน</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={styles.shelfGrid}>
+                      {selectedGridCategory.stories.map((story) => {
+                        const isInteractiveStory = story.path_mode === 'branching';
+                        return (
+                          <Link
+                            key={`grid-${selectedGridCategory.id}-${story.id}`}
+                            href={`/story/${story.id}`}
+                            className={`${styles.mainCategoryShelfCard} ${styles.shelfGridCard}`}
+                            data-gsap-card="grid-category"
+                          >
+                            <div className={styles.mainCategoryShelfCoverWrap}>
+                              {story.cover_url || story.cover_wide_url ? (
+                                <Image
+                                  src={story.cover_url || story.cover_wide_url || ''}
+                                  alt={story.title}
+                                  className={styles.mainCategoryShelfCover}
+                                  fill
+                                  sizes="(max-width: 767px) 46vw, (max-width: 1180px) 23vw, 16vw"
+                                />
+                              ) : (
+                                <div className={styles.mainCategoryShelfCoverFallback}>{story.title.slice(0, 2)}</div>
+                              )}
+                            </div>
+
+                            <div className={styles.mainCategoryShelfBody}>
+                              <h4 className={styles.mainCategoryShelfTitle}>{story.title}</h4>
+                              <p className={styles.mainCategoryShelfAuthor}>{story.pen_name}</p>
+                              <div className={styles.mainCategoryShelfMetaRow}>
+                                {isInteractiveStory ? (
+                                  <span className={styles.posterModeChip}>Interactive</span>
+                                ) : (
+                                  <span className={styles.posterMetric}>
+                                    <List size={12} className={styles.posterMetricIcon} />
+                                    {story.published_chapter_count.toLocaleString('th-TH')} ตอน
+                                  </span>
+                                )}
+                                <span className={styles.posterMetric}>
+                                  <Eye size={12} className={styles.posterMetricIcon} />
+                                  {(story.total_view_count ?? 0).toLocaleString('th-TH')}
+                                </span>
+                                <span className={styles.posterMetric}>
+                                  <Heart size={12} className={styles.posterMetricIcon} />
+                                  {(story.total_like_count ?? 0).toLocaleString('th-TH')}
+                                </span>
+                              </div>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              ) : railState.items.length === 0 ? (
+              ) : (
                 <div className={styles.railStateCard}>
                   <Inbox size={18} />
                   <div>
-                    <p className={styles.railStateTitle}>ยังไม่มีข้อมูล</p>
-                    <p className={styles.railStateText}>{railConfig.emptyLabel}</p>
+                    <p className={styles.railStateTitle}>ไม่พบหมวดที่เลือก</p>
+                    <p className={styles.railStateText}>กรุณาตรวจสอบลิงก์ แล้วลองเปิดใหม่อีกครั้ง</p>
                   </div>
                 </div>
-              ) : (
-                <div className={styles.storiesRail}>
-                  {railState.items.map((story, index) => {
-                    const isInteractiveStory = story.path_mode === 'branching';
-
-                    return (
-                      <Link
-                        key={`${railConfig.key}-${story.id}`}
-                        href={`/story/${story.id}`}
-                        className={styles.posterCard}
-                      >
-                        <div className={styles.posterCoverWrap}>
-                          {story.cover_url || story.cover_wide_url ? (
-                            <Image
-                              src={story.cover_url || story.cover_wide_url || ''}
-                              alt={story.title}
-                              className={styles.posterCover}
-                              fill
-                              sizes="(max-width: 768px) 45vw, 220px"
-                            />
-                          ) : (
-                            <div className={styles.posterCoverFallback}>{story.title.slice(0, 2)}</div>
-                          )}
-
-                          <div className={styles.posterTopBadges}>
-                            {railConfig.key === 'trending' && index < 3 && (
-                              <span className={styles.posterRankBadge}>#{index + 1}</span>
-                            )}
-                            {story.completion_status === 'completed' && (
-                              <span className={styles.posterCompletedBadge}>จบแล้ว</span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className={styles.posterBody}>
-                          <h3 className={styles.posterTitle}>{story.title}</h3>
-                          <p className={styles.posterAuthor}>{story.pen_name}</p>
-                          <div className={styles.posterMetaRow}>
-                            {isInteractiveStory ? (
-                              <span className={styles.posterModeChip}>Interactive</span>
-                            ) : (
-                              <span className={styles.posterMetric}>
-                                <List size={12} className={styles.posterMetricIcon} />
-                                {story.published_chapter_count.toLocaleString('th-TH')} ตอน
-                              </span>
-                            )}
-                            <span className={styles.posterMetric}>
-                              <Eye size={12} className={styles.posterMetricIcon} />
-                              {(story.total_view_count ?? 0).toLocaleString('th-TH')}
-                            </span>
-                            <span className={styles.posterMetric}>
-                              <Heart size={12} className={styles.posterMetricIcon} />
-                              {(story.total_like_count ?? 0).toLocaleString('th-TH')}
-                            </span>
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
+              )
+            ) : mainCategoryShelves.length === 0 ? (
+              <div className={styles.railStateCard}>
+                <Inbox size={18} />
+                <div>
+                  <p className={styles.railStateTitle}>ยังไม่มีเรื่องในหมวดหลักตอนนี้</p>
+                  <p className={styles.railStateText}>ลองค้นหาด้วยคำอื่น แล้วระบบจะแสดงรายการเรื่องที่เกี่ยวข้องให้ทันที</p>
                 </div>
+              </div>
+            ) : (
+              <div className={styles.mainCategoryGroups}>
+                {mainCategoryShelves.map((group) => (
+                  <section key={`category-group-${group.id}`} className={styles.mainCategoryGroup} data-gsap-shelf-group>
+                    <header className={styles.mainCategoryShelfRowHeader}>
+                      <h3 className={styles.mainCategoryGroupTitle}>{group.label}</h3>
+                      <Link
+                        href={`/?view=grid&category=${encodeURIComponent(group.id)}`}
+                        className={styles.mainCategoryShelfViewAll}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        ดูทั้งหมด
+                      </Link>
+                    </header>
+
+                    <div className={styles.mainCategoryShelfRailWrap}>
+                      <div
+                        ref={(node) => setMainCategoryRailRef(group.id, node)}
+                        className={styles.mainCategoryShelfRail}
+                      >
+                        {group.stories.map((story) => {
+                          const isInteractiveStory = story.path_mode === 'branching';
+                          return (
+                            <Link key={`category-${group.id}-${story.id}`} href={`/story/${story.id}`} className={styles.mainCategoryShelfCard} data-gsap-card="main-category">
+                              <div className={styles.mainCategoryShelfCoverWrap}>
+                                {story.cover_url || story.cover_wide_url ? (
+                                  <Image
+                                    src={story.cover_url || story.cover_wide_url || ''}
+                                    alt={story.title}
+                                    className={styles.mainCategoryShelfCover}
+                                    fill
+                                    sizes="(max-width: 767px) 48vw, (max-width: 1180px) 24vw, 16vw"
+                                  />
+                                ) : (
+                                  <div className={styles.mainCategoryShelfCoverFallback}>{story.title.slice(0, 2)}</div>
+                                )}
+                              </div>
+
+                              <div className={styles.mainCategoryShelfBody}>
+                                <h4 className={styles.mainCategoryShelfTitle}>{story.title}</h4>
+                                <p className={styles.mainCategoryShelfAuthor}>{story.pen_name}</p>
+                                <div className={styles.mainCategoryShelfMetaRow}>
+                                  {isInteractiveStory ? (
+                                    <span className={styles.posterModeChip}>Interactive</span>
+                                  ) : (
+                                    <span className={styles.posterMetric}>
+                                      <List size={12} className={styles.posterMetricIcon} />
+                                      {story.published_chapter_count.toLocaleString('th-TH')} ตอน
+                                    </span>
+                                  )}
+                                  <span className={styles.posterMetric}>
+                                    <Eye size={12} className={styles.posterMetricIcon} />
+                                    {(story.total_view_count ?? 0).toLocaleString('th-TH')}
+                                  </span>
+                                  <span className={styles.posterMetric}>
+                                    <Heart size={12} className={styles.posterMetricIcon} />
+                                    {(story.total_like_count ?? 0).toLocaleString('th-TH')}
+                                  </span>
+                                </div>
+                              </div>
+                            </Link>
+                          );
+                        })}
+                      </div>
+
+                      <button
+                        type="button"
+                        className={styles.mainCategoryShelfArrowButton}
+                        onClick={() => handleScrollMainCategoryRail(group.id)}
+                        aria-label={`เลื่อนไปขวาในหมวด ${group.label}`}
+                      >
+                        <ChevronRight size={18} />
+                      </button>
+                    </div>
+                  </section>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className={styles.editorSection} ref={editorSectionRef} data-gsap-section="editor">
+            <h2 className={styles.editorSectionTitle}>คัดพิเศษจากบรรณาธิการ</h2>
+            {editorFeaturedStory ? (
+              <div className={styles.editorGrid}>
+                <Link href={`/story/${editorFeaturedStory.id}`} className={styles.editorFeaturedCard} data-gsap-card="editor">
+                  {editorFeaturedStory.cover_wide_url || editorFeaturedStory.cover_url ? (
+                    <Image
+                      src={editorFeaturedStory.cover_wide_url || editorFeaturedStory.cover_url || ''}
+                      alt={editorFeaturedStory.title}
+                      className={styles.editorFeaturedImage}
+                      fill
+                      sizes="(max-width: 1023px) 100vw, 58vw"
+                    />
+                  ) : (
+                    <div className={styles.editorFeaturedFallback}>{editorFeaturedStory.title}</div>
+                  )}
+                  <div className={styles.editorFeaturedOverlay}>
+                    <span className={styles.editorFeaturedBadge}>เรื่องคัดพิเศษ</span>
+                    <h3 className={styles.editorFeaturedTitle}>{editorFeaturedStory.title}</h3>
+                    <p className={styles.editorFeaturedSummary}>
+                      {editorFeaturedStory.synopsis || 'เรื่องเด่นที่บรรณาธิการอยากแนะนำให้คุณเปิดอ่านทันที'}
+                    </p>
+                  </div>
+                </Link>
+
+                <div className={styles.editorSideList}>
+                  {editorSideStories.map((story) => (
+                    <Link key={`editor-side-${story.id}`} href={`/story/${story.id}`} className={styles.editorSideCard} data-gsap-card="editor">
+                      <div className={styles.editorSideCoverWrap}>
+                        {story.cover_url || story.cover_wide_url ? (
+                          <Image
+                            src={story.cover_url || story.cover_wide_url || ''}
+                            alt={story.title}
+                            className={styles.editorSideCover}
+                            fill
+                            sizes="220px"
+                          />
+                        ) : (
+                          <div className={styles.editorSideFallback}>{story.title.slice(0, 2)}</div>
+                        )}
+                      </div>
+                      <div className={styles.editorSideBody}>
+                        <h4 className={styles.editorSideTitle}>{story.title}</h4>
+                        <p className={styles.editorSideDesc}>{story.synopsis || `${story.pen_name} · เรื่องที่ไม่อยากให้พลาด`}</p>
+                        <span className={styles.editorSideLink}>อ่านรีวิวเรื่องนี้</span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className={styles.railStateCard}>
+                <Inbox size={18} />
+                <div>
+                  <p className={styles.railStateTitle}>ยังไม่มีเรื่องแนะนำ</p>
+                  <p className={styles.railStateText}>กำลังรวบรวมเรื่องเด่นสำหรับบล็อกคัดพิเศษจากบรรณาธิการ</p>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className={styles.writerCtaSection} ref={writerCtaSectionRef} data-gsap-section="writer-cta">
+            <div className={styles.writerCtaCard}>
+              <h2 className={styles.writerCtaTitle}>
+                ทุกปริศนาต้องมี
+                <br />
+                <span className={styles.writerCtaAccent}>นักเขียนผู้วางเกม</span>
+              </h2>
+              <p className={styles.writerCtaText}>
+                ถ้าคุณมีเรื่องลึกลับในหัว ถึงเวลาปล่อยให้ผู้อ่านทั่วแพลตฟอร์มได้ติดตามไปกับมัน
+              </p>
+              {user ? (
+                <Link href="/story/create" className={styles.writerCtaButton}>
+                  เริ่มสร้างนิยายของคุณ
+                  <PenTool size={16} />
+                </Link>
+              ) : (
+                <button type="button" className={styles.writerCtaButton} onClick={handleOpenLoginDialog}>
+                  เข้าสู่ระบบเพื่อเริ่มเขียน
+                  <PenTool size={16} />
+                </button>
               )}
-            </section>
-          );
-        })}
+            </div>
+          </section>
+        </div>
+
+        <footer className={styles.footer}>
+          <div className={styles.footerInner}>
+            <div className={styles.footerBrand}>
+              <span className={styles.footerBrandName}>FlowFic</span>
+              <p className={styles.footerCopy}>© 2026 FlowFic Anthology. สงวนลิขสิทธิ์ทั้งหมด</p>
+            </div>
+            <div className={styles.footerLinks}>
+              <Link href="/legal-contact-and-versioning">เกี่ยวกับเรา</Link>
+              <Link href="/terms">ข้อกำหนดการใช้งาน</Link>
+              <Link href="/privacy">นโยบายความเป็นส่วนตัว</Link>
+              <Link href="/billing-policies">ศูนย์ช่วยเหลือ</Link>
+            </div>
+          </div>
+        </footer>
       </div>
 
       {/* Profile Modal */}
@@ -1460,7 +1231,7 @@ export default function HomePageClient({ initialFilters, initialDiscovery }: Hom
             onClick={(event) => event.stopPropagation()}
           >
             <div className={styles.modalHeader}>
-              <h2 id="dashboard-auth-dialog-title">เข้าสู่ระบบก่อนเข้าแดชบอร์ดนักเขียน</h2>
+              <h2 id="dashboard-auth-dialog-title">{dashboardAuthDialogTitle}</h2>
               <button className={styles.closeBtn} onClick={handleCloseDashboardAuthDialog} type="button">
                 <X size={20} />
               </button>

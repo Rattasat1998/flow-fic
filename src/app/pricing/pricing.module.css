@@ -13,9 +13,7 @@
 }
 
 .headerContent {
-    max-width: 1000px;
-    margin: 0 auto;
-    padding: 1rem 1.5rem;
+    padding: 1rem 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -44,7 +42,7 @@
 .container {
     max-width: 800px;
     margin: 0 auto;
-    padding: 2.5rem 1.5rem;
+    padding: 2.5rem 0;
     display: flex;
     flex-direction: column;
     gap: 3rem;

@@ -25,6 +25,14 @@ function isSameSessionSnapshot(current: Session | null, next: Session | null): b
         && current.expires_at === next.expires_at;
 }
 
+function shouldRecoverFromSessionError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message.toLowerCase() : '';
+    return message.includes('refresh token')
+        || message.includes('invalid_grant')
+        || message.includes('session')
+        || message.includes('jwt');
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
@@ -40,7 +48,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setSession(session);
                 setUser(session?.user ?? null);
             } catch (error) {
-                console.error('Error fetching auth session:', error);
+                console.warn('Error fetching auth session:', error);
+                setSession(null);
+                setUser(null);
+
+                if (shouldRecoverFromSessionError(error)) {
+                    try {
+                        await supabase.auth.signOut({ scope: 'local' });
+                    } catch {
+                        // ignore local cleanup errors
+                    }
+                }
             } finally {
                 setIsLoading(false);
             }

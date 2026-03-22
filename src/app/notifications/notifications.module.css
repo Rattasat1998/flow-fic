@@ -8,13 +8,17 @@
 .header {
     background: white;
     border-bottom: 1px solid #e2e8f0;
-    padding: 1.25rem 1.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
     position: sticky;
     top: 0;
     z-index: 10;
+}
+
+.headerInner {
+    min-height: 74px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
 }
 
 .headerLeft {
@@ -55,11 +59,15 @@
     cursor: not-allowed;
 }
 
+.contentShell {
+    padding-top: 1.5rem;
+}
+
 /* ─── Notification List ─── */
 .list {
     max-width: 700px;
-    margin: 1.5rem auto;
-    padding: 0 1rem;
+    margin: 0 auto;
+    padding: 0;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
@@ -224,4 +232,16 @@
 
 .loginBtn:hover {
     opacity: 0.9;
+}
+
+@media (max-width: 720px) {
+    .headerInner {
+        min-height: auto;
+        padding: 0.8rem 0;
+        flex-wrap: wrap;
+    }
+
+    .title {
+        font-size: 1.12rem;
+    }
 }

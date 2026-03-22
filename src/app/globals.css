@@ -1,4 +1,6 @@
 :root {
+  --ff-page-max-width: 1220px;
+  --ff-page-gutter: clamp(0.95rem, 3vw, 1.8rem);
   --background: #ffffff;
   --foreground: #0f172a;
   --primary: #f97316;
@@ -37,6 +39,18 @@ body {
   font-family: var(--font-sans);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+}
+
+.ffPageContainer {
+  width: min(var(--ff-page-max-width), 100%);
+  margin: 0 auto;
+  padding-inline: var(--ff-page-gutter);
+}
+
+.ffPageTopbarInner {
+  width: min(var(--ff-page-max-width), 100%);
+  margin: 0 auto;
+  padding-inline: var(--ff-page-gutter);
 }
 
 .ffStudioShell {
@@ -216,6 +230,18 @@ body {
   }
 }
 
+@media (min-width: 768px) and (max-width: 1180px) {
+  :root {
+    --ff-page-gutter: clamp(0.92rem, 2.4vw, 1.24rem);
+  }
+}
+
+@media (max-width: 767px) {
+  :root {
+    --ff-page-gutter: 0.72rem;
+  }
+}
+
 @media (max-width: 720px) {
   .ffStudioPage,
   .ffStudioTopbarInner {
@@ -268,9 +294,16 @@ a {
 .appFooterLinks {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 16px;
+  row-gap: 8px;
+  min-width: 0;
   color: #334155;
   font-size: 0.88rem;
+}
+
+.appFooterLinks a {
+  white-space: normal;
 }
 
 .appFooterLinks a:hover {
@@ -281,4 +314,34 @@ a {
   margin: 0;
   color: #64748b;
   font-size: 0.82rem;
+}
+
+body.home-dark-premium-body .appFooter {
+  display: none;
+}
+
+body.story-detail-dark-body .appFooter {
+  display: none;
+}
+
+body:has(main[class*="home-module__main"]) .appFooter {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .appFooterInner {
+    padding: 12px 14px;
+    align-items: flex-start;
+  }
+
+  .appFooterLinks {
+    width: 100%;
+    gap: 10px;
+    font-size: 0.8rem;
+  }
+
+  .appFooterCopy {
+    width: 100%;
+    font-size: 0.76rem;
+  }
 }

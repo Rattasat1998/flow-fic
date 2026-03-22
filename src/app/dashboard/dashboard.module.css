@@ -325,6 +325,8 @@
     padding: 1.5rem;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     border: 1px solid var(--border);
+    overflow: hidden;
+    max-width: 100%;
 }
 
 .cardHeader {
@@ -356,6 +358,8 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .tabsContainer {
@@ -408,6 +412,8 @@
     border: 1px solid var(--border);
     transition: background-color 0.2s;
     background-color: white;
+    max-width: 100%;
+    overflow: hidden;
     /* added */
 }
 
@@ -1615,6 +1621,428 @@
     box-shadow: var(--shadow-soft);
 }
 
+/* Wave 1 responsive rules removed — consolidated into dark theme section below */
+
+/* =========================================
+   Dashboard Dark Theme + Pagination/Search
+   ========================================= */
+
+.main {
+    min-height: 100vh;
+    background:
+        radial-gradient(circle at 50% -18%, rgba(77, 130, 112, 0.2) 0%, rgba(77, 130, 112, 0) 56%),
+        radial-gradient(circle at 20% 12%, rgba(255, 143, 112, 0.12) 0%, rgba(255, 143, 112, 0) 42%),
+        #05070b;
+    color: #f4f6fb;
+    overflow-x: clip;
+}
+
+.pageShell {
+    padding-top: 64px;
+}
+
+.content {
+    max-width: none;
+    padding: 1.7rem 0 3rem;
+    gap: 1.2rem;
+}
+
+.welcomeSection {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 1.25rem;
+    padding: 1.55rem;
+    border-radius: 24px;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    background: linear-gradient(155deg, rgba(10, 14, 24, 0.92) 0%, rgba(20, 30, 46, 0.88) 100%);
+    box-shadow: 0 24px 52px rgba(1, 3, 8, 0.5);
+}
+
+.welcomeEyebrow,
+.cardEyebrow,
+.statLabel {
+    color: rgba(148, 163, 184, 0.9);
+}
+
+.greeting,
+.cardTitle,
+.storyTitle,
+.statValue,
+.storyInfoTitle,
+.modalHeader h2 {
+    color: #f8fbff;
+}
+
+.subtitle,
+.cardSubtitle,
+.storySynopsis,
+.statNote,
+.storyMeta,
+.storyInfoDesc,
+.storyInfoMetaLabel,
+.searchResultMeta,
+.paginationInfo,
+.formGroup label {
+    color: rgba(226, 232, 240, 0.75);
+}
+
+.welcomePill {
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    background: rgba(15, 23, 42, 0.45);
+    color: rgba(241, 245, 249, 0.94);
+}
+
+.welcomeActions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.7rem;
+    flex-wrap: wrap;
+}
+
+.createBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 42px;
+    padding: 0.64rem 1rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 143, 112, 0.44);
+    background: linear-gradient(135deg, rgba(255, 143, 112, 0.92) 0%, rgba(214, 77, 43, 0.92) 100%);
+    box-shadow: 0 14px 28px rgba(214, 77, 43, 0.3);
+    color: #ffffff;
+    font-weight: 700;
+    text-decoration: none;
+    transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.createBtn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.05);
+}
+
+.profileSettingsBtn {
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    background: rgba(15, 23, 42, 0.56);
+    color: rgba(241, 245, 249, 0.95);
+}
+
+.profileSettingsBtn:hover {
+    border-color: rgba(255, 143, 112, 0.44);
+    background: rgba(30, 41, 59, 0.78);
+}
+
+.statCard,
+.card,
+.storyListItem {
+    border: 1px solid rgba(148, 163, 184, 0.26);
+    background: rgba(10, 14, 24, 0.84);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.36);
+}
+
+.storyListItem:hover {
+    background: rgba(19, 26, 41, 0.94);
+}
+
+.storyThumb {
+    box-shadow: 0 16px 30px rgba(0, 0, 0, 0.42);
+}
+
+.cardHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 1rem;
+    margin-bottom: 1.1rem;
+}
+
+.cardHeaderCopy {
+    min-width: 0;
+}
+
+.cardHeaderActions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.4rem;
+    min-width: min(360px, 100%);
+}
+
+.storySearchForm {
+    width: min(360px, 100%);
+    min-height: 40px;
+    padding: 0 0.68rem 0 0.72rem;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(15, 23, 42, 0.62);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.storySearchForm:focus-within {
+    border-color: rgba(255, 143, 112, 0.58);
+    box-shadow: 0 0 0 3px rgba(255, 143, 112, 0.14);
+}
+
+.storySearchIcon {
+    color: rgba(148, 163, 184, 0.9);
+    flex-shrink: 0;
+}
+
+.storySearchInput {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: #f8fbff;
+    font-size: 0.84rem;
+    font-weight: 600;
+}
+
+.storySearchInput::placeholder {
+    color: rgba(148, 163, 184, 0.8);
+}
+
+.searchResultMeta {
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.tabsContainer {
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    background: rgba(15, 23, 42, 0.54);
+}
+
+.tabBtn {
+    color: rgba(203, 213, 225, 0.86);
+}
+
+.tabBadge {
+    background: rgba(148, 163, 184, 0.28);
+}
+
+.tabBtn:hover {
+    background: rgba(51, 65, 85, 0.6);
+    color: #f8fbff;
+}
+
+.activeTab {
+    background: rgba(248, 250, 252, 0.98);
+    color: #111827;
+    border-color: rgba(248, 250, 252, 0.96);
+}
+
+.activeTab .tabBadge {
+    background: rgba(59, 130, 246, 0.2);
+    color: #1d4ed8;
+}
+
+.storyMetaDivider {
+    color: rgba(148, 163, 184, 0.65);
+}
+
+.listLoading {
+    border-radius: 16px;
+    border: 1px dashed rgba(148, 163, 184, 0.4);
+    background: rgba(15, 23, 42, 0.52);
+    color: rgba(226, 232, 240, 0.86);
+    padding: 1.25rem;
+    text-align: center;
+    font-weight: 700;
+}
+
+.emptyStories {
+    border-radius: 16px;
+    border: 1px dashed rgba(148, 163, 184, 0.36);
+    background: rgba(15, 23, 42, 0.5);
+    color: rgba(226, 232, 240, 0.86);
+    padding: 1.25rem;
+}
+
+.emptyStoriesLink {
+    color: #ffb499;
+}
+
+.publishDropdownContainer {
+    border: 1px solid rgba(148, 163, 184, 0.36);
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.84), rgba(30, 41, 59, 0.86));
+    box-shadow: 0 12px 24px rgba(2, 6, 23, 0.42);
+}
+
+.publishDropdownContainer.private {
+    color: #cbd5e1;
+    border-color: rgba(148, 163, 184, 0.42);
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(30, 41, 59, 0.9));
+}
+
+.publishDropdownContainer.public {
+    color: #6ee7b7;
+    border-color: rgba(16, 185, 129, 0.44);
+    background: linear-gradient(180deg, rgba(6, 78, 59, 0.9), rgba(5, 150, 105, 0.68));
+}
+
+.editBtn,
+.moreMenuBtn {
+    border: 1px solid rgba(148, 163, 184, 0.32);
+    background: rgba(15, 23, 42, 0.62);
+    color: rgba(241, 245, 249, 0.94);
+}
+
+.editBtn:hover,
+.moreMenuBtn:hover {
+    background: rgba(30, 41, 59, 0.9);
+    color: #ffffff;
+    border-color: rgba(148, 163, 184, 0.52);
+}
+
+.storyActionMenu {
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    background: rgba(7, 12, 22, 0.98);
+    box-shadow: 0 20px 30px rgba(2, 6, 23, 0.64);
+}
+
+.storyActionMenuItem {
+    color: rgba(241, 245, 249, 0.94);
+}
+
+.storyActionMenuItem:hover {
+    background: rgba(30, 41, 59, 0.86);
+    color: #ffffff;
+}
+
+.paginationBar {
+    margin-top: 1.1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(148, 163, 184, 0.24);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.85rem;
+    flex-wrap: wrap;
+}
+
+.paginationInfo {
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.paginationActions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.paginationPage {
+    min-width: 90px;
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: rgba(226, 232, 240, 0.82);
+}
+
+.paginationBtn {
+    min-height: 36px;
+    padding: 0 0.85rem;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.38);
+    background: rgba(15, 23, 42, 0.7);
+    color: rgba(241, 245, 249, 0.95);
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.16s ease, border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.paginationBtn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    border-color: rgba(255, 143, 112, 0.58);
+    background: rgba(30, 41, 59, 0.92);
+}
+
+.paginationBtn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.modalOverlay {
+    background: rgba(2, 6, 23, 0.72);
+}
+
+.modalContent {
+    border: 1px solid rgba(148, 163, 184, 0.34);
+    background: rgba(8, 13, 24, 0.98);
+    box-shadow: 0 22px 42px rgba(0, 0, 0, 0.58);
+}
+
+.modalHeader {
+    border-bottom: 1px solid rgba(148, 163, 184, 0.24);
+    background: rgba(2, 6, 23, 0.72);
+}
+
+.modalBody {
+    color: rgba(241, 245, 249, 0.94);
+}
+
+.modalFooter {
+    border-top: 1px solid rgba(148, 163, 184, 0.24);
+    background: rgba(2, 6, 23, 0.62);
+}
+
+.closeBtn,
+.cancelBtn,
+.inputField,
+.textareaField,
+.storyInfoMetaItem,
+.storyInfoDesc {
+    border-color: rgba(148, 163, 184, 0.34);
+    background: rgba(15, 23, 42, 0.72);
+    color: rgba(241, 245, 249, 0.95);
+}
+
+.closeBtn:hover,
+.cancelBtn:hover {
+    border-color: rgba(148, 163, 184, 0.52);
+    background: rgba(30, 41, 59, 0.92);
+    color: #ffffff;
+}
+
+.inputField::placeholder,
+.textareaField::placeholder {
+    color: rgba(148, 163, 184, 0.82);
+}
+
+.uploadLabel {
+    background: rgba(59, 130, 246, 0.18);
+    color: #93c5fd;
+}
+
+.uploadLabel:hover {
+    background: rgba(59, 130, 246, 0.28);
+}
+
+.avatarPreview,
+.avatarPlaceholder {
+    border-color: rgba(148, 163, 184, 0.3);
+}
+
+.saveBtn {
+    background: linear-gradient(135deg, rgba(255, 143, 112, 0.96) 0%, rgba(214, 77, 43, 0.96) 100%);
+}
+
+.dangerBtn {
+    border-color: rgba(244, 114, 182, 0.45);
+    background: rgba(159, 18, 57, 0.24);
+    color: #fecdd3;
+}
+
+.dangerBtn:hover {
+    background: rgba(190, 24, 93, 0.28);
+    color: #ffe4e6;
+}
+
 @media (max-width: 980px) {
     .welcomeSection {
         grid-template-columns: 1fr;
@@ -1623,61 +2051,410 @@
 
     .welcomeActions {
         justify-content: flex-start;
+        flex-direction: column;
+        gap: 0.75rem;
     }
 
-    .storyContent {
+    .createBtn,
+    .profileSettingsBtn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .cardHeader {
+        align-items: stretch;
         flex-direction: column;
     }
 
-    .storySide {
+    .cardHeaderActions {
         width: 100%;
-        flex-direction: row;
-        justify-content: space-between;
-        align-items: center;
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .storySearchForm {
+        width: 100%;
+    }
+}
+
+@media (max-width: 767px) {
+    .pageShell {
+        padding-top: 58px;
     }
 }
 
 @media (max-width: 720px) {
     .content {
-        padding: 1rem 0 3rem;
+        padding: 1rem 0 2.5rem;
         gap: 1rem;
-    }
-
-    .welcomeSection {
-        padding: 1.35rem;
-        border-radius: 22px;
     }
 
     .statsGrid {
         grid-template-columns: 1fr;
     }
 
-    .tabsContainer {
+    .welcomeSection {
+        padding: 1.2rem;
         border-radius: 20px;
     }
 
-    .storyListItem {
+    .welcomeActions {
+        justify-content: flex-start;
         flex-direction: column;
+        gap: 0.75rem;
     }
 
-    .storyThumb {
-        width: 112px;
-        height: auto;
-        aspect-ratio: 3 / 4;
+    .createBtn,
+    .profileSettingsBtn {
+        width: 100%;
+        justify-content: center;
     }
 
-    .storySide {
-        flex-direction: column;
+    .tabsContainer {
+        border-radius: 18px;
+    }
+
+    .paginationBar {
         align-items: stretch;
     }
 
-    .actionsContainer {
+    .paginationActions {
         width: 100%;
         justify-content: space-between;
     }
 
+    .paginationPage {
+        min-width: 80px;
+    }
+}
+
+/* =========================================
+   Mobile Navigation + Responsive Fixes
+   ========================================= */
+
+.storyTitle,
+.storySynopsis,
+.storyInfoTitle,
+.storyInfoDesc,
+.storyInfoMetaValue,
+.modalHeader h2,
+.formGroup label {
+    color: rgba(241, 245, 249, 0.96);
+}
+
+.storyInfoMetaLabel {
+    color: rgba(203, 213, 225, 0.9);
+}
+
+.storyTitle,
+.storyInfoTitle {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.storyContent,
+.storyDetails,
+.storySide {
+    min-width: 0;
+}
+
+.storySynopsis,
+.storyMeta {
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 1024px) {
+    .storyListItem {
+        display: grid;
+        grid-template-columns: 100px 1fr;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 0.78rem;
+        border-radius: 14px;
+    }
+
+    .storyThumb {
+        width: 100px;
+        height: auto;
+        aspect-ratio: 3 / 4;
+        border-radius: 12px;
+    }
+
+    .storyContent {
+        display: contents;
+    }
+
+    .storyDetails {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .storyMeta {
+        flex-wrap: wrap;
+        row-gap: 0.3rem;
+    }
+
+    .storySide {
+        grid-column: 1 / -1;
+        width: 100%;
+        margin-left: 0;
+        margin-top: 0.25rem;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: stretch;
+        gap: 0.55rem;
+    }
+
+    .publishDropdownContainer {
+        width: auto;
+        flex: 1;
+        min-width: 130px;
+        min-height: 42px;
+        margin-left: 0;
+        padding-right: 0.7rem;
+    }
+
+    .publishDropdownSelect {
+        width: 100%;
+        min-width: 0;
+        min-height: 40px;
+    }
+
+    .actionsContainer {
+        width: auto;
+        flex: 1;
+        min-width: 130px;
+        margin-left: 0;
+        justify-content: flex-end;
+        gap: 0.55rem;
+    }
+
     .editBtn {
         flex: 1;
+        min-width: 0;
         justify-content: center;
+        padding-inline: 0.8rem;
+        white-space: nowrap;
+    }
+}
+
+@media (max-width: 980px) {
+    .pageShell {
+        padding-top: 58px;
+    }
+
+    .content {
+        padding: 1rem 0 2.5rem;
+    }
+
+    .cardHeaderActions {
+        width: 100%;
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .searchResultMeta {
+        text-align: right;
+    }
+}
+
+@media (max-width: 767px) {
+    .pageShell {
+        padding-top: 58px;
+    }
+
+    .content {
+        gap: 0.95rem;
+        padding-bottom: calc(2.8rem + env(safe-area-inset-bottom, 0px));
+    }
+
+    .welcomeSection {
+        padding: 1.08rem;
+        border-radius: 18px;
+    }
+
+    .welcomePills {
+        row-gap: 0.38rem;
+    }
+
+    .card {
+        padding: 1rem 0.82rem;
+        border-radius: 16px;
+    }
+
+    .cardHeader {
+        gap: 0.8rem;
+        margin-bottom: 0.9rem;
+    }
+
+    .cardTitle {
+        font-size: 1.1rem;
+    }
+
+    .cardSubtitle {
+        font-size: 0.84rem;
+    }
+
+    .cardHeaderActions {
+        gap: 0.35rem;
+    }
+
+    .storySearchForm {
+        min-height: 42px;
+    }
+
+    .searchResultMeta {
+        text-align: left;
+    }
+
+    .tabsContainer {
+        position: sticky;
+        top: calc(58px + env(safe-area-inset-top, 0px) + 0.45rem);
+        z-index: 24;
+        margin-bottom: 0.82rem;
+        padding: 0.28rem;
+        gap: 0.28rem;
+        border-radius: 14px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        scroll-snap-type: x proximity;
+        background: rgba(6, 11, 20, 0.96);
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        box-shadow: 0 10px 22px rgba(2, 6, 23, 0.4);
+    }
+
+    .tabsContainer::-webkit-scrollbar {
+        display: none;
+    }
+
+    .tabBtn {
+        flex: 0 0 auto;
+        min-width: max-content;
+        min-height: 38px;
+        padding: 0.45rem 0.85rem;
+        scroll-snap-align: start;
+    }
+
+    .tabBadge {
+        min-width: 1.6rem;
+        height: 1.35rem;
+    }
+
+    /* Mobile layout inherited from tablet (1024px) */
+
+    .paginationBar {
+        align-items: stretch;
+    }
+
+    .paginationInfo {
+        font-size: 0.78rem;
+    }
+
+    .paginationActions {
+        width: 100%;
+        justify-content: space-between;
+        flex-wrap: wrap;
+    }
+
+    .paginationPage {
+        width: 100%;
+        min-width: 0;
+        order: -1;
+    }
+
+    .modalOverlay {
+        align-items: flex-end;
+        padding: max(0.7rem, env(safe-area-inset-top, 0px)) 0.7rem max(0.7rem, env(safe-area-inset-bottom, 0px));
+    }
+
+    .modalContent {
+        max-height: min(88dvh, 760px);
+        border-radius: 16px;
+    }
+
+    .storyModal {
+        max-width: 100%;
+    }
+
+    .modalHeader {
+        padding: 0.82rem 0.9rem;
+    }
+
+    .modalBody {
+        padding: 0.9rem;
+        gap: 0.85rem;
+    }
+
+    .modalFooter {
+        padding: 0.82rem 0.9rem;
+        flex-direction: column-reverse;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+
+    .cancelBtn,
+    .saveBtn,
+    .dangerBtn {
+        width: 100%;
+        justify-content: center;
+        margin-right: 0;
+    }
+
+    .storyInfoGrid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.8rem;
+    }
+
+    .storyInfoCover {
+        width: min(52vw, 190px);
+        height: auto;
+        margin: 0 auto;
+        aspect-ratio: 3 / 4;
+    }
+
+    .storyInfoMetaGrid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 520px) {
+    .cardTitle {
+        font-size: 1.02rem;
+    }
+
+    .tabBtn {
+        font-size: 0.8rem;
+        padding: 0.42rem 0.76rem;
+    }
+
+    .storyListItem {
+        grid-template-columns: 92px 1fr;
+    }
+
+    .storyThumb {
+        width: 100%;
+    }
+
+    .storyTitle {
+        font-size: 0.96rem;
+    }
+
+    .storySynopsis {
+        font-size: 0.84rem;
+        line-height: 1.56;
+    }
+
+    .storyMeta,
+    .searchResultMeta,
+    .paginationInfo {
+        font-size: 0.74rem;
+    }
+
+    .paginationBtn {
+        flex: 1;
+        min-height: 34px;
+        padding: 0 0.6rem;
     }
 }

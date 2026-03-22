@@ -214,14 +214,14 @@ export default function LovesPage() {
   return (
     <main className={styles.main}>
       <nav className={styles.navbar}>
-        <div className={styles.navLeft}>
+        <div className={`ffPageContainer ${styles.navLeft}`}>
           <BrandLogo href="/" size="sm" className={styles.logo} />
           <span className={styles.navDivider}>/</span>
           <span className={styles.pageTitle}>รักเลยของฉัน</span>
         </div>
       </nav>
 
-      <div className={styles.content}>
+      <div className={`ffPageContainer ${styles.content}`}>
         <div className={styles.header}>
           <div className={styles.headerIcon}>
             <Heart size={28} />

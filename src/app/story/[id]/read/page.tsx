@@ -2773,7 +2773,6 @@ export default function StoryPage({ params }: StoryPageProps) {
             <ChatActionBar
               onNextLine={handleNextLine}
               hasMore={!isCurrentChapterLocked && currentIndex < chatScript.length}
-              onCloseChapter={() => setIsTocOpen(true)}
               secondaryActions={readerMobileActions}
             />
           </>
