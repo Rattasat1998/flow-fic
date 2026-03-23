@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { BranchGraphCanvas } from './components/BranchGraphCanvas';
 import { BranchInspector } from './components/BranchInspector';
+import { VisualNovelStage } from '@/components/story/VisualNovelStage';
 
 import { RevisionDrawer } from './components/RevisionDrawer';
 import type {
@@ -34,13 +35,33 @@ type Character = {
     image_url: string | null;
 };
 
+type EditorStyle = 'narrative' | 'chat' | 'thread' | 'visual_novel';
+type SceneFocusSide = 'left' | 'right' | 'none';
+type VisualNovelLayoutMode = 'stage' | 'split' | 'solo';
+type SceneImageTargetSlot = 'backgroundUrl' | 'leftSceneImageUrl' | 'rightSceneImageUrl' | 'soloSceneImageUrl';
+
 type Block = {
     id: string;
-    type: 'paragraph' | 'image';
+    type: 'paragraph' | 'image' | 'scene';
     text: string;
     characterId: string | null;
     imageUrl?: string;
     isFlashback: boolean;
+    layoutMode?: VisualNovelLayoutMode;
+    backgroundUrl?: string | null;
+    leftCharacterId?: string | null;
+    rightCharacterId?: string | null;
+    soloCharacterId?: string | null;
+    speakerCharacterId?: string | null;
+    leftSceneImageUrl?: string | null;
+    rightSceneImageUrl?: string | null;
+    soloSceneImageUrl?: string | null;
+    focusSide?: SceneFocusSide;
+};
+
+type SceneImageTarget = {
+    blockId: string;
+    slot: SceneImageTargetSlot;
 };
 
 type CharSelectorViewportPosition = {
@@ -82,6 +103,91 @@ const MAX_BRANCH_CHOICES = 4;
 const MIN_BRANCH_CHOICES = 1;
 const MAX_BRANCH_TIMER_SECONDS = 300;
 const BRANCHING_FEATURE_ENABLED = FEATURE_FLAGS.branching;
+
+const createBlockId = (prefix: string) =>
+    `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+const createEmptyParagraphBlock = (id: string = createBlockId('block')): Block => ({
+    id,
+    type: 'paragraph',
+    text: '',
+    characterId: null,
+    isFlashback: false,
+});
+
+const createEmptySceneBlock = (id: string = createBlockId('scene')): Block => ({
+    id,
+    type: 'scene',
+    text: '',
+    characterId: null,
+    isFlashback: false,
+    layoutMode: 'stage',
+    backgroundUrl: null,
+    leftCharacterId: null,
+    rightCharacterId: null,
+    soloCharacterId: null,
+    speakerCharacterId: null,
+    leftSceneImageUrl: null,
+    rightSceneImageUrl: null,
+    soloSceneImageUrl: null,
+    focusSide: 'none',
+});
+
+const normalizeSceneLayoutMode = (value: unknown): VisualNovelLayoutMode =>
+    value === 'split' || value === 'solo' ? value : 'stage';
+
+const isMeaningfulBlock = (block: Block) => {
+    if (block.type === 'scene') {
+        return Boolean(
+            block.text.trim()
+            || block.leftSceneImageUrl
+            || block.rightSceneImageUrl
+            || block.soloSceneImageUrl
+            || block.backgroundUrl
+            || block.leftCharacterId
+            || block.rightCharacterId
+            || block.soloCharacterId
+            || block.speakerCharacterId
+        );
+    }
+
+    return block.text.trim() !== '' || block.characterId !== null || block.type === 'image';
+};
+
+const ensureBlocksForStyle = (rawBlocks: Block[], style: EditorStyle): Block[] => {
+    if (style === 'visual_novel') {
+        const sceneBlocks: Block[] = rawBlocks
+            .map((block) => {
+                if (block.type === 'scene') {
+                    const nextFocusSide: SceneFocusSide = block.focusSide === 'left' || block.focusSide === 'right'
+                        ? block.focusSide
+                        : 'none';
+                    return {
+                        ...createEmptySceneBlock(block.id),
+                        ...block,
+                        type: 'scene' as const,
+                        layoutMode: normalizeSceneLayoutMode(block.layoutMode),
+                        focusSide: nextFocusSide,
+                    };
+                }
+
+                return {
+                    ...createEmptySceneBlock(block.id),
+                    text: block.text,
+                    speakerCharacterId: block.characterId,
+                    layoutMode: 'stage' as const,
+                    backgroundUrl: block.type === 'image' ? block.imageUrl || null : null,
+                    soloCharacterId: null,
+                    soloSceneImageUrl: null,
+                };
+            })
+            .filter(Boolean);
+
+        return sceneBlocks.length > 0 ? sceneBlocks : [createEmptySceneBlock('scene-empty')];
+    }
+
+    return rawBlocks.length > 0 ? rawBlocks : [createEmptyParagraphBlock('block-empty')];
+};
 
 const normalizePathMode = (value: string | null | undefined): StoryPathMode => {
     if (!BRANCHING_FEATURE_ENABLED) return 'linear';
@@ -164,7 +270,11 @@ const normalizeBlocks = (rawBlocks: unknown, fallbackPrefix: string): Block[] =>
         .map((item, index) => {
             if (!item || typeof item !== 'object') return null;
             const blockObject = item as Record<string, unknown>;
-            const type = blockObject.type === 'image' ? 'image' : 'paragraph';
+            const type = blockObject.type === 'image'
+                ? 'image'
+                : blockObject.type === 'scene'
+                    ? 'scene'
+                    : 'paragraph';
             const text = typeof blockObject.text === 'string' ? blockObject.text : '';
             const characterId = typeof blockObject.characterId === 'string' ? blockObject.characterId : null;
             const imageUrl = typeof blockObject.imageUrl === 'string' ? blockObject.imageUrl : undefined;
@@ -172,6 +282,31 @@ const normalizeBlocks = (rawBlocks: unknown, fallbackPrefix: string): Block[] =>
             const id = typeof blockObject.id === 'string' && blockObject.id
                 ? blockObject.id
                 : `${fallbackPrefix}-${Date.now()}-${index}`;
+            const backgroundUrl = typeof blockObject.backgroundUrl === 'string'
+                ? blockObject.backgroundUrl
+                : blockObject.backgroundUrl === null
+                    ? null
+                    : undefined;
+            const leftCharacterId = typeof blockObject.leftCharacterId === 'string' ? blockObject.leftCharacterId : null;
+            const rightCharacterId = typeof blockObject.rightCharacterId === 'string' ? blockObject.rightCharacterId : null;
+            const soloCharacterId = typeof blockObject.soloCharacterId === 'string' ? blockObject.soloCharacterId : null;
+            const speakerCharacterId = typeof blockObject.speakerCharacterId === 'string' ? blockObject.speakerCharacterId : null;
+            const leftSceneImageUrl = typeof blockObject.leftSceneImageUrl === 'string'
+                ? blockObject.leftSceneImageUrl
+                : blockObject.leftSceneImageUrl === null
+                    ? null
+                    : undefined;
+            const rightSceneImageUrl = typeof blockObject.rightSceneImageUrl === 'string'
+                ? blockObject.rightSceneImageUrl
+                : blockObject.rightSceneImageUrl === null
+                    ? null
+                    : undefined;
+            const soloSceneImageUrl = typeof blockObject.soloSceneImageUrl === 'string'
+                ? blockObject.soloSceneImageUrl
+                : blockObject.soloSceneImageUrl === null
+                    ? null
+                    : undefined;
+            const focusSide = blockObject.focusSide === 'left' || blockObject.focusSide === 'right' ? blockObject.focusSide : 'none';
 
             return {
                 id,
@@ -180,6 +315,16 @@ const normalizeBlocks = (rawBlocks: unknown, fallbackPrefix: string): Block[] =>
                 characterId,
                 imageUrl,
                 isFlashback,
+                layoutMode: normalizeSceneLayoutMode(blockObject.layoutMode),
+                backgroundUrl,
+                leftCharacterId,
+                rightCharacterId,
+                soloCharacterId,
+                speakerCharacterId,
+                leftSceneImageUrl,
+                rightSceneImageUrl,
+                soloSceneImageUrl,
+                focusSide,
             } as Block;
         })
         .filter((item): item is Block => item !== null);
@@ -236,7 +381,7 @@ const parseStoredChapterContent = (rawContent: unknown): ChapterContentPayload =
     }
 
     if (parsedBlocks.length === 0) {
-        parsedBlocks = [{ id: `block-${Date.now()}`, type: 'paragraph', text: '', characterId: null, isFlashback: false }];
+        parsedBlocks = [createEmptyParagraphBlock()];
     }
 
     const parsedContent: ChapterContentPayload = {
@@ -253,6 +398,57 @@ const parseStoredChapterContent = (rawContent: unknown): ChapterContentPayload =
     parsedContent.choiceTimerSeconds = parsedChoiceTimerSeconds;
 
     return parsedContent;
+};
+
+const collectMediaUrlsFromChapterContent = (content: unknown): string[] => {
+    const urls: string[] = [];
+
+    if (!content) return urls;
+
+    if (typeof content === 'string') {
+        try {
+            return collectMediaUrlsFromChapterContent(JSON.parse(content));
+        } catch {
+            return urls;
+        }
+    }
+
+    if (typeof content !== 'object') return urls;
+
+    const contentRecord = content as Record<string, unknown>;
+
+    if (Array.isArray(contentRecord.blocks)) {
+        contentRecord.blocks.forEach((block) => {
+            if (!block || typeof block !== 'object') return;
+            const blockRecord = block as Record<string, unknown>;
+            const mediaCandidates = [
+                blockRecord.imageUrl,
+                blockRecord.backgroundUrl,
+                blockRecord.leftSceneImageUrl,
+                blockRecord.rightSceneImageUrl,
+                blockRecord.soloSceneImageUrl,
+            ];
+
+            mediaCandidates.forEach((candidate) => {
+                if (typeof candidate === 'string' && candidate.length > 0) {
+                    urls.push(candidate);
+                }
+            });
+        });
+    }
+
+    return urls;
+};
+
+const getCoverStoragePathFromPublicUrl = (url: string): string | null => {
+    try {
+        const urlObj = new URL(url);
+        const pathParts = urlObj.pathname.split('/public/covers/');
+        if (pathParts.length !== 2) return null;
+        return decodeURIComponent(pathParts[1]);
+    } catch {
+        return null;
+    }
 };
 
 export default function EditChapterPage() {
@@ -292,6 +488,7 @@ export default function EditChapterPage() {
     const imageInputRef = useRef<HTMLInputElement>(null);
     const [isUploadingImage, setIsUploadingImage] = useState(false);
     const [chatTheme, setChatTheme] = useState<string>('white');
+    const [sceneImageTarget, setSceneImageTarget] = useState<SceneImageTarget | null>(null);
 
     // Track which block has its character selector open (narrative mode)
     const [openCharSelectorId, setOpenCharSelectorId] = useState<string | null>(null);
@@ -305,7 +502,7 @@ export default function EditChapterPage() {
     const [quickCharImageFile, setQuickCharImageFile] = useState<File | null>(null);
     const [isSavingQuickChar, setIsSavingQuickChar] = useState(false);
     const [showUnsplashModal, setShowUnsplashModal] = useState(false);
-    const [unsplashTarget, setUnsplashTarget] = useState<'chat' | 'character' | 'narrative'>('chat');
+    const [unsplashTarget, setUnsplashTarget] = useState<'chat' | 'character' | 'narrative' | 'visual_novel'>('chat');
     const [unsplashQuery, setUnsplashQuery] = useState('');
     const [unsplashResults, setUnsplashResults] = useState<UnsplashImage[]>([]);
     const [isUnsplashLoading, setIsUnsplashLoading] = useState(false);
@@ -332,9 +529,18 @@ export default function EditChapterPage() {
     );
 
     const styleParam = searchParams.get('style');
-    const editorStyle = styleParam === 'chat' || styleParam === 'thread' ? styleParam : 'narrative';
+    const editorStyle: EditorStyle = styleParam === 'chat' || styleParam === 'thread' || styleParam === 'visual_novel'
+        ? styleParam
+        : 'narrative';
     const isChatStyle = editorStyle === 'chat';
-    const styleLabel = isChatStyle ? 'แชท' : editorStyle === 'thread' ? 'กระทู้' : 'บรรยาย';
+    const isVisualNovelStyle = editorStyle === 'visual_novel';
+    const styleLabel = isChatStyle
+        ? 'แชท'
+        : isVisualNovelStyle
+            ? 'วิชวลโนเวล'
+            : editorStyle === 'thread'
+                ? 'กระทู้'
+                : 'บรรยาย';
     const isBranchingStory = BRANCHING_FEATURE_ENABLED && storyPathMode === 'branching';
 
     // ── Auto-Save Hook ──
@@ -415,7 +621,7 @@ export default function EditChapterPage() {
         const draft = acceptRecovery();
         if (!draft) return;
         setTitle(draft.title);
-        setBlocks(normalizeBlocks(draft.blocks, 'recovered-block'));
+        setBlocks(ensureBlocksForStyle(normalizeBlocks(draft.blocks, 'recovered-block'), editorStyle));
         setPovCharacterId(draft.povCharacterId);
         setChatTheme(draft.chatTheme);
         setIsPremium(draft.isPremium);
@@ -440,9 +646,9 @@ export default function EditChapterPage() {
         showNotice('success', 'ละทิ้งฉบับร่าง', 'ใช้ข้อมูลจากเซิร์ฟเวอร์แทน');
     };
 
-    const showNotice = (tone: NoticeState['tone'], title: string, message: string) => {
+    const showNotice = useCallback((tone: NoticeState['tone'], title: string, message: string) => {
         setNotice({ tone, title, message });
-    };
+    }, []);
 
     const updateSavedDraftSignature = useCallback((signature: string) => {
         serverDraftSignatureRef.current = signature;
@@ -461,7 +667,7 @@ export default function EditChapterPage() {
         coinPrice: number;
     }) => {
         setTitle(snapshot.title);
-        setBlocks(snapshot.content.blocks);
+        setBlocks(ensureBlocksForStyle(normalizeBlocks(snapshot.content.blocks, 'restored-block'), editorStyle));
         setPovCharacterId(snapshot.content.povCharacterId);
         setChatTheme(snapshot.content.chatTheme || 'white');
         setIsPremium(snapshot.isPremium);
@@ -478,7 +684,7 @@ export default function EditChapterPage() {
             : [];
         setIsEndingChapter(snapshot.content.isEnding === true);
         setChapterChoices(snapshot.content.isEnding === true ? [] : normalizedChoices);
-    }, []);
+    }, [editorStyle]);
 
     const getRevisionTypeLabel = (revisionType: ChapterRevisionType) => {
         if (revisionType === 'publish') return 'เผยแพร่';
@@ -541,10 +747,8 @@ export default function EditChapterPage() {
         }
     }, [isChatStyle]);
 
-    const buildDraftSnapshot = useCallback(() => {
-        const draftBlocks = blocks.length > 0
-            ? blocks
-            : [{ id: 'block-empty', type: 'paragraph' as const, text: '', characterId: null, isFlashback: false }];
+    const buildDraftContentFromBlocks = useCallback((sourceBlocks: Block[]): ChapterContentPayload => {
+        const draftBlocks = ensureBlocksForStyle(sourceBlocks, editorStyle);
         const draftChoices = isBranchingStory && !isEndingChapter
             ? chapterChoices.map((choice, index) => ({
                 id: choice.id || `choice-${index}`,
@@ -563,6 +767,21 @@ export default function EditChapterPage() {
             isEnding: isBranchingStory ? isEndingChapter : undefined,
             choiceTimerSeconds: isBranchingStory ? choiceTimerSeconds : undefined,
         };
+
+        return draftContent;
+    }, [
+        editorStyle,
+        chapterChoices,
+        isEndingChapter,
+        choiceTimerSeconds,
+        isBranchingStory,
+        isChatStyle,
+        povCharacterId,
+        chatTheme,
+    ]);
+
+    const buildDraftSnapshotForBlocks = useCallback((sourceBlocks: Block[]) => {
+        const draftContent = buildDraftContentFromBlocks(sourceBlocks);
         const signature = buildSignatureFromSnapshot({
             title,
             content: draftContent,
@@ -573,20 +792,18 @@ export default function EditChapterPage() {
 
         return { draftContent, signature };
     }, [
-        blocks,
-        chapterChoices,
-        isEndingChapter,
-        choiceTimerSeconds,
-        isBranchingStory,
-        isChatStyle,
-        povCharacterId,
-        chatTheme,
         title,
         isPremium,
         coinPrice,
         status,
+        buildDraftContentFromBlocks,
         buildSignatureFromSnapshot,
     ]);
+
+    const buildDraftSnapshot = useCallback(
+        () => buildDraftSnapshotForBlocks(blocks),
+        [blocks, buildDraftSnapshotForBlocks]
+    );
 
     const currentDraftSignature = useMemo(() => buildDraftSnapshot().signature, [buildDraftSnapshot]);
     const isDraftDirty = currentDraftSignature !== savedDraftSignature;
@@ -862,6 +1079,167 @@ export default function EditChapterPage() {
         updateSavedChoicesSignature,
     ]);
 
+    const collectMediaUrlsFromBlocks = useCallback((sourceBlocks: Block[]): string[] => {
+        const urls: string[] = [];
+
+        sourceBlocks.forEach((block) => {
+            if (block.type === 'image' && typeof block.imageUrl === 'string' && block.imageUrl.length > 0) {
+                urls.push(block.imageUrl);
+                return;
+            }
+
+            if (block.type !== 'scene') return;
+
+            [
+                block.backgroundUrl,
+                block.leftSceneImageUrl,
+                block.rightSceneImageUrl,
+                block.soloSceneImageUrl,
+            ].forEach((candidate) => {
+                if (typeof candidate === 'string' && candidate.length > 0) {
+                    urls.push(candidate);
+                }
+            });
+        });
+
+        return urls;
+    }, []);
+
+    const removeCoverUrlsFromStorage = useCallback(async (candidateUrls: Array<string | null | undefined>) => {
+        const removablePaths = Array.from(new Set(
+            candidateUrls
+                .filter((url): url is string => typeof url === 'string' && url.length > 0)
+                .map((url) => getCoverStoragePathFromPublicUrl(url))
+                .filter((path): path is string => typeof path === 'string' && path.length > 0)
+        ));
+
+        if (removablePaths.length === 0) return;
+
+        const { error } = await supabase.storage.from('covers').remove(removablePaths);
+        if (error) {
+            throw error;
+        }
+    }, []);
+
+    const collectReferencedCoverPathsForStory = useCallback(async (currentBlocks: Block[]) => {
+        const referencedPaths = new Set<string>();
+        collectMediaUrlsFromBlocks(currentBlocks).forEach((url) => {
+            const path = getCoverStoragePathFromPublicUrl(url);
+            if (path) referencedPaths.add(path);
+        });
+
+        const { data, error } = await supabase
+            .from('chapters')
+            .select('id, content, draft_content')
+            .eq('story_id', storyId);
+
+        if (error) {
+            throw error;
+        }
+
+        (data || []).forEach((row) => {
+            const chapterRow = row as { id: string; content: unknown; draft_content: unknown };
+
+            if (chapterRow.id === chapterId) {
+                if (status === 'published') {
+                    collectMediaUrlsFromChapterContent(chapterRow.content).forEach((url) => {
+                        const path = getCoverStoragePathFromPublicUrl(url);
+                        if (path) referencedPaths.add(path);
+                    });
+                }
+                return;
+            }
+
+            [chapterRow.content, chapterRow.draft_content].forEach((content) => {
+                collectMediaUrlsFromChapterContent(content).forEach((url) => {
+                    const path = getCoverStoragePathFromPublicUrl(url);
+                    if (path) referencedPaths.add(path);
+                });
+            });
+        });
+
+        return referencedPaths;
+    }, [
+        chapterId,
+        collectMediaUrlsFromBlocks,
+        status,
+        storyId,
+    ]);
+
+    const cleanupOrphanedCoverUrls = useCallback(async (
+        candidateUrls: Array<string | null | undefined>,
+        currentBlocks: Block[],
+    ) => {
+        const candidatePaths = Array.from(new Set(
+            candidateUrls
+                .filter((url): url is string => typeof url === 'string' && url.length > 0)
+                .map((url) => getCoverStoragePathFromPublicUrl(url))
+                .filter((path): path is string => typeof path === 'string' && path.length > 0)
+        ));
+
+        if (candidatePaths.length === 0) return;
+
+        const referencedPaths = await collectReferencedCoverPathsForStory(currentBlocks);
+        const pathsToDelete = candidatePaths.filter((path) => !referencedPaths.has(path));
+        if (pathsToDelete.length === 0) return;
+
+        const { error } = await supabase.storage.from('covers').remove(pathsToDelete);
+        if (error) {
+            throw error;
+        }
+    }, [collectReferencedCoverPathsForStory]);
+
+    const commitBlocksMutation = useCallback(async ({
+        previousBlocks,
+        nextBlocks,
+        oldUrls = [],
+        uploadedUrls = [],
+        failureMessage,
+    }: {
+        previousBlocks: Block[];
+        nextBlocks: Block[];
+        oldUrls?: Array<string | null | undefined>;
+        uploadedUrls?: Array<string | null | undefined>;
+        failureMessage: string;
+    }) => {
+        setBlocks(nextBlocks);
+
+        const saved = await persistSnapshotAsDraft({
+            title,
+            content: buildDraftContentFromBlocks(nextBlocks),
+            isPremium,
+            coinPrice,
+        });
+
+        if (!saved) {
+            setBlocks(previousBlocks);
+            try {
+                await removeCoverUrlsFromStorage(uploadedUrls);
+            } catch (cleanupError) {
+                console.error('Failed to rollback newly uploaded scene media:', cleanupError);
+            }
+            showNotice('error', 'บันทึกไม่สำเร็จ', failureMessage);
+            return false;
+        }
+
+        try {
+            await cleanupOrphanedCoverUrls(oldUrls, nextBlocks);
+        } catch (cleanupError) {
+            console.error('Failed to clean orphaned chapter media:', cleanupError);
+        }
+
+        return true;
+    }, [
+        buildDraftContentFromBlocks,
+        cleanupOrphanedCoverUrls,
+        coinPrice,
+        isPremium,
+        persistSnapshotAsDraft,
+        removeCoverUrlsFromStorage,
+        showNotice,
+        title,
+    ]);
+
     const buildSnapshotFromRevision = useCallback((revision: ChapterRevision) => {
         const parsedContent = parseStoredChapterContent(revision.content);
         return {
@@ -1124,7 +1502,7 @@ export default function EditChapterPage() {
         } finally {
             setIsCreatingBranchTarget(false);
         }
-    }, [user, storyId, isCreatingBranchTarget, chapterTargets, updateChapterChoice]);
+    }, [user, storyId, isCreatingBranchTarget, chapterTargets, updateChapterChoice, showNotice]);
 
     const getChoiceValidationError = useCallback((choices: BranchChoiceDraft[] = chapterChoices): string | null => {
         if (!isBranchingStory) return null;
@@ -1167,6 +1545,7 @@ export default function EditChapterPage() {
         persistSnapshotAsDraft,
         applySnapshotToEditor,
         saveRevisionSnapshot,
+        showNotice,
     ]);
 
     const handleDiscardDraft = useCallback(async () => {
@@ -1252,6 +1631,7 @@ export default function EditChapterPage() {
         persistSnapshotAsDraft,
         applySnapshotToEditor,
         saveRevisionSnapshot,
+        showNotice,
     ]);
 
     const updateCharSelectorViewportPosition = useCallback((blockId: string | null) => {
@@ -1439,7 +1819,7 @@ export default function EditChapterPage() {
                 setTitle(parsed.title);
                 setStatus(parsed.status);
                 setLastSavedAt(parsed.lastSavedAt);
-                setBlocks(parsed.blocks);
+                setBlocks(ensureBlocksForStyle(normalizeBlocks(parsed.blocks, 'cached-block'), editorStyle));
                 setPovCharacterId(parsed.povCharacterId);
                 setChatTheme(typeof parsed.chatTheme === 'string' ? parsed.chatTheme : 'white');
                 setIsPremium(!!parsed.isPremium);
@@ -1464,9 +1844,7 @@ export default function EditChapterPage() {
                     povCharacterId: parsed.povCharacterId || null,
                     chatTheme: typeof parsed.chatTheme === 'string' ? parsed.chatTheme : 'white',
                     backgroundSound: null,
-                    blocks: parsedBlocks.length > 0
-                        ? parsedBlocks
-                        : [{ id: 'block-empty', type: 'paragraph' as const, text: '', characterId: null, isFlashback: false }],
+                    blocks: ensureBlocksForStyle(parsedBlocks, editorStyle),
                     branchChoices: effectiveCachedChoices,
                     isEnding: parsed.isEndingChapter === true,
                     choiceTimerSeconds: normalizeChoiceTimerSeconds(parsed.choiceTimerSeconds),
@@ -1573,7 +1951,7 @@ export default function EditChapterPage() {
 
                 // Parse content into blocks
                 const parsedContent = parseStoredChapterContent(draftContent);
-                const parsedBlocks = parsedContent.blocks;
+                const parsedBlocks = ensureBlocksForStyle(parsedContent.blocks, editorStyle);
                 const parsedPov = parsedContent.povCharacterId;
                 const parsedChatTheme = parsedContent.chatTheme || 'white';
                 const parsedDraftChoices = parsedContent.branchChoices;
@@ -1650,9 +2028,7 @@ export default function EditChapterPage() {
                     povCharacterId: isChatStyle ? parsedPov : null,
                     chatTheme: isChatStyle ? parsedChatTheme : undefined,
                     backgroundSound: null,
-                    blocks: parsedBlocks.length > 0
-                        ? parsedBlocks
-                        : [{ id: 'block-empty', type: 'paragraph' as const, text: '', characterId: null, isFlashback: false }],
+                    blocks: ensureBlocksForStyle(parsedBlocks, editorStyle),
                     branchChoices: effectiveChoices,
                     isEnding: parsedIsEnding,
                     choiceTimerSeconds: parsedChoiceTimerSeconds,
@@ -1704,6 +2080,7 @@ export default function EditChapterPage() {
         isLoadingAuth,
         router,
         isChatStyle,
+        editorStyle,
         buildSignatureFromSnapshot,
         buildChoicesSignature,
         updateSavedDraftSignature,
@@ -1881,10 +2258,8 @@ export default function EditChapterPage() {
         const choicesForSave = isBranchingStory && !isEndingChapter ? chapterChoices : [];
 
         const newStatus = publish ? 'published' : status;
-        const cleanBlocks = blocks.filter(b => b.text.trim() !== '' || b.characterId !== null || b.type === 'image');
-        const normalizedBlocks = cleanBlocks.length > 0
-            ? cleanBlocks
-            : [{ id: `block-${Date.now()}`, type: 'paragraph' as const, text: '', characterId: null, isFlashback: false }];
+        const cleanBlocks = blocks.filter(isMeaningfulBlock);
+        const normalizedBlocks = ensureBlocksForStyle(cleanBlocks, editorStyle);
         const contentPayload: ChapterContentPayload = {
             povCharacterId: isChatStyle ? povCharacterId : null,
             chatTheme: isChatStyle ? chatTheme : undefined,
@@ -1982,7 +2357,9 @@ export default function EditChapterPage() {
             setLastSavedAt(nowIso);
             updateSavedDraftSignature(draftSignatureForSave);
             updateSavedChoicesSignature(choiceSignatureForSave);
-            if (cleanBlocks.length !== blocks.length) setBlocks(cleanBlocks); // optimize view
+            if (cleanBlocks.length !== blocks.length || normalizedBlocks.length !== blocks.length) {
+                setBlocks(normalizedBlocks);
+            }
             clearDraft(); // Clear auto-save draft after successful save
             void saveRevisionSnapshot(publish ? 'publish' : 'manual_save', {
                 title,
@@ -2024,17 +2401,35 @@ export default function EditChapterPage() {
     };
 
     const addBlock = (afterId?: string) => {
-        const newId = `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const newId = createBlockId(isVisualNovelStyle ? 'scene' : 'block');
         setBlocks(prev => {
             let inheritedCharId: string | null = null;
+            let inheritedScene: Block | null = null;
             if (afterId && isChatStyle) {
                 const afterBlock = prev.find(b => b.id === afterId);
                 if (afterBlock) {
                     inheritedCharId = afterBlock.characterId;
                 }
             }
+            if (afterId && isVisualNovelStyle) {
+                inheritedScene = prev.find((block) => block.id === afterId) || null;
+            }
 
-            const newBlock: Block = { id: newId, type: 'paragraph', text: '', characterId: inheritedCharId, isFlashback: false };
+            const newBlock: Block = isVisualNovelStyle
+                ? {
+                    ...createEmptySceneBlock(newId),
+                    layoutMode: normalizeSceneLayoutMode(inheritedScene?.layoutMode),
+                    backgroundUrl: inheritedScene?.backgroundUrl || null,
+                    leftCharacterId: inheritedScene?.leftCharacterId || null,
+                    rightCharacterId: inheritedScene?.rightCharacterId || null,
+                    soloCharacterId: inheritedScene?.soloCharacterId || null,
+                    speakerCharacterId: inheritedScene?.speakerCharacterId || null,
+                    leftSceneImageUrl: inheritedScene?.leftSceneImageUrl || null,
+                    rightSceneImageUrl: inheritedScene?.rightSceneImageUrl || null,
+                    soloSceneImageUrl: inheritedScene?.soloSceneImageUrl || null,
+                    focusSide: inheritedScene?.focusSide || 'none',
+                }
+                : { ...createEmptyParagraphBlock(newId), characterId: inheritedCharId };
 
             if (!afterId) return [...prev, newBlock];
             const index = prev.findIndex(b => b.id === afterId);
@@ -2046,7 +2441,8 @@ export default function EditChapterPage() {
 
         // Focus the new block after a short delay to allow React to render it
         setTimeout(() => {
-            const el = document.getElementById(`textarea-${newId}`) as HTMLTextAreaElement;
+            const elementId = isVisualNovelStyle ? `scene-text-${newId}` : `textarea-${newId}`;
+            const el = document.getElementById(elementId) as HTMLTextAreaElement | null;
             if (el) el.focus();
         }, 50);
     };
@@ -2080,6 +2476,53 @@ export default function EditChapterPage() {
         }, 100);
     };
 
+    const openSceneImagePicker = (blockId: string, slot: SceneImageTargetSlot) => {
+        setSceneImageTarget({ blockId, slot });
+        imageInputRef.current?.click();
+    };
+
+    const commitSceneImageSlotChange = useCallback(async ({
+        blockId,
+        slot,
+        nextUrl,
+        uploadedUrls = [],
+        failureMessage,
+    }: {
+        blockId: string;
+        slot: SceneImageTargetSlot;
+        nextUrl: string | null;
+        uploadedUrls?: Array<string | null | undefined>;
+        failureMessage: string;
+    }) => {
+        const previousBlocks = blocks;
+        const targetBlock = previousBlocks.find((block) => block.id === blockId);
+        if (!targetBlock || targetBlock.type !== 'scene') return false;
+
+        const previousUrl = typeof targetBlock[slot] === 'string' ? targetBlock[slot] : null;
+        const nextBlocks = previousBlocks.map((block) => (
+            block.id === blockId
+                ? { ...block, [slot]: nextUrl }
+                : block
+        ));
+
+        return commitBlocksMutation({
+            previousBlocks,
+            nextBlocks,
+            oldUrls: [previousUrl],
+            uploadedUrls,
+            failureMessage,
+        });
+    }, [blocks, commitBlocksMutation]);
+
+    const handleClearSceneImage = useCallback((blockId: string, slot: SceneImageTargetSlot) => {
+        void commitSceneImageSlotChange({
+            blockId,
+            slot,
+            nextUrl: null,
+            failureMessage: 'ไม่สามารถล้างภาพฉากนี้ได้ กรุณาลองใหม่อีกครั้ง',
+        });
+    }, [commitSceneImageSlotChange]);
+
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file || !user) return;
@@ -2101,32 +2544,44 @@ export default function EditChapterPage() {
                 .from('covers')
                 .getPublicUrl(filePath);
 
-            const newId = `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            const newBlock: Block = {
-                id: newId,
-                type: 'image',
-                text: '',
-                characterId: activeCharacterId,
-                imageUrl: publicUrl,
-                isFlashback: false,
-            };
+            if (isVisualNovelStyle && sceneImageTarget) {
+                await commitSceneImageSlotChange({
+                    blockId: sceneImageTarget.blockId,
+                    slot: sceneImageTarget.slot,
+                    nextUrl: publicUrl,
+                    uploadedUrls: [publicUrl],
+                    failureMessage: 'ไม่สามารถบันทึกรูปฉากนี้ได้ กรุณาลองใหม่อีกครั้ง',
+                });
+                setSceneImageTarget(null);
+            } else {
+                const newId = createBlockId('block');
+                const newBlock: Block = {
+                    id: newId,
+                    type: 'image',
+                    text: '',
+                    characterId: activeCharacterId,
+                    imageUrl: publicUrl,
+                    isFlashback: false,
+                };
 
-            setBlocks(prev => {
-                if (prev.length === 1 && prev[0].text === '' && prev[0].characterId === null && prev[0].type === 'paragraph') {
-                    return [newBlock];
-                }
-                return [...prev, newBlock];
-            });
+                setBlocks(prev => {
+                    if (prev.length === 1 && prev[0].text === '' && prev[0].characterId === null && prev[0].type === 'paragraph') {
+                        return [newBlock];
+                    }
+                    return [...prev, newBlock];
+                });
 
-            setTimeout(() => {
-                chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-            }, 100);
+                setTimeout(() => {
+                    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+                }, 100);
+            }
 
         } catch (error) {
             console.error('Error uploading chat image:', error);
             alert('เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ');
         } finally {
             setIsUploadingImage(false);
+            setSceneImageTarget(null);
             if (imageInputRef.current) {
                 imageInputRef.current.value = ''; // Reset input
             }
@@ -2168,17 +2623,30 @@ export default function EditChapterPage() {
         }
     };
 
-    const openUnsplashPicker = (target: 'chat' | 'character' | 'narrative') => {
+    const openUnsplashPicker = (
+        target: 'chat' | 'character' | 'narrative' | 'visual_novel',
+        blockId?: string,
+        slot?: SceneImageTargetSlot,
+    ) => {
         setUnsplashTarget(target);
+        setSceneImageTarget(
+            target === 'visual_novel' && blockId && slot
+                ? { blockId, slot }
+                : null
+        );
         setShowUnsplashModal(true);
         setUnsplashError(null);
 
         if (!unsplashQuery) {
             const defaultQuery = target === 'chat'
                 ? 'cinematic scene'
-                : target === 'narrative'
-                    ? 'fantasy landscape'
-                    : 'portrait character';
+                : target === 'visual_novel'
+                    ? slot === 'backgroundUrl'
+                        ? 'anime sci-fi background'
+                        : 'anime character illustration'
+                    : target === 'narrative'
+                        ? 'fantasy landscape'
+                        : 'portrait character';
             setUnsplashQuery(defaultQuery);
             handleSearchUnsplash(defaultQuery);
         } else if (unsplashResults.length === 0) {
@@ -2186,9 +2654,9 @@ export default function EditChapterPage() {
         }
     };
 
-    const handleSelectUnsplashImage = (image: UnsplashImage) => {
+    const handleSelectUnsplashImage = async (image: UnsplashImage) => {
         if (unsplashTarget === 'chat') {
-            const newId = `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const newId = createBlockId('block');
             const newBlock: Block = {
                 id: newId,
                 type: 'image',
@@ -2208,8 +2676,15 @@ export default function EditChapterPage() {
             setTimeout(() => {
                 chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
             }, 100);
+        } else if (unsplashTarget === 'visual_novel' && sceneImageTarget) {
+            await commitSceneImageSlotChange({
+                blockId: sceneImageTarget.blockId,
+                slot: sceneImageTarget.slot,
+                nextUrl: image.regular,
+                failureMessage: 'ไม่สามารถบันทึกรูปฉากจาก Unsplash ได้ กรุณาลองใหม่อีกครั้ง',
+            });
         } else if (unsplashTarget === 'narrative') {
-            const newId = `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const newId = createBlockId('block');
             const newBlock: Block = {
                 id: newId,
                 type: 'image',
@@ -2230,49 +2705,50 @@ export default function EditChapterPage() {
             setQuickCharForm(prev => ({ ...prev, imageUrl: image.regular }));
         }
 
+        setSceneImageTarget(null);
         setShowUnsplashModal(false);
     };
 
     const removeBlock = async (id: string) => {
-        // Find the block to be removed
-        const blockToRemove = blocks.find(b => b.id === id);
+        const previousBlocks = blocks;
+        const blockToRemove = previousBlocks.find((block) => block.id === id);
+        if (!blockToRemove) return;
 
-        setBlocks(prev => {
-            if (prev.length <= 1) return [{ id: `block-${Date.now()}`, type: 'paragraph', text: '', characterId: null, isFlashback: false }];
-
-            const index = prev.findIndex(b => b.id === id);
-            if (index > 0) {
-                // Focus previous block before removing
-                setTimeout(() => {
-                    const el = document.getElementById(`textarea-${prev[index - 1].id}`);
-                    if (el) el.focus();
-                }, 0);
-            }
-            return prev.filter(b => b.id !== id);
-        });
-
-        // If the block is an image, delete it from storage
-        if (blockToRemove?.type === 'image' && blockToRemove.imageUrl) {
-            try {
-                // Extract file path from public URL
-                // Example URL: https://[project-ref].supabase.co/storage/v1/object/public/covers/chat_images/[storyId]/[fileName]
-                const urlObj = new URL(blockToRemove.imageUrl);
-                const pathParts = urlObj.pathname.split('/public/covers/');
-                if (pathParts.length === 2) {
-                    const filePath = decodeURIComponent(pathParts[1]);
-
-                    const { error } = await supabase.storage
-                        .from('covers')
-                        .remove([filePath]);
-
-                    if (error) {
-                        console.error('Failed to delete image from storage:', error);
-                    }
-                }
-            } catch (error) {
-                console.error('Error parsing image URL for deletion:', error);
-            }
+        const index = previousBlocks.findIndex((block) => block.id === id);
+        if (index > 0) {
+            setTimeout(() => {
+                const previousId = previousBlocks[index - 1].id;
+                const textAreaId = previousBlocks[index - 1].type === 'scene'
+                    ? `scene-text-${previousId}`
+                    : `textarea-${previousId}`;
+                const element = document.getElementById(textAreaId);
+                if (element) element.focus();
+            }, 0);
         }
+
+        const nextBlocks = previousBlocks.length <= 1
+            ? ensureBlocksForStyle([], editorStyle)
+            : previousBlocks.filter((block) => block.id !== id);
+
+        const removableImageUrls = blockToRemove.type === 'image'
+            ? [blockToRemove.imageUrl].filter((url): url is string => typeof url === 'string' && url.length > 0)
+            : blockToRemove.type === 'scene'
+                ? [
+                    blockToRemove.backgroundUrl,
+                    blockToRemove.leftSceneImageUrl,
+                    blockToRemove.rightSceneImageUrl,
+                    blockToRemove.soloSceneImageUrl,
+                ].filter((url): url is string => typeof url === 'string' && url.length > 0)
+                : [];
+
+        await commitBlocksMutation({
+            previousBlocks,
+            nextBlocks,
+            oldUrls: removableImageUrls,
+            failureMessage: blockToRemove.type === 'scene'
+                ? 'ไม่สามารถลบฉากนี้ได้ กรุณาลองใหม่อีกครั้ง'
+                : 'ไม่สามารถลบบล็อกนี้ได้ กรุณาลองใหม่อีกครั้ง',
+        });
     };
 
     const moveBlockUp = useCallback((id: string) => {
@@ -2579,7 +3055,7 @@ export default function EditChapterPage() {
             return;
         }
         showNotice('success', 'ตรวจสอบผ่านแล้ว', 'ทุกทางเลือกพร้อมสำหรับบันทึกหรือเผยแพร่');
-    }, [getChoiceValidationError, chapterChoices, isEndingChapter]);
+    }, [getChoiceValidationError, chapterChoices, isEndingChapter, showNotice]);
 
     if (!isMounted) return null;
 
@@ -2976,6 +3452,429 @@ export default function EditChapterPage() {
                             </div>
                         </div>
                     </>
+                ) : isVisualNovelStyle ? (
+                    <div className={styles.visualNovelEditorPane}>
+                        <div className={styles.visualNovelHero}>
+                            <div>
+                                <h3 className={styles.visualNovelTitle}>Scene Editor</h3>
+                                <p className={styles.visualNovelLead}>
+                                    เลือกได้ทั้งเวทีปกติ ครึ่งต่อครึ่ง หรือฉากเดี่ยว พร้อมแยกรูปใช้บนเวทีออกจากรูปแนะนำตัวละคร
+                                </p>
+                            </div>
+                            <div className={styles.visualNovelHeroActions}>
+                                <button
+                                    type="button"
+                                    className={styles.visualNovelSecondaryBtn}
+                                    onClick={() => setShowQuickAddChar(true)}
+                                >
+                                    <Plus size={16} />
+                                    เพิ่มตัวละครด่วน
+                                </button>
+                                <button
+                                    type="button"
+                                    className={styles.visualNovelPrimaryBtn}
+                                    onClick={() => addBlock()}
+                                >
+                                    <Plus size={16} />
+                                    เพิ่มฉากใหม่
+                                </button>
+                            </div>
+                        </div>
+
+                        <input
+                            type="file"
+                            accept="image/*"
+                            ref={imageInputRef}
+                            style={{ display: 'none' }}
+                            onChange={handleImageUpload}
+                            disabled={isUploadingImage}
+                        />
+
+                        <div className={styles.visualNovelSceneList}>
+                            {blocks.map((block, index) => {
+                                const leftCharacterName = characters.find((char) => char.id === block.leftCharacterId)?.name || '';
+                                const rightCharacterName = characters.find((char) => char.id === block.rightCharacterId)?.name || '';
+                                const soloCharacterName = characters.find((char) => char.id === block.soloCharacterId)?.name || '';
+                                const sceneLayoutMode = normalizeSceneLayoutMode(block.layoutMode);
+                                const isSplitScene = sceneLayoutMode === 'split';
+                                const isSoloScene = sceneLayoutMode === 'solo';
+                                const sceneMetaLabel = isSoloScene
+                                    ? soloCharacterName || 'ภาพเดี่ยว'
+                                    : `${leftCharacterName || 'ซ้ายว่าง'} / ${rightCharacterName || 'ขวาว่าง'}`;
+                                const isUploadingBackground = isUploadingImage
+                                    && sceneImageTarget?.blockId === block.id
+                                    && sceneImageTarget.slot === 'backgroundUrl';
+                                const isUploadingLeftScene = isUploadingImage
+                                    && sceneImageTarget?.blockId === block.id
+                                    && sceneImageTarget.slot === 'leftSceneImageUrl';
+                                const isUploadingRightScene = isUploadingImage
+                                    && sceneImageTarget?.blockId === block.id
+                                    && sceneImageTarget.slot === 'rightSceneImageUrl';
+                                const isUploadingSoloScene = isUploadingImage
+                                    && sceneImageTarget?.blockId === block.id
+                                    && sceneImageTarget.slot === 'soloSceneImageUrl';
+
+                                return (
+                                    <section key={block.id} className={styles.visualNovelSceneCard}>
+                                        <div className={styles.visualNovelSceneHeader}>
+                                            <div>
+                                                <span className={styles.visualNovelSceneEyebrow}>Scene {index + 1}</span>
+                                                <h4 className={styles.visualNovelSceneTitle}>
+                                                    {block.text.trim().slice(0, 42) || 'ฉากใหม่'}
+                                                </h4>
+                                            </div>
+                                            <span className={styles.visualNovelSceneMeta}>
+                                                {sceneMetaLabel}
+                                            </span>
+                                        </div>
+
+                                        <VisualNovelStage
+                                            scene={block}
+                                            characters={characters}
+                                            variant="editor"
+                                            className={styles.visualNovelStagePreview}
+                                            footerSlot={
+                                                <span className={styles.visualNovelSceneCounter}>
+                                                    ฉาก {index + 1}/{blocks.length}
+                                                </span>
+                                            }
+                                        />
+
+                                        <div className={styles.visualNovelLayoutRow}>
+                                            <span className={styles.visualNovelLayoutLabel}>รูปแบบฉาก</span>
+                                            <div className={styles.visualNovelLayoutButtons}>
+                                                {([
+                                                    { key: 'stage', label: 'เวทีปกติ' },
+                                                    { key: 'split', label: 'ครึ่งต่อครึ่ง' },
+                                                    { key: 'solo', label: 'คนเดียว' },
+                                                ] as const).map((option) => (
+                                                    <button
+                                                        key={option.key}
+                                                        type="button"
+                                                        className={`${styles.visualNovelLayoutBtn} ${sceneLayoutMode === option.key ? styles.visualNovelLayoutBtnActive : ''}`}
+                                                        onClick={() => updateBlock(block.id, { layoutMode: option.key })}
+                                                    >
+                                                        {option.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {isSplitScene ? (
+                                            <div className={styles.visualNovelSplitAssetGrid}>
+                                                <section className={styles.visualNovelSplitAssetCard}>
+                                                    <div className={styles.visualNovelSplitAssetHeader}>
+                                                        <div>
+                                                            <span className={styles.visualNovelBackgroundLabel}>ฝั่งซ้าย</span>
+                                                            <span className={styles.visualNovelBackgroundValue}>
+                                                                {block.leftSceneImageUrl ? 'ตั้งค่าภาพแล้ว' : 'ยังไม่ได้เลือกภาพฝั่งซ้าย'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <label className={styles.visualNovelControl}>
+                                                        <span>ตัวละครฝั่งซ้าย</span>
+                                                        <select
+                                                            value={block.leftCharacterId || ''}
+                                                            onChange={(event) => updateBlock(block.id, { leftCharacterId: event.target.value || null })}
+                                                            className={styles.visualNovelSelect}
+                                                        >
+                                                            <option value="">-- ไม่แสดง --</option>
+                                                            {characters.map((char) => (
+                                                                <option key={char.id} value={char.id}>{char.name}</option>
+                                                            ))}
+                                                        </select>
+                                                    </label>
+                                                    <div className={styles.visualNovelSplitAssetActions}>
+                                                        <button
+                                                            type="button"
+                                                            className={styles.visualNovelSecondaryBtn}
+                                                            onClick={() => openSceneImagePicker(block.id, 'leftSceneImageUrl')}
+                                                            disabled={isUploadingImage}
+                                                        >
+                                                            {isUploadingLeftScene ? <Loader2 size={15} className={styles.spinner} /> : <ImageIcon size={15} />}
+                                                            อัปโหลด
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className={styles.visualNovelSecondaryBtn}
+                                                            onClick={() => openUnsplashPicker('visual_novel', block.id, 'leftSceneImageUrl')}
+                                                        >
+                                                            <Search size={15} />
+                                                            Unsplash
+                                                        </button>
+                                                        {block.leftSceneImageUrl && (
+                                                            <button
+                                                                type="button"
+                                                                className={styles.visualNovelGhostBtn}
+                                                                onClick={() => handleClearSceneImage(block.id, 'leftSceneImageUrl')}
+                                                            >
+                                                                ล้างภาพ
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </section>
+
+                                                <section className={styles.visualNovelSplitAssetCard}>
+                                                    <div className={styles.visualNovelSplitAssetHeader}>
+                                                        <div>
+                                                            <span className={styles.visualNovelBackgroundLabel}>ฝั่งขวา</span>
+                                                            <span className={styles.visualNovelBackgroundValue}>
+                                                                {block.rightSceneImageUrl ? 'ตั้งค่าภาพแล้ว' : 'ยังไม่ได้เลือกภาพฝั่งขวา'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <label className={styles.visualNovelControl}>
+                                                        <span>ตัวละครฝั่งขวา</span>
+                                                        <select
+                                                            value={block.rightCharacterId || ''}
+                                                            onChange={(event) => updateBlock(block.id, { rightCharacterId: event.target.value || null })}
+                                                            className={styles.visualNovelSelect}
+                                                        >
+                                                            <option value="">-- ไม่แสดง --</option>
+                                                            {characters.map((char) => (
+                                                                <option key={char.id} value={char.id}>{char.name}</option>
+                                                            ))}
+                                                        </select>
+                                                    </label>
+                                                    <div className={styles.visualNovelSplitAssetActions}>
+                                                        <button
+                                                            type="button"
+                                                            className={styles.visualNovelSecondaryBtn}
+                                                            onClick={() => openSceneImagePicker(block.id, 'rightSceneImageUrl')}
+                                                            disabled={isUploadingImage}
+                                                        >
+                                                            {isUploadingRightScene ? <Loader2 size={15} className={styles.spinner} /> : <ImageIcon size={15} />}
+                                                            อัปโหลด
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className={styles.visualNovelSecondaryBtn}
+                                                            onClick={() => openUnsplashPicker('visual_novel', block.id, 'rightSceneImageUrl')}
+                                                        >
+                                                            <Search size={15} />
+                                                            Unsplash
+                                                        </button>
+                                                        {block.rightSceneImageUrl && (
+                                                            <button
+                                                                type="button"
+                                                                className={styles.visualNovelGhostBtn}
+                                                                onClick={() => handleClearSceneImage(block.id, 'rightSceneImageUrl')}
+                                                            >
+                                                                ล้างภาพ
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </section>
+                                            </div>
+                                        ) : isSoloScene ? (
+                                            <section className={styles.visualNovelSoloAssetCard}>
+                                                <div className={styles.visualNovelSplitAssetHeader}>
+                                                    <div>
+                                                        <span className={styles.visualNovelBackgroundLabel}>ภาพฉากเดี่ยว</span>
+                                                        <span className={styles.visualNovelBackgroundValue}>
+                                                            {block.soloSceneImageUrl ? 'ตั้งค่าภาพแล้ว' : 'ยังไม่ได้เลือกภาพฉากเดี่ยว'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className={styles.visualNovelAssetGuide}>
+                                                    <span className={styles.visualNovelAssetHint}>แนะนำ 1920x1080 px ขึ้นไป (16:9)</span>
+                                                    <span className={styles.visualNovelAssetSubhint}>สัดส่วนอื่นใช้ได้ แต่ขอบภาพอาจถูกครอปเมื่อแสดงผลเต็มฉาก</span>
+                                                </div>
+                                                <label className={styles.visualNovelControl}>
+                                                    <span>ตัวละครหลักของฉาก</span>
+                                                    <select
+                                                        value={block.soloCharacterId || ''}
+                                                        onChange={(event) => updateBlock(block.id, { soloCharacterId: event.target.value || null })}
+                                                        className={styles.visualNovelSelect}
+                                                    >
+                                                        <option value="">-- ไม่ระบุตัวละคร --</option>
+                                                        {characters.map((char) => (
+                                                            <option key={char.id} value={char.id}>{char.name}</option>
+                                                        ))}
+                                                    </select>
+                                                </label>
+                                                <div className={styles.visualNovelSplitAssetActions}>
+                                                    <button
+                                                        type="button"
+                                                        className={styles.visualNovelSecondaryBtn}
+                                                        onClick={() => openSceneImagePicker(block.id, 'soloSceneImageUrl')}
+                                                        disabled={isUploadingImage}
+                                                    >
+                                                        {isUploadingSoloScene ? <Loader2 size={15} className={styles.spinner} /> : <ImageIcon size={15} />}
+                                                        อัปโหลด
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className={styles.visualNovelSecondaryBtn}
+                                                        onClick={() => openUnsplashPicker('visual_novel', block.id, 'soloSceneImageUrl')}
+                                                    >
+                                                        <Search size={15} />
+                                                        Unsplash
+                                                    </button>
+                                                    {block.soloSceneImageUrl && (
+                                                        <button
+                                                            type="button"
+                                                            className={styles.visualNovelGhostBtn}
+                                                            onClick={() => handleClearSceneImage(block.id, 'soloSceneImageUrl')}
+                                                        >
+                                                            ล้างภาพ
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </section>
+                                        ) : (
+                                            <>
+                                                <div className={styles.visualNovelControlGrid}>
+                                                    <label className={styles.visualNovelControl}>
+                                                        <span>ตัวละครฝั่งซ้าย</span>
+                                                        <select
+                                                            value={block.leftCharacterId || ''}
+                                                            onChange={(event) => updateBlock(block.id, { leftCharacterId: event.target.value || null })}
+                                                            className={styles.visualNovelSelect}
+                                                        >
+                                                            <option value="">-- ไม่แสดง --</option>
+                                                            {characters.map((char) => (
+                                                                <option key={char.id} value={char.id}>{char.name}</option>
+                                                            ))}
+                                                        </select>
+                                                    </label>
+
+                                                    <label className={styles.visualNovelControl}>
+                                                        <span>ตัวละครฝั่งขวา</span>
+                                                        <select
+                                                            value={block.rightCharacterId || ''}
+                                                            onChange={(event) => updateBlock(block.id, { rightCharacterId: event.target.value || null })}
+                                                            className={styles.visualNovelSelect}
+                                                        >
+                                                            <option value="">-- ไม่แสดง --</option>
+                                                            {characters.map((char) => (
+                                                                <option key={char.id} value={char.id}>{char.name}</option>
+                                                            ))}
+                                                        </select>
+                                                    </label>
+                                                </div>
+
+                                                <div className={styles.visualNovelBackgroundRow}>
+                                                    <div className={styles.visualNovelBackgroundInfo}>
+                                                        <span className={styles.visualNovelBackgroundLabel}>พื้นหลังฉาก</span>
+                                                        <span className={styles.visualNovelBackgroundValue}>
+                                                            {block.backgroundUrl ? 'ตั้งค่าแล้ว' : 'ยังไม่ได้เลือกภาพพื้นหลัง'}
+                                                        </span>
+                                                    </div>
+                                                    <div className={styles.visualNovelBackgroundActions}>
+                                                        <button
+                                                            type="button"
+                                                            className={styles.visualNovelSecondaryBtn}
+                                                            onClick={() => openSceneImagePicker(block.id, 'backgroundUrl')}
+                                                            disabled={isUploadingImage}
+                                                        >
+                                                            {isUploadingBackground ? <Loader2 size={15} className={styles.spinner} /> : <ImageIcon size={15} />}
+                                                            อัปโหลด
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className={styles.visualNovelSecondaryBtn}
+                                                            onClick={() => openUnsplashPicker('visual_novel', block.id, 'backgroundUrl')}
+                                                        >
+                                                            <Search size={15} />
+                                                            Unsplash
+                                                        </button>
+                                                        {block.backgroundUrl && (
+                                                            <button
+                                                                type="button"
+                                                                className={styles.visualNovelGhostBtn}
+                                                                onClick={() => handleClearSceneImage(block.id, 'backgroundUrl')}
+                                                            >
+                                                                ล้างภาพ
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
+
+                                        <div className={styles.visualNovelMetaGrid}>
+                                            <label className={styles.visualNovelControl}>
+                                                <span>ผู้พูด</span>
+                                                <select
+                                                    value={block.speakerCharacterId || ''}
+                                                    onChange={(event) => updateBlock(block.id, { speakerCharacterId: event.target.value || null })}
+                                                    className={styles.visualNovelSelect}
+                                                >
+                                                    <option value="">ผู้บรรยาย / ระบบ</option>
+                                                    {characters.map((char) => (
+                                                        <option key={char.id} value={char.id}>{char.name}</option>
+                                                    ))}
+                                                </select>
+                                            </label>
+
+                                            {isSoloScene ? (
+                                                <div className={styles.visualNovelSoloMetaNote}>
+                                                    โหมดคนเดียวจะใช้ภาพเดียวเต็มฉาก และไม่ใช้การหรี่โฟกัสซ้าย/ขวา
+                                                </div>
+                                            ) : (
+                                                <div className={styles.visualNovelFocusRow}>
+                                                    <span className={styles.visualNovelFocusLabel}>โฟกัสฉาก</span>
+                                                    <div className={styles.visualNovelFocusButtons}>
+                                                        {([
+                                                            { key: 'left', label: 'ซ้าย' },
+                                                            { key: 'right', label: 'ขวา' },
+                                                            { key: 'none', label: 'เท่ากัน' },
+                                                        ] as const).map((option) => (
+                                                            <button
+                                                                key={option.key}
+                                                                type="button"
+                                                                className={`${styles.visualNovelFocusBtn} ${block.focusSide === option.key ? styles.visualNovelFocusBtnActive : ''}`}
+                                                                onClick={() => updateBlock(block.id, { focusSide: option.key })}
+                                                            >
+                                                                {option.label}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <label className={styles.visualNovelDialogueField}>
+                                            <span>บทพูด / คำบรรยายของฉาก</span>
+                                            <textarea
+                                                id={`scene-text-${block.id}`}
+                                                className={styles.visualNovelTextarea}
+                                                value={block.text}
+                                                onChange={(event) => {
+                                                    updateBlock(block.id, { text: event.target.value });
+                                                    event.target.style.height = 'auto';
+                                                    event.target.style.height = `${event.target.scrollHeight}px`;
+                                                }}
+                                                onKeyDown={(event) => handleKeyDown(event, block.id)}
+                                                placeholder="พิมพ์บทพูดหรือคำบรรยายของฉากนี้..."
+                                                rows={2}
+                                            />
+                                        </label>
+
+                                        <div className={styles.visualNovelSceneActions}>
+                                            <button type="button" className={styles.visualNovelGhostBtn} onClick={() => moveBlockUp(block.id)}>
+                                                <ChevronUp size={15} />
+                                                เลื่อนขึ้น
+                                            </button>
+                                            <button type="button" className={styles.visualNovelGhostBtn} onClick={() => moveBlockDown(block.id)}>
+                                                <ChevronDown size={15} />
+                                                เลื่อนลง
+                                            </button>
+                                            <button type="button" className={styles.visualNovelGhostBtn} onClick={() => addBlock(block.id)}>
+                                                <Plus size={15} />
+                                                เพิ่มต่อท้าย
+                                            </button>
+                                            <button type="button" className={styles.visualNovelDangerBtn} onClick={() => removeBlock(block.id)}>
+                                                <Trash2 size={15} />
+                                                ลบฉาก
+                                            </button>
+                                        </div>
+                                    </section>
+                                );
+                            })}
+                        </div>
+                    </div>
                 ) : (
                     <div className={styles.narrativeEditorPane}>
 
@@ -3676,11 +4575,17 @@ export default function EditChapterPage() {
             }
 
             {showUnsplashModal && (
-                <div className={styles.modalOverlay} onClick={() => setShowUnsplashModal(false)}>
+                <div className={styles.modalOverlay} onClick={() => {
+                    setShowUnsplashModal(false);
+                    setSceneImageTarget(null);
+                }}>
                     <div className={`${styles.modal} ${styles.unsplashModal}`} onClick={e => e.stopPropagation()}>
                         <div className={styles.modalHeader}>
                             <h2 className={styles.modalTitle}>ค้นหารูปจาก Unsplash</h2>
-                            <button className={styles.iconBtn} onClick={() => setShowUnsplashModal(false)}>
+                            <button className={styles.iconBtn} onClick={() => {
+                                setShowUnsplashModal(false);
+                                setSceneImageTarget(null);
+                            }}>
                                 <X size={20} />
                             </button>
                         </div>
@@ -3701,6 +4606,8 @@ export default function EditChapterPage() {
                                     placeholder={
                                         unsplashTarget === 'chat'
                                             ? 'เช่น เมืองกลางคืน, rain, fantasy'
+                                            : unsplashTarget === 'visual_novel'
+                                                ? 'เช่น cyberpunk room, neon city, anime background'
                                             : unsplashTarget === 'narrative'
                                                 ? 'เช่น fantasy landscape, storm, magic forest'
                                                 : 'เช่น anime portrait, character'

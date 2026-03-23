@@ -1524,6 +1524,7 @@
 .badgeCartoon,
 .badgeNarrativeStyle,
 .badgeChatStyle,
+.badgeVisualNovelStyle,
 .badgeInteractive,
 .badgeCompleted,
 .badgeOngoing {
@@ -1556,6 +1557,11 @@
 .badgeChatStyle {
     background: rgba(56, 189, 248, 0.14);
     color: #0369a1;
+}
+
+.badgeVisualNovelStyle {
+    background: rgba(34, 211, 238, 0.14);
+    color: #0f766e;
 }
 
 .badgeInteractive {

@@ -1,0 +1,297 @@
+.main {
+    min-height: 100vh;
+    background:
+        radial-gradient(circle at 12% 0%, rgba(249, 115, 22, 0.16), transparent 28%),
+        radial-gradient(circle at 88% 10%, rgba(244, 114, 182, 0.1), transparent 24%),
+        linear-gradient(180deg, #05070b 0%, #0a1020 42%, #0d1528 100%);
+    color: #f4f6fb;
+}
+
+.pageShell {
+    padding: calc(64px + 1.6rem) 0 4rem;
+}
+
+.pageHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.2rem 1.35rem;
+    border-radius: 28px;
+    background:
+        linear-gradient(180deg, rgba(10, 17, 32, 0.88), rgba(5, 9, 19, 0.96));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow:
+        0 24px 48px rgba(2, 6, 23, 0.26),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.pageHeaderBookshelf {
+    background:
+        radial-gradient(circle at top right, rgba(249, 115, 22, 0.14), transparent 38%),
+        linear-gradient(180deg, rgba(10, 17, 32, 0.88), rgba(5, 9, 19, 0.96));
+}
+
+.pageHeaderLoves {
+    background:
+        radial-gradient(circle at top right, rgba(244, 114, 182, 0.14), transparent 38%),
+        linear-gradient(180deg, rgba(10, 17, 32, 0.88), rgba(5, 9, 19, 0.96));
+}
+
+.pageHeaderBody {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    min-width: 0;
+}
+
+.headerIcon {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 18px 30px rgba(2, 6, 23, 0.22);
+}
+
+.headerIconBookshelf {
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.28), rgba(251, 146, 60, 0.12));
+    color: #ffb499;
+    border: 1px solid rgba(249, 115, 22, 0.22);
+}
+
+.headerIconLoves {
+    background: linear-gradient(135deg, rgba(244, 114, 182, 0.24), rgba(251, 146, 60, 0.08));
+    color: #f9a8d4;
+    border: 1px solid rgba(244, 114, 182, 0.18);
+}
+
+.eyebrow {
+    display: inline-flex;
+    margin-bottom: 0.28rem;
+    color: rgba(148, 163, 184, 0.84);
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.heading {
+    margin: 0;
+    font-size: clamp(1.35rem, 2.35vw, 2rem);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1.08;
+    color: #f8fafc;
+}
+
+.subheading {
+    margin: 0.32rem 0 0;
+    color: rgba(226, 232, 240, 0.74);
+    font-size: 0.88rem;
+    line-height: 1.62;
+    max-width: 58ch;
+}
+
+.headerMeta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 0.58rem 0.88rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    white-space: nowrap;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.headerMetaBookshelf {
+    background: rgba(249, 115, 22, 0.14);
+    border: 1px solid rgba(249, 115, 22, 0.2);
+    color: #ffd5c2;
+}
+
+.headerMetaLoves {
+    background: rgba(244, 114, 182, 0.12);
+    border: 1px solid rgba(244, 114, 182, 0.18);
+    color: #fbcfe8;
+}
+
+.content {
+    margin-top: 1.4rem;
+}
+
+.stateCard {
+    min-height: 320px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.9rem;
+    padding: 2.8rem 1.5rem;
+    border-radius: 28px;
+    text-align: center;
+    background:
+        linear-gradient(180deg, rgba(10, 17, 32, 0.88), rgba(5, 9, 19, 0.96));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow:
+        0 24px 48px rgba(2, 6, 23, 0.26),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.stateIcon {
+    width: 82px;
+    height: 82px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.stateIconBookshelf {
+    background:
+        radial-gradient(circle at 30% 30%, rgba(249, 115, 22, 0.24), transparent 58%),
+        rgba(255, 255, 255, 0.04);
+    color: #ffb499;
+}
+
+.stateIconLoves {
+    background:
+        radial-gradient(circle at 30% 30%, rgba(244, 114, 182, 0.22), transparent 58%),
+        rgba(255, 255, 255, 0.04);
+    color: #f9a8d4;
+}
+
+.stateTitle {
+    margin: 0;
+    color: #f8fafc;
+    font-size: 1.2rem;
+    font-weight: 800;
+}
+
+.stateDescription {
+    margin: 0;
+    max-width: 44ch;
+    color: rgba(226, 232, 240, 0.72);
+    font-size: 0.92rem;
+    line-height: 1.7;
+}
+
+.stateAction {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0.72rem 1.3rem;
+    border-radius: 999px;
+    text-decoration: none;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #ffffff;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
+    box-shadow: 0 16px 28px rgba(249, 115, 22, 0.18);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+}
+
+.stateAction:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 20px 34px rgba(249, 115, 22, 0.24);
+}
+
+.librarySurface {
+    padding: 1.4rem;
+    border-radius: 30px;
+    background:
+        linear-gradient(180deg, rgba(10, 17, 32, 0.88), rgba(5, 9, 19, 0.96));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow:
+        0 24px 48px rgba(2, 6, 23, 0.26),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    overflow: hidden;
+}
+
+.surfaceHeader {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.surfaceTitle {
+    margin: 0;
+    color: #f8fafc;
+    font-size: 1.15rem;
+    font-weight: 800;
+}
+
+.surfaceMeta {
+    margin: 0.28rem 0 0;
+    color: rgba(148, 163, 184, 0.8);
+    font-size: 0.88rem;
+    line-height: 1.6;
+}
+
+.surfaceCount {
+    color: rgba(226, 232, 240, 0.68);
+    font-size: 0.82rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.gridStage {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 186px));
+    gap: 0.9rem;
+    align-items: stretch;
+    justify-content: flex-start;
+}
+
+@media (max-width: 920px) {
+    .pageHeader {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .headerMeta {
+        align-self: flex-start;
+    }
+}
+
+@media (max-width: 720px) {
+    .pageShell {
+        padding: calc(64px + 1rem) 0 3rem;
+    }
+
+    .pageHeader,
+    .librarySurface,
+    .stateCard {
+        padding: 1.2rem;
+        border-radius: 24px;
+    }
+
+    .pageHeaderBody {
+        gap: 0.85rem;
+    }
+
+    .headerIcon {
+        width: 48px;
+        height: 48px;
+        border-radius: 16px;
+    }
+
+    .surfaceHeader {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.4rem;
+    }
+
+    .gridStage {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.85rem;
+    }
+}

@@ -5,10 +5,21 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 // ─── Types ────────────────────────────────────────────
 type Block = {
     id: string;
-    type: 'paragraph' | 'image';
+    type: 'paragraph' | 'image' | 'scene';
     text: string;
     characterId: string | null;
     imageUrl?: string;
+    isFlashback?: boolean;
+    layoutMode?: 'stage' | 'split' | 'solo';
+    backgroundUrl?: string | null;
+    leftCharacterId?: string | null;
+    rightCharacterId?: string | null;
+    soloCharacterId?: string | null;
+    speakerCharacterId?: string | null;
+    leftSceneImageUrl?: string | null;
+    rightSceneImageUrl?: string | null;
+    soloSceneImageUrl?: string | null;
+    focusSide?: 'left' | 'right' | 'none';
 };
 
 export interface AutoSaveDraft {

@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   PenTool,
   Heart,
@@ -31,6 +31,8 @@ import { WalletLedgerPanel } from '@/components/profile/WalletLedgerPanel';
 import { useHomeGsapAnimations } from '@/components/home/useHomeGsapAnimations';
 import { SharedNavbar } from '@/components/navigation/SharedNavbar';
 import { StorySearchPanel } from '@/components/navigation/StorySearchPanel';
+import { CoverTiltFrame } from '@/components/story/CoverTiltFrame';
+import { StoryMediumCard } from '@/components/story/StoryMediumCard';
 import type {
   DiscoveryFilters,
   DiscoveryRailKey,
@@ -117,74 +119,6 @@ function railsFromPayload(payload: DiscoveryResponse, loading: boolean): HomeRai
 type HomePageClientProps = {
   initialDiscovery: DiscoveryResponse;
 };
-
-function supportsCoverTilt(pointerType: string): boolean {
-  if (pointerType === 'touch') return false;
-  if (typeof window === 'undefined') return false;
-  return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-
-function resetCoverTilt(node: HTMLDivElement): void {
-  node.dataset.tiltActive = 'false';
-  node.style.setProperty('--story-card-tilt-x', '0deg');
-  node.style.setProperty('--story-card-tilt-y', '0deg');
-  node.style.setProperty('--story-card-glare-x', '50%');
-  node.style.setProperty('--story-card-glare-y', '50%');
-  node.style.setProperty('--story-card-glare-opacity', '0');
-  node.style.setProperty('--story-card-aura-opacity', '0');
-}
-
-type StoryCoverTiltFrameProps = {
-  className: string;
-  children: ReactNode;
-};
-
-function StoryCoverTiltFrame({ className, children }: StoryCoverTiltFrameProps) {
-  const handlePointerEnter = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!supportsCoverTilt(event.pointerType)) return;
-    event.currentTarget.dataset.tiltActive = 'true';
-  }, []);
-
-  const handlePointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!supportsCoverTilt(event.pointerType)) return;
-
-    const node = event.currentTarget;
-    const rect = node.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-
-    const relativeX = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
-    const relativeY = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
-    const rotateX = (0.5 - relativeY) * 14;
-    const rotateY = (relativeX - 0.5) * 14;
-
-    node.dataset.tiltActive = 'true';
-    node.style.setProperty('--story-card-tilt-x', `${rotateX.toFixed(2)}deg`);
-    node.style.setProperty('--story-card-tilt-y', `${rotateY.toFixed(2)}deg`);
-    node.style.setProperty('--story-card-glare-x', `${(relativeX * 100).toFixed(2)}%`);
-    node.style.setProperty('--story-card-glare-y', `${(relativeY * 100).toFixed(2)}%`);
-    node.style.setProperty('--story-card-glare-opacity', '1');
-    node.style.setProperty('--story-card-aura-opacity', '1');
-  }, []);
-
-  const handlePointerLeave = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    resetCoverTilt(event.currentTarget);
-  }, []);
-
-  return (
-    <div
-      className={`${className} ${styles.storyCoverTiltFrame}`}
-      data-tilt-active="false"
-      onPointerEnter={handlePointerEnter}
-      onPointerMove={handlePointerMove}
-      onPointerLeave={handlePointerLeave}
-      onPointerCancel={handlePointerLeave}
-    >
-      {children}
-      <div className={styles.storyCoverTiltGlare} aria-hidden="true" />
-      <div className={styles.storyCoverTiltAura} aria-hidden="true" />
-    </div>
-  );
-}
 
 export default function HomePageClient({ initialDiscovery }: HomePageClientProps) {
   const searchParams = useSearchParams();
@@ -769,6 +703,43 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
   }, [mainCategoryShelves, resolvedGridCategoryId, viewMode]);
 
   const isGridMode = viewMode === 'grid';
+  const renderHomeMediumCard = (story: DiscoveryStory, className: string, dataCard: string, imageSizes: string) => {
+    const isInteractiveStory = story.path_mode === 'branching';
+
+    return (
+      <StoryMediumCard
+        key={`${dataCard}-${story.id}`}
+        href={`/story/${story.id}`}
+        coverUrl={story.cover_url || story.cover_wide_url}
+        title={story.title}
+        author={story.pen_name}
+        className={className}
+        dataCard={dataCard}
+        enableTilt
+        imageSizes={imageSizes}
+        footer={(
+          <div className={styles.mainCategoryShelfMetaRow}>
+            {isInteractiveStory ? (
+              <span className={styles.posterModeChip}>Interactive</span>
+            ) : (
+              <span className={styles.posterMetric}>
+                <List size={12} className={styles.posterMetricIcon} />
+                {story.published_chapter_count.toLocaleString('th-TH')} ตอน
+              </span>
+            )}
+            <span className={styles.posterMetric}>
+              <Eye size={12} className={styles.posterMetricIcon} />
+              {(story.total_view_count ?? 0).toLocaleString('th-TH')}
+            </span>
+            <span className={styles.posterMetric}>
+              <Heart size={12} className={styles.posterMetricIcon} />
+              {(story.total_like_count ?? 0).toLocaleString('th-TH')}
+            </span>
+          </div>
+        )}
+      />
+    );
+  };
 
   useHomeGsapAnimations({
     rootRef: homeRootRef,
@@ -932,7 +903,7 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
 
                   return (
                     <Link key={`trending-${story.id}`} href={`/story/${story.id}`} className={styles.trendingCard} data-gsap-card="trending">
-                      <StoryCoverTiltFrame className={styles.trendingCoverWrap}>
+                      <CoverTiltFrame className={styles.trendingCoverWrap}>
                         {story.cover_url || story.cover_wide_url ? (
                           <Image
                             src={story.cover_url || story.cover_wide_url || ''}
@@ -946,7 +917,7 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
                         )}
 
                         {index < 4 && <span className={styles.trendingRankBadge}>#{index + 1}</span>}
-                      </StoryCoverTiltFrame>
+                      </CoverTiltFrame>
 
                       <div className={styles.trendingBody}>
                         <h3 className={styles.trendingTitle}>{story.title}</h3>
@@ -997,54 +968,14 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
                     </div>
                   ) : (
                     <div className={styles.shelfGrid}>
-                      {selectedGridCategory.stories.map((story) => {
-                        const isInteractiveStory = story.path_mode === 'branching';
-                        return (
-                          <Link
-                            key={`grid-${selectedGridCategory.id}-${story.id}`}
-                            href={`/story/${story.id}`}
-                            className={`${styles.mainCategoryShelfCard} ${styles.shelfGridCard}`}
-                            data-gsap-card="grid-category"
-                          >
-                            <StoryCoverTiltFrame className={styles.mainCategoryShelfCoverWrap}>
-                              {story.cover_url || story.cover_wide_url ? (
-                                <Image
-                                  src={story.cover_url || story.cover_wide_url || ''}
-                                  alt={story.title}
-                                  className={styles.mainCategoryShelfCover}
-                                  fill
-                                  sizes="(max-width: 767px) 46vw, (max-width: 1180px) 23vw, 16vw"
-                                />
-                              ) : (
-                                <div className={styles.mainCategoryShelfCoverFallback}>{story.title.slice(0, 2)}</div>
-                              )}
-                            </StoryCoverTiltFrame>
-
-                            <div className={styles.mainCategoryShelfBody}>
-                              <h4 className={styles.mainCategoryShelfTitle}>{story.title}</h4>
-                              <p className={styles.mainCategoryShelfAuthor}>{story.pen_name}</p>
-                              <div className={styles.mainCategoryShelfMetaRow}>
-                                {isInteractiveStory ? (
-                                  <span className={styles.posterModeChip}>Interactive</span>
-                                ) : (
-                                  <span className={styles.posterMetric}>
-                                    <List size={12} className={styles.posterMetricIcon} />
-                                    {story.published_chapter_count.toLocaleString('th-TH')} ตอน
-                                  </span>
-                                )}
-                                <span className={styles.posterMetric}>
-                                  <Eye size={12} className={styles.posterMetricIcon} />
-                                  {(story.total_view_count ?? 0).toLocaleString('th-TH')}
-                                </span>
-                                <span className={styles.posterMetric}>
-                                  <Heart size={12} className={styles.posterMetricIcon} />
-                                  {(story.total_like_count ?? 0).toLocaleString('th-TH')}
-                                </span>
-                              </div>
-                            </div>
-                          </Link>
-                        );
-                      })}
+                      {selectedGridCategory.stories.map((story) =>
+                        renderHomeMediumCard(
+                          story,
+                          `${styles.mainCategoryShelfCard} ${styles.shelfGridCard}`,
+                          'grid-category',
+                          '(max-width: 767px) 46vw, (max-width: 1180px) 23vw, 16vw'
+                        )
+                      )}
                     </div>
                   )}
                 </div>
@@ -1086,49 +1017,14 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
                         ref={(node) => setMainCategoryRailRef(group.id, node)}
                         className={styles.mainCategoryShelfRail}
                       >
-                        {group.stories.map((story) => {
-                          const isInteractiveStory = story.path_mode === 'branching';
-                          return (
-                            <Link key={`category-${group.id}-${story.id}`} href={`/story/${story.id}`} className={styles.mainCategoryShelfCard} data-gsap-card="main-category">
-                              <StoryCoverTiltFrame className={styles.mainCategoryShelfCoverWrap}>
-                                {story.cover_url || story.cover_wide_url ? (
-                                  <Image
-                                    src={story.cover_url || story.cover_wide_url || ''}
-                                    alt={story.title}
-                                    className={styles.mainCategoryShelfCover}
-                                    fill
-                                    sizes="(max-width: 767px) 48vw, (max-width: 1180px) 24vw, 16vw"
-                                  />
-                                ) : (
-                                  <div className={styles.mainCategoryShelfCoverFallback}>{story.title.slice(0, 2)}</div>
-                                )}
-                              </StoryCoverTiltFrame>
-
-                              <div className={styles.mainCategoryShelfBody}>
-                                <h4 className={styles.mainCategoryShelfTitle}>{story.title}</h4>
-                                <p className={styles.mainCategoryShelfAuthor}>{story.pen_name}</p>
-                                <div className={styles.mainCategoryShelfMetaRow}>
-                                  {isInteractiveStory ? (
-                                    <span className={styles.posterModeChip}>Interactive</span>
-                                  ) : (
-                                    <span className={styles.posterMetric}>
-                                      <List size={12} className={styles.posterMetricIcon} />
-                                      {story.published_chapter_count.toLocaleString('th-TH')} ตอน
-                                    </span>
-                                  )}
-                                  <span className={styles.posterMetric}>
-                                    <Eye size={12} className={styles.posterMetricIcon} />
-                                    {(story.total_view_count ?? 0).toLocaleString('th-TH')}
-                                  </span>
-                                  <span className={styles.posterMetric}>
-                                    <Heart size={12} className={styles.posterMetricIcon} />
-                                    {(story.total_like_count ?? 0).toLocaleString('th-TH')}
-                                  </span>
-                                </div>
-                              </div>
-                            </Link>
-                          );
-                        })}
+                        {group.stories.map((story) =>
+                          renderHomeMediumCard(
+                            story,
+                            styles.mainCategoryShelfCard,
+                            'main-category',
+                            '(max-width: 767px) 48vw, (max-width: 1180px) 24vw, 16vw'
+                          )
+                        )}
                       </div>
 
                       <button
@@ -1174,7 +1070,7 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
                 <div className={styles.editorSideList}>
                   {editorSideStories.map((story) => (
                     <Link key={`editor-side-${story.id}`} href={`/story/${story.id}`} className={styles.editorSideCard} data-gsap-card="editor">
-                      <StoryCoverTiltFrame className={styles.editorSideCoverWrap}>
+                      <CoverTiltFrame className={styles.editorSideCoverWrap}>
                         {story.cover_url || story.cover_wide_url ? (
                           <Image
                             src={story.cover_url || story.cover_wide_url || ''}
@@ -1186,7 +1082,7 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
                         ) : (
                           <div className={styles.editorSideFallback}>{story.title.slice(0, 2)}</div>
                         )}
-                      </StoryCoverTiltFrame>
+                      </CoverTiltFrame>
                       <div className={styles.editorSideBody}>
                         <h4 className={styles.editorSideTitle}>{story.title}</h4>
                         <p className={styles.editorSideDesc}>{story.synopsis || `${story.pen_name} · เรื่องที่ไม่อยากให้พลาด`}</p>

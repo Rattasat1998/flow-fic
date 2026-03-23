@@ -1345,14 +1345,16 @@
 }
 
 .pageBody {
-    padding: 1.5rem 0 4rem;
+    padding: calc(64px + 1.5rem) 0 4rem;
     display: flex;
     flex-direction: column;
     gap: 1.35rem;
 }
 
 .statePage {
-    min-height: 72vh;
+    min-height: calc(100vh - 64px);
+    padding-top: calc(64px + 1.5rem);
+    padding-bottom: 2rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1464,6 +1466,49 @@
 
 .heroTags {
     gap: 0.6rem;
+}
+
+.heroActionRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 0.2rem;
+}
+
+.heroActionBtn {
+    min-height: 44px;
+    padding: 0.72rem 1rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.08);
+    color: #f8fafc;
+    font-size: 0.92rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+    backdrop-filter: blur(10px);
+}
+
+.heroActionBtn:hover {
+    transform: translateY(-1px);
+    border-color: rgba(251, 146, 60, 0.34);
+    background: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 14px 28px rgba(2, 6, 23, 0.22);
+}
+
+.heroActionBtnPrimary {
+    border-color: transparent;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
+    color: #ffffff;
+    box-shadow: 0 14px 28px rgba(249, 115, 22, 0.2);
+}
+
+.heroActionBtnPrimary:hover {
+    border-color: transparent;
+    background: linear-gradient(135deg, var(--primary-hover) 0%, var(--primary) 100%);
 }
 
 .tagPill {
@@ -1955,7 +2000,7 @@
 
 @media (max-width: 720px) {
     .pageBody {
-        padding: 1rem 0 calc(8rem + env(safe-area-inset-bottom, 0px));
+        padding: calc(64px + 1rem) 0 calc(8rem + env(safe-area-inset-bottom, 0px));
         gap: 1rem;
     }
 
@@ -1985,6 +2030,10 @@
 
     .heroSummaryStrip {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .heroActionRow {
+        display: none;
     }
 
     .storyStatusPanel,

@@ -120,6 +120,10 @@
     gap: 0.9rem;
 }
 
+.styleGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .optionBtn {
     position: relative;
     display: flex;
@@ -241,6 +245,10 @@
     }
 
     .grid {
+        grid-template-columns: 1fr;
+    }
+
+    .styleGrid {
         grid-template-columns: 1fr;
     }
 

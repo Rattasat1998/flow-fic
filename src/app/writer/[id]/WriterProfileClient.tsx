@@ -6,7 +6,7 @@ import { BookOpen, Eye, Heart } from 'lucide-react';
 import styles from './writer.module.css';
 import { supabase } from '@/lib/supabase';
 import { BrandLogo } from '@/components/brand/BrandLogo';
-import { CompactStoryCard } from '@/components/story/CompactStoryCard';
+import { StoryMediumCard } from '@/components/story/StoryMediumCard';
 import { ShareButton } from '@/components/share/ShareButton';
 import { useTracking } from '@/hooks/useTracking';
 
@@ -50,7 +50,7 @@ type AuthorStory = {
     title: string;
     coverUrl: string;
     penName: string;
-    writingStyle: 'narrative' | 'chat' | 'thread';
+    writingStyle: 'narrative' | 'chat' | 'thread' | 'visual_novel';
     category: 'original' | 'fanfic';
     completionStatus: 'ongoing' | 'completed';
     createdAt: string | null;
@@ -64,8 +64,8 @@ type AuthorStats = {
 
 const fallbackCover = 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=600&q=80';
 
-const normalizeWritingStyle = (value: string | null | undefined): 'narrative' | 'chat' | 'thread' => {
-    if (value === 'chat' || value === 'thread') return value;
+const normalizeWritingStyle = (value: string | null | undefined): 'narrative' | 'chat' | 'thread' | 'visual_novel' => {
+    if (value === 'chat' || value === 'thread' || value === 'visual_novel') return value;
     return 'narrative';
 };
 
@@ -81,12 +81,14 @@ const categoryLabel = (value: 'original' | 'fanfic') => {
     return value === 'fanfic' ? 'แฟนฟิค' : 'ออริจินัล';
 };
 
-const writingStyleLabel = (value: 'narrative' | 'chat' | 'thread') => {
+const writingStyleLabel = (value: 'narrative' | 'chat' | 'thread' | 'visual_novel') => {
     switch (value) {
         case 'chat':
             return 'แชท';
         case 'thread':
             return 'เธรด';
+        case 'visual_novel':
+            return 'วิชวลโนเวล';
         default:
             return 'บรรยาย';
     }
@@ -356,7 +358,7 @@ export default function WriterProfileClient({ writerId }: WriterProfileClientPro
                     {stories.length > 0 ? (
                         <div className={styles.storyGrid}>
                             {stories.map((story) => (
-                                <CompactStoryCard
+                                <StoryMediumCard
                                     key={story.id}
                                     href={`/story/${story.id}`}
                                     coverUrl={story.coverUrl}
@@ -364,6 +366,7 @@ export default function WriterProfileClient({ writerId }: WriterProfileClientPro
                                     author={story.penName || author.penName}
                                     tags={[categoryLabel(story.category), writingStyleLabel(story.writingStyle)]}
                                     isCompleted={story.completionStatus === 'completed'}
+                                    imageSizes="(max-width: 720px) 44vw, 180px"
                                 />
                             ))}
                         </div>

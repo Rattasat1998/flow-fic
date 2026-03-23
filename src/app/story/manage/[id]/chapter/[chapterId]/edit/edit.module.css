@@ -264,6 +264,388 @@
     overflow-y: auto;
 }
 
+.visualNovelEditorPane {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
+    width: 100%;
+    padding-bottom: 2rem;
+    overflow: auto;
+}
+
+.visualNovelHero {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.1rem;
+    border-radius: 20px;
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.66) 0%, rgba(9, 14, 26, 0.94) 100%);
+}
+
+.visualNovelTitle {
+    margin: 0 0 0.2rem;
+    color: #f8fafc;
+    font-size: 1.15rem;
+    font-weight: 800;
+}
+
+.visualNovelLead {
+    margin: 0;
+    color: #94a3b8;
+    font-size: 0.88rem;
+    line-height: 1.6;
+}
+
+.visualNovelHeroActions {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.visualNovelPrimaryBtn,
+.visualNovelSecondaryBtn,
+.visualNovelGhostBtn,
+.visualNovelDangerBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    min-height: 40px;
+    padding: 0 0.95rem;
+    border-radius: 999px;
+    font-size: 0.84rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.visualNovelPrimaryBtn {
+    border: 1px solid rgba(251, 146, 60, 0.46);
+    background: linear-gradient(95deg, rgba(251, 146, 60, 0.94) 0%, rgba(234, 88, 12, 0.94) 100%);
+    color: #fff;
+}
+
+.visualNovelSecondaryBtn {
+    border: 1px solid rgba(103, 232, 249, 0.16);
+    background: rgba(15, 23, 42, 0.88);
+    color: #e2e8f0;
+}
+
+.visualNovelGhostBtn {
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(15, 23, 42, 0.42);
+    color: #cbd5e1;
+}
+
+.visualNovelDangerBtn {
+    border: 1px solid rgba(248, 113, 113, 0.22);
+    background: rgba(69, 10, 10, 0.42);
+    color: #fecaca;
+}
+
+.visualNovelPrimaryBtn:hover,
+.visualNovelSecondaryBtn:hover,
+.visualNovelGhostBtn:hover,
+.visualNovelDangerBtn:hover {
+    transform: translateY(-1px);
+}
+
+.visualNovelSceneList {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.visualNovelSceneCard {
+    display: flex;
+    flex-direction: column;
+    gap: 0.95rem;
+    padding: 1rem;
+    border-radius: 24px;
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    background:
+        linear-gradient(180deg, rgba(8, 13, 24, 0.98) 0%, rgba(3, 7, 18, 0.98) 100%);
+    box-shadow: 0 22px 44px rgba(2, 6, 23, 0.28);
+}
+
+.visualNovelSceneHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.visualNovelSceneEyebrow {
+    display: inline-flex;
+    margin-bottom: 0.3rem;
+    color: #7dd3fc;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.visualNovelSceneTitle {
+    margin: 0;
+    color: #f8fafc;
+    font-size: 1rem;
+    font-weight: 800;
+}
+
+.visualNovelSceneMeta {
+    color: #94a3b8;
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+
+.visualNovelStagePreview {
+    min-height: 0;
+}
+
+.visualNovelSceneCounter {
+    color: rgba(226, 232, 240, 0.76);
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.visualNovelControlGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.8rem;
+}
+
+.visualNovelControl {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    color: #cbd5e1;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.visualNovelSelect,
+.visualNovelTextarea {
+    width: 100%;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(15, 23, 42, 0.82);
+    color: #f8fafc;
+    padding: 0.72rem 0.9rem;
+    font: inherit;
+}
+
+.visualNovelSelect:focus,
+.visualNovelTextarea:focus {
+    outline: none;
+    border-color: rgba(56, 189, 248, 0.58);
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
+}
+
+.visualNovelLayoutRow,
+.visualNovelMetaGrid {
+    display: grid;
+    gap: 0.8rem;
+}
+
+.visualNovelLayoutRow {
+    grid-template-columns: auto 1fr;
+    align-items: center;
+}
+
+.visualNovelMetaGrid {
+    grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+    align-items: flex-start;
+}
+
+.visualNovelLayoutLabel {
+    color: #cbd5e1;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.visualNovelLayoutButtons {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+}
+
+.visualNovelLayoutBtn {
+    min-height: 38px;
+    padding: 0 0.95rem;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(15, 23, 42, 0.38);
+    color: #cbd5e1;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.visualNovelLayoutBtn:hover {
+    transform: translateY(-1px);
+}
+
+.visualNovelLayoutBtnActive {
+    border-color: rgba(103, 232, 249, 0.3);
+    background: rgba(8, 47, 73, 0.62);
+    color: #cffafe;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.visualNovelFocusRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.9rem;
+    min-height: 100%;
+    padding: 0.82rem 0.95rem;
+    border-radius: 18px;
+    background: rgba(15, 23, 42, 0.52);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.visualNovelFocusLabel,
+.visualNovelBackgroundLabel {
+    color: #cbd5e1;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.visualNovelFocusButtons,
+.visualNovelBackgroundActions,
+.visualNovelSceneActions {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+}
+
+.visualNovelFocusBtn {
+    min-height: 36px;
+    padding: 0 0.9rem;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(15, 23, 42, 0.38);
+    color: #cbd5e1;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.visualNovelFocusBtnActive {
+    border-color: rgba(251, 146, 60, 0.42);
+    background: rgba(154, 52, 18, 0.34);
+    color: #fed7aa;
+}
+
+.visualNovelBackgroundRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem 0.95rem;
+    border-radius: 18px;
+    background: rgba(15, 23, 42, 0.52);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.visualNovelBackgroundInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.18rem;
+}
+
+.visualNovelBackgroundValue {
+    color: #94a3b8;
+    font-size: 0.8rem;
+}
+
+.visualNovelSplitAssetGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.8rem;
+}
+
+.visualNovelSoloAssetCard,
+.visualNovelSplitAssetCard {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    padding: 0.9rem 0.95rem;
+    border-radius: 18px;
+    background: rgba(15, 23, 42, 0.52);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.visualNovelSoloAssetCard {
+    width: 100%;
+}
+
+.visualNovelSplitAssetHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.visualNovelAssetGuide {
+    display: flex;
+    flex-direction: column;
+    gap: 0.18rem;
+}
+
+.visualNovelAssetHint {
+    color: #e2e8f0;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.visualNovelAssetSubhint {
+    color: #94a3b8;
+    font-size: 0.76rem;
+    line-height: 1.5;
+}
+
+.visualNovelSplitAssetActions {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+}
+
+.visualNovelSoloMetaNote {
+    min-height: 100%;
+    padding: 0.88rem 0.95rem;
+    border-radius: 18px;
+    background: rgba(15, 23, 42, 0.46);
+    border: 1px solid rgba(148, 163, 184, 0.08);
+    color: #94a3b8;
+    font-size: 0.8rem;
+    line-height: 1.6;
+}
+
+.visualNovelDialogueField {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    color: #cbd5e1;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.visualNovelTextarea {
+    min-height: 88px;
+    line-height: 1.7;
+    resize: vertical;
+}
+
 .content {
     flex: 1;
     max-width: 800px;
@@ -3635,6 +4017,35 @@
     .content {
         border-radius: 20px;
     }
+
+    .visualNovelHero,
+    .visualNovelLayoutRow,
+    .visualNovelMetaGrid,
+    .visualNovelSplitAssetHeader,
+    .visualNovelBackgroundRow,
+    .visualNovelFocusRow,
+    .visualNovelSceneHeader {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .visualNovelHeroActions,
+    .visualNovelLayoutButtons,
+    .visualNovelSplitAssetActions,
+    .visualNovelBackgroundActions,
+    .visualNovelSceneActions {
+        justify-content: flex-start;
+    }
+
+    .visualNovelControlGrid,
+    .visualNovelMetaGrid,
+    .visualNovelSplitAssetGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .visualNovelLayoutRow {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-width: 768px) {
@@ -3656,5 +4067,10 @@
 
     .stateCard {
         padding: 1.5rem 1.15rem;
+    }
+
+    .visualNovelSceneCard {
+        padding: 0.85rem;
+        border-radius: 20px;
     }
 }

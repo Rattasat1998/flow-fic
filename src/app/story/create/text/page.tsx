@@ -22,11 +22,12 @@ type UnsplashImage = {
 
 type StoryPathMode = 'linear' | 'branching';
 type UnsplashTarget = 'cover' | 'wide';
-type CreateWritingStyle = 'narrative' | 'chat';
+type CreateWritingStyle = 'narrative' | 'chat' | 'visual_novel';
 type CreateStoryFormat = 'multi' | 'single';
 
 function parseCreateStyle(raw: string | null): CreateWritingStyle {
-    return raw === 'chat' ? 'chat' : 'narrative';
+    if (raw === 'chat' || raw === 'visual_novel') return raw;
+    return 'narrative';
 }
 
 function parseCreateFormat(raw: string | null): CreateStoryFormat {
@@ -328,8 +329,18 @@ function CreateTextForm() {
     };
 
     const mobileSubmitLabel = isSubmitting ? 'กำลังสร้าง...' : 'สร้างผลงาน';
-    const writingStyleLabel = writingStyle === 'chat' ? 'แชท' : 'บรรยาย';
+    const writingStyleLabel = writingStyle === 'chat'
+        ? 'แชท'
+        : writingStyle === 'visual_novel'
+            ? 'วิชวลโนเวล'
+            : 'บรรยาย';
     const storyFormatLabel = storyFormat === 'single' ? 'ตอนเดียวจบ' : 'หลายตอน';
+    const pageIntro = writingStyle === 'visual_novel'
+        ? 'กรอกข้อมูลสำคัญของเรื่องให้พร้อมก่อนเข้าสู่แดชบอร์ดนักเขียน เรื่องนี้จะถูกอ่านแบบฉากเต็มจอ ตัวละครซ้ายขวา และกล่องบทพูดด้านล่าง'
+        : 'กรอกข้อมูลสำคัญของเรื่องให้พร้อมก่อนเข้าสู่แดชบอร์ดนักเขียน คุณสามารถกลับมาแก้รายละเอียดเพิ่มเติมได้ภายหลัง';
+    const cardLead = writingStyle === 'visual_novel'
+        ? 'ตั้งชื่อเรื่อง เลือกภาพปก และระบุหมวดหมู่ให้พร้อมก่อนเข้าสู่โหมดเขียนฉาก visual novel'
+        : 'ตั้งชื่อเรื่อง เลือกภาพปก และระบุหมวดหมู่ให้พร้อมสำหรับการเปิดหน้าเรื่องครั้งแรก';
 
     return (
         <main className={styles.main}>
@@ -338,7 +349,7 @@ function CreateTextForm() {
                     <p className={styles.eyebrow}>Writer Setup</p>
                     <h1 className={styles.pageTitle}>ข้อมูลผลงานใหม่</h1>
                     <p className={styles.pageIntro}>
-                        กรอกข้อมูลสำคัญของเรื่องให้พร้อมก่อนเข้าสู่แดชบอร์ดนักเขียน คุณสามารถกลับมาแก้รายละเอียดเพิ่มเติมได้ภายหลัง
+                        {pageIntro}
                     </p>
                     <div className={styles.metaRow}>
                         <span className={styles.metaPill}>สไตล์ {writingStyleLabel}</span>
@@ -353,7 +364,7 @@ function CreateTextForm() {
                                 ข้อมูลผลงาน ({writingStyleLabel})
                             </h2>
                             <p className={styles.cardLead}>
-                                ตั้งชื่อเรื่อง เลือกภาพปก และระบุหมวดหมู่ให้พร้อมสำหรับการเปิดหน้าเรื่องครั้งแรก
+                                {cardLead}
                             </p>
 
                             <div className={styles.formGroup}>

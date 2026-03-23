@@ -17,7 +17,7 @@ create table if not exists public.stories (
   synopsis text,
   cover_url text,
   cover_wide_url text,
-  writing_style text not null default 'narrative', -- 'narrative' | 'chat' | 'thread'
+  writing_style text not null default 'narrative', -- 'narrative' | 'chat' | 'thread' | 'visual_novel'
   story_format text not null default 'multi', -- 'multi' | 'single'
   settings jsonb not null default '{
     "allowComments": true,

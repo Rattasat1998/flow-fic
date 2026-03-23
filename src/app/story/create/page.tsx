@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation';
 import {
     ArrowRight,
     FileText,
+    Image as ImageIcon,
     Layers3,
     ListChecks,
     MessageSquareText,
 } from 'lucide-react';
 import styles from './selection.module.css';
 
-type CreateWritingStyle = 'narrative' | 'chat';
+type CreateWritingStyle = 'narrative' | 'chat' | 'visual_novel';
 type CreateStoryFormat = 'multi' | 'single';
 
 export default function CreateSelectionPage() {
@@ -46,7 +47,7 @@ export default function CreateSelectionPage() {
                             <h3 className={styles.sectionTitle}>สไตล์งานเขียน</h3>
                         </div>
 
-                        <div className={styles.grid}>
+                        <div className={`${styles.grid} ${styles.styleGrid}`}>
                             <button
                                 type="button"
                                 aria-pressed={style === 'narrative'}
@@ -69,6 +70,18 @@ export default function CreateSelectionPage() {
                                     <MessageSquareText size={32} className={styles.icon} />
                                 </span>
                                 <span className={styles.label}>แชท</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                aria-pressed={style === 'visual_novel'}
+                                className={`${styles.optionBtn} ${style === 'visual_novel' ? styles.activeOption : ''}`}
+                                onClick={() => setStyle('visual_novel')}
+                            >
+                                <span className={styles.iconWrap}>
+                                    <ImageIcon size={32} className={styles.icon} />
+                                </span>
+                                <span className={styles.label}>วิชวลโนเวล</span>
                             </button>
                         </div>
                     </div>

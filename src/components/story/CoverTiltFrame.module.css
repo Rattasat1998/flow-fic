@@ -1,0 +1,72 @@
+.frame {
+    --story-card-tilt-x: 0deg;
+    --story-card-tilt-y: 0deg;
+    --story-card-glare-x: 50%;
+    --story-card-glare-y: 50%;
+    --story-card-glare-opacity: 0;
+    --story-card-aura-opacity: 0;
+    position: relative;
+    transform-style: preserve-3d;
+    transform-origin: center center;
+    transform: perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1);
+    will-change: transform;
+    transition: transform 300ms ease-out, box-shadow 300ms ease-out, filter 300ms ease-out;
+    isolation: isolate;
+    backface-visibility: hidden;
+}
+
+.frame[data-tilt-active="true"] {
+    transform:
+        perspective(1000px) rotateX(var(--story-card-tilt-x)) rotateY(var(--story-card-tilt-y)) scale3d(1.02, 1.02, 1.02);
+    box-shadow:
+        0 22px 34px rgba(0, 0, 0, 0.34),
+        0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+    filter: saturate(1.04);
+    z-index: 2;
+}
+
+.glare,
+.aura {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    transition: opacity 240ms ease;
+}
+
+.glare {
+    z-index: 2;
+    mix-blend-mode: screen;
+    background:
+        radial-gradient(circle at var(--story-card-glare-x) var(--story-card-glare-y),
+            rgba(255, 255, 255, 0.62) 0%,
+            rgba(255, 244, 236, 0.24) 18%,
+            rgba(255, 255, 255, 0) 58%);
+    opacity: calc(var(--story-card-glare-opacity) * 0.9);
+}
+
+.aura {
+    z-index: 1;
+    background:
+        linear-gradient(135deg,
+            rgba(255, 143, 112, 0.16) 0%,
+            rgba(255, 143, 112, 0.04) 36%,
+            rgba(99, 213, 217, 0.12) 100%);
+    opacity: calc(var(--story-card-aura-opacity) * 0.75);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .frame,
+    .frame[data-tilt-active="true"] {
+        transform: none;
+        transition: none;
+        box-shadow: none;
+        filter: none;
+    }
+
+    .glare,
+    .aura {
+        opacity: 0;
+        transition: none;
+    }
+}

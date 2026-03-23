@@ -15,6 +15,7 @@ export type ReaderProgressRow = {
 export type StoredChapterProgress = {
   scrollY?: number;
   chatNextIndex?: number;
+  visualNovelNextIndex?: number;
   anchorBlockId?: string | null;
   manualBookmarkBlockId?: string | null;
   manualBookmarkScrollY?: number;
@@ -49,6 +50,11 @@ const parseStoredChapterStates = (input: unknown): Record<string, StoredChapterP
     parsed[chapterId] = {
       scrollY: typeof raw.scrollY === 'number' ? raw.scrollY : undefined,
       chatNextIndex: typeof raw.chatNextIndex === 'number' ? raw.chatNextIndex : undefined,
+      visualNovelNextIndex: typeof raw.visualNovelNextIndex === 'number'
+        ? raw.visualNovelNextIndex
+        : typeof raw.visual_novel_next_index === 'number'
+          ? raw.visual_novel_next_index
+          : undefined,
       anchorBlockId: typeof raw.anchorBlockId === 'string'
         ? raw.anchorBlockId
         : typeof raw.anchor_block_id === 'string'

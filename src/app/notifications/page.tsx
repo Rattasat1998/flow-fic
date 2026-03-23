@@ -133,8 +133,11 @@ export default function NotificationsPage() {
                 </header>
                 <div className={`ffPageContainer ${styles.contentShell}`}>
                     <div className={styles.loginPrompt}>
-                        <Bell size={40} />
-                        <p>กรุณาเข้าสู่ระบบเพื่อดูการแจ้งเตือน</p>
+                        <div className={styles.stateIconWrap}>
+                            <Bell size={40} />
+                        </div>
+                        <p className={styles.loginPromptTitle}>กรุณาเข้าสู่ระบบเพื่อดูการแจ้งเตือน</p>
+                        <p className={styles.loginPromptDesc}>การอัปเดตตอนใหม่และกิจกรรมล่าสุดของเรื่องที่คุณติดตามจะแสดงที่หน้านี้</p>
                         <Link href="/" className={styles.loginBtn}>เข้าสู่ระบบ</Link>
                     </div>
                 </div>
@@ -149,11 +152,10 @@ export default function NotificationsPage() {
                 <div className={`ffPageContainer ${styles.headerInner}`}>
                     <div className={styles.headerLeft}>
                         <h1 className={styles.title}>
-                            <Bell size={20} /> การแจ้งเตือน
+                            <Bell size={20} className={styles.titleIcon} />
+                            <span>การแจ้งเตือน</span>
                             {unreadCount > 0 && (
-                                <span style={{ fontSize: '0.8rem', color: '#3b82f6', marginLeft: '0.35rem' }}>
-                                    ({unreadCount})
-                                </span>
+                                <span className={styles.unreadCountBadge}>{unreadCount.toLocaleString('th-TH')}</span>
                             )}
                         </h1>
                     </div>
@@ -174,7 +176,9 @@ export default function NotificationsPage() {
                     </div>
                 ) : notifications.length === 0 ? (
                     <div className={styles.emptyState}>
-                        <div className={styles.emptyIcon}>🔔</div>
+                        <div className={styles.stateIconWrap}>
+                            <div className={styles.emptyIcon}>🔔</div>
+                        </div>
                         <div className={styles.emptyTitle}>ยังไม่มีการแจ้งเตือน</div>
                         <div className={styles.emptyDesc}>เมื่อคุณติดตามเรื่องและมีตอนใหม่ จะแสดงที่นี่</div>
                     </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type FormEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Plus, Settings, BarChart2, Edit3, Image as ImageIcon, GripVertical, Trash2, X, Save, Loader2, Upload, Search } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult, DroppableProvided, DraggableProvided, DraggableStateSnapshot, DroppableStateSnapshot } from '@hello-pangea/dnd';
@@ -9,7 +9,9 @@ import { supabase } from '@/lib/supabase';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import { MAIN_CATEGORIES, SUB_CATEGORIES } from '@/lib/categories';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrandLogo } from '@/components/brand/BrandLogo';
+import { SharedNavbar } from '@/components/navigation/SharedNavbar';
+import { StorySearchPanel } from '@/components/navigation/StorySearchPanel';
+import type { DiscoveryResponse, DiscoveryStory } from '@/types/discovery';
 
 type StoryCompletionStatus = 'ongoing' | 'completed';
 type StoryPublicationStatus = 'draft' | 'published';
@@ -130,6 +132,16 @@ type MutableChapterContentBlock = Record<string, unknown> & {
     text?: string | null;
     characterId?: string | null;
     imageUrl?: string | null;
+    layoutMode?: string | null;
+    backgroundUrl?: string | null;
+    leftCharacterId?: string | null;
+    rightCharacterId?: string | null;
+    soloCharacterId?: string | null;
+    speakerCharacterId?: string | null;
+    leftSceneImageUrl?: string | null;
+    rightSceneImageUrl?: string | null;
+    soloSceneImageUrl?: string | null;
+    focusSide?: string | null;
     isFlashback?: boolean | null;
     is_flashback?: boolean | null;
 };
@@ -158,10 +170,20 @@ type MutableChapterChoice = Record<string, unknown> & {
 };
 
 type ComparableChapterBlock = {
-    type: 'paragraph' | 'image';
+    type: 'paragraph' | 'image' | 'scene';
     text: string;
     characterId: string | null;
     imageUrl: string | null;
+    layoutMode: 'stage' | 'split' | 'solo';
+    backgroundUrl: string | null;
+    leftCharacterId: string | null;
+    rightCharacterId: string | null;
+    soloCharacterId: string | null;
+    speakerCharacterId: string | null;
+    leftSceneImageUrl: string | null;
+    rightSceneImageUrl: string | null;
+    soloSceneImageUrl: string | null;
+    focusSide: 'left' | 'right' | 'none';
     isFlashback: boolean;
 };
 
@@ -275,10 +297,28 @@ const normalizeComparableContent = (rawContent: unknown): ComparableChapterConte
                     if (!item || typeof item !== 'object') return null;
                     const blockObject = item as MutableChapterContentBlock;
                     return {
-                        type: blockObject.type === 'image' ? 'image' : 'paragraph',
+                        type: blockObject.type === 'image'
+                            ? 'image'
+                            : blockObject.type === 'scene'
+                                ? 'scene'
+                                : 'paragraph',
                         text: typeof blockObject.text === 'string' ? blockObject.text : '',
                         characterId: typeof blockObject.characterId === 'string' ? blockObject.characterId : null,
                         imageUrl: typeof blockObject.imageUrl === 'string' ? blockObject.imageUrl : null,
+                        layoutMode: blockObject.layoutMode === 'split'
+                            ? 'split'
+                            : blockObject.layoutMode === 'solo'
+                                ? 'solo'
+                                : 'stage',
+                        backgroundUrl: typeof blockObject.backgroundUrl === 'string' ? blockObject.backgroundUrl : null,
+                        leftCharacterId: typeof blockObject.leftCharacterId === 'string' ? blockObject.leftCharacterId : null,
+                        rightCharacterId: typeof blockObject.rightCharacterId === 'string' ? blockObject.rightCharacterId : null,
+                        soloCharacterId: typeof blockObject.soloCharacterId === 'string' ? blockObject.soloCharacterId : null,
+                        speakerCharacterId: typeof blockObject.speakerCharacterId === 'string' ? blockObject.speakerCharacterId : null,
+                        leftSceneImageUrl: typeof blockObject.leftSceneImageUrl === 'string' ? blockObject.leftSceneImageUrl : null,
+                        rightSceneImageUrl: typeof blockObject.rightSceneImageUrl === 'string' ? blockObject.rightSceneImageUrl : null,
+                        soloSceneImageUrl: typeof blockObject.soloSceneImageUrl === 'string' ? blockObject.soloSceneImageUrl : null,
+                        focusSide: blockObject.focusSide === 'left' || blockObject.focusSide === 'right' ? blockObject.focusSide : 'none',
                         isFlashback: blockObject.isFlashback === true || blockObject.is_flashback === true,
                     } as ComparableChapterBlock;
                 })
@@ -292,6 +332,16 @@ const normalizeComparableContent = (rawContent: unknown): ComparableChapterConte
                     text: line,
                     characterId: null,
                     imageUrl: null,
+                    layoutMode: 'stage' as const,
+                    backgroundUrl: null,
+                    leftCharacterId: null,
+                    rightCharacterId: null,
+                    soloCharacterId: null,
+                    speakerCharacterId: null,
+                    leftSceneImageUrl: null,
+                    rightSceneImageUrl: null,
+                    soloSceneImageUrl: null,
+                    focusSide: 'none' as const,
                     isFlashback: false,
                 }));
         }
@@ -313,6 +363,16 @@ const normalizeComparableContent = (rawContent: unknown): ComparableChapterConte
                 text: line,
                 characterId: null,
                 imageUrl: null,
+                layoutMode: 'stage' as const,
+                backgroundUrl: null,
+                leftCharacterId: null,
+                rightCharacterId: null,
+                soloCharacterId: null,
+                speakerCharacterId: null,
+                leftSceneImageUrl: null,
+                rightSceneImageUrl: null,
+                soloSceneImageUrl: null,
+                focusSide: 'none' as const,
                 isFlashback: false,
             }));
     }
@@ -338,7 +398,13 @@ const extractCharacterIdsFromContent = (rawContent: unknown): string[] => {
     };
 
     registerCharacter(comparableContent.povCharacterId);
-    comparableContent.blocks.forEach((block) => registerCharacter(block.characterId));
+    comparableContent.blocks.forEach((block) => {
+        registerCharacter(block.characterId);
+        registerCharacter(block.leftCharacterId);
+        registerCharacter(block.rightCharacterId);
+        registerCharacter(block.soloCharacterId);
+        registerCharacter(block.speakerCharacterId);
+    });
 
     return characterIds;
 };
@@ -404,14 +470,53 @@ const getCharacterInitial = (name: string): string => {
     return firstChar ? firstChar.toLocaleUpperCase() : '?';
 };
 
+const STORY_SEARCH_PANEL_LIMIT = 8;
+
+const compareSearchStoriesByPriority = (a: DiscoveryStory, b: DiscoveryStory): number => {
+    if (b.score_7d !== a.score_7d) return b.score_7d - a.score_7d;
+    if (b.total_view_count !== a.total_view_count) return b.total_view_count - a.total_view_count;
+
+    const createdAtA = a.created_at ? Date.parse(a.created_at) : 0;
+    const createdAtB = b.created_at ? Date.parse(b.created_at) : 0;
+    const safeCreatedAtA = Number.isNaN(createdAtA) ? 0 : createdAtA;
+    const safeCreatedAtB = Number.isNaN(createdAtB) ? 0 : createdAtB;
+    return safeCreatedAtB - safeCreatedAtA;
+};
+
+const buildStorySearchPanelQuery = (query: string): string => {
+    const params = new URLSearchParams();
+    if (query) params.set('q', query);
+    params.set('focusCore', 'false');
+    params.set('limit', String(STORY_SEARCH_PANEL_LIMIT));
+    return params.toString();
+};
+
+const collectStorySearchPanelStories = (payload: DiscoveryResponse): DiscoveryStory[] => {
+    const uniqueStories = new Map<string, DiscoveryStory>();
+    [...payload.rails.trending.items, ...payload.rails.popular.items, ...payload.rails.new.items].forEach((story) => {
+        if (!uniqueStories.has(story.id)) uniqueStories.set(story.id, story);
+    });
+
+    return Array.from(uniqueStories.values())
+        .sort(compareSearchStoriesByPriority)
+        .slice(0, STORY_SEARCH_PANEL_LIMIT);
+};
+
 export default function StoryManagerPage() {
     const params = useParams();
     const router = useRouter();
     const storyId = params.id as string;
     const manageCacheKey = `flowfic_manage_${storyId}`;
     const manageScrollKey = `flowfic_manage_scroll_${storyId}`;
-    const { user, isLoading: isLoadingAuth } = useAuth();
+    const { user, isLoading: isLoadingAuth, signOut } = useAuth();
     const userId = user?.id ?? null;
+    const [topSearchInput, setTopSearchInput] = useState('');
+    const [topSearchStories, setTopSearchStories] = useState<DiscoveryStory[]>([]);
+    const [isTopSearchLoading, setIsTopSearchLoading] = useState(false);
+    const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+    const profileMenuRef = useRef<HTMLDivElement>(null);
+    const [walletCoinBalance, setWalletCoinBalance] = useState<number | null>(null);
+    const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
     const [storyData, setStoryData] = useState<ManageStory | null>(null);
     const [chapters, setChapters] = useState<ManageChapter[]>([]);
@@ -470,6 +575,100 @@ export default function StoryManagerPage() {
     const [isMounted, setIsMounted] = useState(false);
     const hasRestoredScrollRef = useRef(false);
     const statsSummaryRef = useRef<HTMLDivElement | null>(null);
+    const topSearchQuery = topSearchInput.trim();
+
+    useEffect(() => {
+        if (!userId) {
+            setUnreadNotifCount(0);
+            return;
+        }
+
+        const fetchUnread = async () => {
+            const { count } = await supabase
+                .from('notifications')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', userId)
+                .eq('is_read', false);
+
+            setUnreadNotifCount(count || 0);
+        };
+
+        void fetchUnread();
+    }, [userId]);
+
+    useEffect(() => {
+        if (!userId) {
+            setWalletCoinBalance(null);
+            return;
+        }
+
+        const fetchWalletBalance = async () => {
+            const { data } = await supabase
+                .from('wallets')
+                .select('coin_balance')
+                .eq('user_id', userId)
+                .maybeSingle();
+
+            setWalletCoinBalance(typeof data?.coin_balance === 'number' ? data.coin_balance : 0);
+        };
+
+        void fetchWalletBalance();
+    }, [userId]);
+
+    useEffect(() => {
+        let isActive = true;
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => {
+            setIsTopSearchLoading(true);
+            setTopSearchStories([]);
+
+            const loadSearchStories = async () => {
+                try {
+                    const response = await fetch(`/api/discovery?${buildStorySearchPanelQuery(topSearchQuery)}`, {
+                        signal: controller.signal,
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`DISCOVERY_HTTP_${response.status}`);
+                    }
+
+                    const payload = await response.json() as DiscoveryResponse;
+                    if (!isActive || controller.signal.aborted) return;
+
+                    setTopSearchStories(collectStorySearchPanelStories(payload));
+                } catch (error) {
+                    if (!isActive || controller.signal.aborted) return;
+                    console.error('[StoryManagerPage] search panel discovery failed:', error);
+                    setTopSearchStories([]);
+                } finally {
+                    if (!isActive || controller.signal.aborted) return;
+                    setIsTopSearchLoading(false);
+                }
+            };
+
+            void loadSearchStories();
+        }, topSearchQuery ? 140 : 0);
+
+        return () => {
+            isActive = false;
+            window.clearTimeout(timer);
+            controller.abort();
+        };
+    }, [topSearchQuery]);
+
+    useEffect(() => {
+        if (!isProfileMenuOpen) return;
+
+        const handlePointerDown = (event: PointerEvent) => {
+            const target = event.target as Node | null;
+            if (!target) return;
+            if (profileMenuRef.current?.contains(target)) return;
+            setIsProfileMenuOpen(false);
+        };
+
+        document.addEventListener('pointerdown', handlePointerDown);
+        return () => document.removeEventListener('pointerdown', handlePointerDown);
+    }, [isProfileMenuOpen]);
 
     useEffect(() => {
         setIsMounted(true);
@@ -685,7 +884,12 @@ export default function StoryManagerPage() {
     const storyTypeLabel = story?.category === 'fanfic' ? 'Fanfiction' : 'Original';
     const publicationLabel = story?.status === 'published' ? 'เผยแพร่แล้ว' : 'แบบร่าง';
     const completionLabel = story?.completionStatus === 'completed' ? 'จบแล้ว' : 'ยังไม่จบ';
-    const storyModeLabel = isBranchingStory ? 'Interactive branching' : 'Linear narrative';
+    const editorStyleLabel = editorStyle === 'chat'
+        ? 'แชท'
+        : editorStyle === 'visual_novel'
+            ? 'วิชวลโนเวล'
+            : 'บรรยาย';
+    const storyModeLabel = isBranchingStory ? 'Interactive branching' : editorStyle === 'visual_novel' ? 'Visual novel flow' : 'Linear narrative';
     const chapterCount = story?.chapters.length ?? 0;
     const totalStoryReadCount = chapters.reduce((sum, chapter) => sum + (chapter.views || 0), 0);
     const canRestoreManageScroll = isMounted && !isLoading && !!story;
@@ -1406,24 +1610,78 @@ export default function StoryManagerPage() {
         });
     };
 
+    const handleDashboardAccess = useCallback((event: ReactMouseEvent<HTMLAnchorElement>) => {
+        setIsProfileMenuOpen(false);
+
+        if (!user) {
+            event.preventDefault();
+            router.push('/');
+            return;
+        }
+
+        if (typeof window !== 'undefined' && window.location.pathname === '/dashboard') {
+            event.preventDefault();
+        }
+    }, [router, user]);
+
+    const handleOpenLogin = useCallback(() => {
+        router.push('/');
+    }, [router]);
+
+    const handleSignOut = useCallback(async () => {
+        try {
+            setIsProfileMenuOpen(false);
+            await signOut();
+            router.push('/');
+        } catch (error) {
+            console.error('[StoryManagerPage] Sign out failed:', error);
+            alert('ออกจากระบบไม่สำเร็จ กรุณาลองใหม่');
+        }
+    }, [router, signOut]);
+
+    const searchPanelContent = useMemo(
+        () => (
+            <StorySearchPanel
+                stories={topSearchStories}
+                query={topSearchQuery}
+                isLoading={isTopSearchLoading}
+            />
+        ),
+        [isTopSearchLoading, topSearchQuery, topSearchStories]
+    );
+
+    const handleTopSearchSubmit = useCallback((event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        const normalizedQuery = topSearchInput.trim();
+        if (!normalizedQuery) {
+            router.push('/');
+            return;
+        }
+        router.push(`/?q=${encodeURIComponent(normalizedQuery)}`);
+    }, [router, topSearchInput]);
+
     if (!isMounted || isLoading) {
         return (null);
     }
     if (authError) return (
         <main className={`${styles.main} ffStudioShell`}>
-            <header className={`ffStudioTopbar ${styles.header}`}>
-                <div className="ffStudioTopbarInner">
-                    <div className={`ffStudioTopbarContext ${styles.headerContext}`}>
-                        <BrandLogo href="/" size="md" className={styles.logo} />
-                        <span className={styles.headerDivider}>/</span>
-                        <div className="ffStudioTopbarCopy">
-                            <span className="ffStudioTopbarEyebrow">Story Studio</span>
-                            <span className="ffStudioTopbarTitle">จัดการเรื่อง</span>
-                            <span className="ffStudioTopbarMeta">ไม่มีสิทธิ์เข้าถึงหน้านี้</span>
-                        </div>
-                    </div>
-                </div>
-            </header>
+            <SharedNavbar
+                user={user}
+                isLoadingAuth={isLoadingAuth}
+                coinBalance={walletCoinBalance}
+                unreadNotifCount={unreadNotifCount}
+                searchValue={topSearchInput}
+                onSearchChange={setTopSearchInput}
+                onSearchSubmit={handleTopSearchSubmit}
+                searchPanel={searchPanelContent}
+                onDashboardAccess={handleDashboardAccess}
+                isProfileMenuOpen={isProfileMenuOpen}
+                profileMenuRef={profileMenuRef}
+                onToggleProfileMenu={() => setIsProfileMenuOpen((prev) => !prev)}
+                onCloseProfileMenu={() => setIsProfileMenuOpen(false)}
+                onOpenLogin={handleOpenLogin}
+                onSignOut={handleSignOut}
+            />
             <div className={`ffStudioPage ${styles.statePage}`}>
                 <div className={`ffStudioEmpty ${styles.stateCard}`}>
                     <h2 className={styles.stateTitle}>ไม่มีสิทธิ์เข้าถึง</h2>
@@ -1434,19 +1692,23 @@ export default function StoryManagerPage() {
     );
     if (!story) return (
         <main className={`${styles.main} ffStudioShell`}>
-            <header className={`ffStudioTopbar ${styles.header}`}>
-                <div className="ffStudioTopbarInner">
-                    <div className={`ffStudioTopbarContext ${styles.headerContext}`}>
-                        <BrandLogo href="/" size="md" className={styles.logo} />
-                        <span className={styles.headerDivider}>/</span>
-                        <div className="ffStudioTopbarCopy">
-                            <span className="ffStudioTopbarEyebrow">Story Studio</span>
-                            <span className="ffStudioTopbarTitle">จัดการเรื่อง</span>
-                            <span className="ffStudioTopbarMeta">ไม่พบข้อมูลเรื่องนี้</span>
-                        </div>
-                    </div>
-                </div>
-            </header>
+            <SharedNavbar
+                user={user}
+                isLoadingAuth={isLoadingAuth}
+                coinBalance={walletCoinBalance}
+                unreadNotifCount={unreadNotifCount}
+                searchValue={topSearchInput}
+                onSearchChange={setTopSearchInput}
+                onSearchSubmit={handleTopSearchSubmit}
+                searchPanel={searchPanelContent}
+                onDashboardAccess={handleDashboardAccess}
+                isProfileMenuOpen={isProfileMenuOpen}
+                profileMenuRef={profileMenuRef}
+                onToggleProfileMenu={() => setIsProfileMenuOpen((prev) => !prev)}
+                onCloseProfileMenu={() => setIsProfileMenuOpen(false)}
+                onOpenLogin={handleOpenLogin}
+                onSignOut={handleSignOut}
+            />
             <div className={`ffStudioPage ${styles.statePage}`}>
                 <div className={`ffStudioEmpty ${styles.stateCard}`}>
                     <h2 className={styles.stateTitle}>ไม่พบข้อมูลเรื่องนี้</h2>
@@ -1496,23 +1758,23 @@ export default function StoryManagerPage() {
 
     return (
         <main className={`${styles.main} ffStudioShell`}>
-            <header className={`ffStudioTopbar ${styles.header}`}>
-                <div className="ffStudioTopbarInner">
-                    <div className={`ffStudioTopbarContext ${styles.headerContext}`}>
-                        <BrandLogo href="/" size="md" className={styles.logo} />
-                        <span className={styles.headerDivider}>/</span>
-                        <div className="ffStudioTopbarCopy">
-                            <span className="ffStudioTopbarEyebrow">Story Studio</span>
-                            <span className="ffStudioTopbarTitle">{story.title}</span>
-                            <span className="ffStudioTopbarMeta">{chapterCount} ตอน · เผยแพร่แล้ว {publishedCount} ตอน</span>
-                        </div>
-                    </div>
-                    <div className={`ffStudioTopbarActions ${styles.headerActions}`}>
-                        <button className={styles.backBtn} onClick={scrollToStoryStats}><BarChart2 size={18} /> สถิติ</button>
-                        <button className={`${styles.backBtn} ${styles.headerPrimaryBtn}`} onClick={openEditModal}><Settings size={18} /> แก้ไขข้อมูล</button>
-                    </div>
-                </div>
-            </header>
+            <SharedNavbar
+                user={user}
+                isLoadingAuth={isLoadingAuth}
+                coinBalance={walletCoinBalance}
+                unreadNotifCount={unreadNotifCount}
+                searchValue={topSearchInput}
+                onSearchChange={setTopSearchInput}
+                onSearchSubmit={handleTopSearchSubmit}
+                searchPanel={searchPanelContent}
+                onDashboardAccess={handleDashboardAccess}
+                isProfileMenuOpen={isProfileMenuOpen}
+                profileMenuRef={profileMenuRef}
+                onToggleProfileMenu={() => setIsProfileMenuOpen((prev) => !prev)}
+                onCloseProfileMenu={() => setIsProfileMenuOpen(false)}
+                onOpenLogin={handleOpenLogin}
+                onSignOut={handleSignOut}
+            />
 
             <div className={`ffStudioPage ${styles.pageBody}`}>
                 <section className={styles.heroSection}>
@@ -1548,7 +1810,25 @@ export default function StoryManagerPage() {
                                         <span className={styles.tagPill}>{publicationLabel}</span>
                                         <span className={styles.tagPill}>{completionLabel}</span>
                                         <span className={styles.tagPill}>{storyModeLabel}</span>
-                                        <span className={styles.tagPill}>Editor: {editorStyle}</span>
+                                        <span className={styles.tagPill}>Editor: {editorStyleLabel}</span>
+                                    </div>
+                                    <div className={styles.heroActionRow}>
+                                        <button
+                                            type="button"
+                                            className={styles.heroActionBtn}
+                                            onClick={scrollToStoryStats}
+                                        >
+                                            <BarChart2 size={18} />
+                                            <span>สถิติ</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`${styles.heroActionBtn} ${styles.heroActionBtnPrimary}`}
+                                            onClick={openEditModal}
+                                        >
+                                            <Settings size={18} />
+                                            <span>แก้ไขข้อมูล</span>
+                                        </button>
                                     </div>
                                 </div>
                             </div>

@@ -57,7 +57,7 @@ type UserProfile = {
 };
 
 type StoryStatus = 'draft' | 'published';
-type StoryWritingStyle = 'narrative' | 'chat';
+type StoryWritingStyle = 'narrative' | 'chat' | 'visual_novel';
 type StoryPathMode = 'linear' | 'branching';
 
 type StoryMetrics = {
@@ -87,7 +87,7 @@ type DashboardStory = {
 };
 
 type StoryModeBadge = {
-    key: 'narrative' | 'chat' | 'interactive';
+    key: 'narrative' | 'chat' | 'visual_novel' | 'interactive';
     label: string;
     className: string;
 };
@@ -164,9 +164,26 @@ const collectMediaUrlsFromChapterContent = (content: unknown) => {
     if (Array.isArray(record.blocks)) {
         record.blocks.forEach((block) => {
             if (!block || typeof block !== 'object') return;
-            const imageUrl = (block as Record<string, unknown>).imageUrl;
+            const blockRecord = block as Record<string, unknown>;
+            const imageUrl = blockRecord.imageUrl;
+            const backgroundUrl = blockRecord.backgroundUrl;
+            const leftSceneImageUrl = blockRecord.leftSceneImageUrl;
+            const rightSceneImageUrl = blockRecord.rightSceneImageUrl;
+            const soloSceneImageUrl = blockRecord.soloSceneImageUrl;
             if (typeof imageUrl === 'string') {
                 urls.push(imageUrl);
+            }
+            if (typeof backgroundUrl === 'string') {
+                urls.push(backgroundUrl);
+            }
+            if (typeof leftSceneImageUrl === 'string') {
+                urls.push(leftSceneImageUrl);
+            }
+            if (typeof rightSceneImageUrl === 'string') {
+                urls.push(rightSceneImageUrl);
+            }
+            if (typeof soloSceneImageUrl === 'string') {
+                urls.push(soloSceneImageUrl);
             }
         });
     }
@@ -208,7 +225,7 @@ const isMissingWriterMetricsRpcError = (error: unknown) => {
 };
 
 const parseStoryWritingStyle = (value: string | null | undefined): StoryWritingStyle =>
-    value === 'chat' ? 'chat' : 'narrative';
+    value === 'chat' || value === 'visual_novel' ? value : 'narrative';
 
 const parseStoryPathMode = (value: string | null | undefined): StoryPathMode =>
     value === 'branching' ? 'branching' : 'linear';
@@ -219,6 +236,8 @@ const getStoryModeBadges = (
     const badges: StoryModeBadge[] = [
         story.writingStyle === 'chat'
             ? { key: 'chat', label: 'แชท', className: styles.badgeChatStyle }
+            : story.writingStyle === 'visual_novel'
+                ? { key: 'visual_novel', label: 'วิชวลโนเวล', className: styles.badgeVisualNovelStyle }
             : { key: 'narrative', label: 'บรรยาย', className: styles.badgeNarrativeStyle },
     ];
 
