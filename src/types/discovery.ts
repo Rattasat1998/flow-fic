@@ -25,6 +25,7 @@ export interface DiscoveryStory {
   category: string;
   main_category: string | null;
   sub_category: string | null;
+  writing_style: string | null;
   path_mode: 'linear' | 'branching';
   completion_status: string | null;
   created_at: string | null;

@@ -134,6 +134,7 @@ type MutableChapterContentBlock = Record<string, unknown> & {
     imageUrl?: string | null;
     layoutMode?: string | null;
     backgroundUrl?: string | null;
+    backgroundColor?: string | null;
     leftCharacterId?: string | null;
     rightCharacterId?: string | null;
     soloCharacterId?: string | null;
@@ -176,6 +177,7 @@ type ComparableChapterBlock = {
     imageUrl: string | null;
     layoutMode: 'stage' | 'split' | 'solo';
     backgroundUrl: string | null;
+    backgroundColor: string | null;
     leftCharacterId: string | null;
     rightCharacterId: string | null;
     soloCharacterId: string | null;
@@ -311,6 +313,7 @@ const normalizeComparableContent = (rawContent: unknown): ComparableChapterConte
                                 ? 'solo'
                                 : 'stage',
                         backgroundUrl: typeof blockObject.backgroundUrl === 'string' ? blockObject.backgroundUrl : null,
+                        backgroundColor: typeof blockObject.backgroundColor === 'string' ? blockObject.backgroundColor : null,
                         leftCharacterId: typeof blockObject.leftCharacterId === 'string' ? blockObject.leftCharacterId : null,
                         rightCharacterId: typeof blockObject.rightCharacterId === 'string' ? blockObject.rightCharacterId : null,
                         soloCharacterId: typeof blockObject.soloCharacterId === 'string' ? blockObject.soloCharacterId : null,
@@ -334,6 +337,7 @@ const normalizeComparableContent = (rawContent: unknown): ComparableChapterConte
                     imageUrl: null,
                     layoutMode: 'stage' as const,
                     backgroundUrl: null,
+                    backgroundColor: null,
                     leftCharacterId: null,
                     rightCharacterId: null,
                     soloCharacterId: null,
@@ -365,6 +369,7 @@ const normalizeComparableContent = (rawContent: unknown): ComparableChapterConte
                 imageUrl: null,
                 layoutMode: 'stage' as const,
                 backgroundUrl: null,
+                backgroundColor: null,
                 leftCharacterId: null,
                 rightCharacterId: null,
                 soloCharacterId: null,

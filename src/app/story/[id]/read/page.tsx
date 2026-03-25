@@ -107,6 +107,7 @@ type Block = {
   isFlashback: boolean;
   layoutMode?: VisualNovelLayoutMode;
   backgroundUrl?: string | null;
+  backgroundColor?: string | null;
   leftCharacterId?: string | null;
   rightCharacterId?: string | null;
   soloCharacterId?: string | null;
@@ -383,6 +384,11 @@ const normalizeReaderBlocks = (rawBlocks: unknown): Block[] => {
       backgroundUrl: typeof block.backgroundUrl === 'string'
         ? block.backgroundUrl
         : block.backgroundUrl === null
+          ? null
+          : undefined,
+      backgroundColor: typeof block.backgroundColor === 'string'
+        ? block.backgroundColor
+        : block.backgroundColor === null
           ? null
           : undefined,
       leftCharacterId: typeof block.leftCharacterId === 'string' ? block.leftCharacterId : null,

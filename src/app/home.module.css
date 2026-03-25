@@ -1483,6 +1483,12 @@
     letter-spacing: 0.04em;
 }
 
+.posterVisualNovelChip {
+    border-color: rgba(181, 143, 255, 0.45);
+    background: rgba(144, 98, 255, 0.16);
+    color: #d6bfff;
+}
+
 .posterMetric {
     display: inline-flex;
     align-items: center;

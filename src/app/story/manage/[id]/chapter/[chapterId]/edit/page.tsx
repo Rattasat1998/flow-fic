@@ -49,6 +49,7 @@ type Block = {
     isFlashback: boolean;
     layoutMode?: VisualNovelLayoutMode;
     backgroundUrl?: string | null;
+    backgroundColor?: string | null;
     leftCharacterId?: string | null;
     rightCharacterId?: string | null;
     soloCharacterId?: string | null;
@@ -123,6 +124,7 @@ const createEmptySceneBlock = (id: string = createBlockId('scene')): Block => ({
     isFlashback: false,
     layoutMode: 'stage',
     backgroundUrl: null,
+    backgroundColor: null,
     leftCharacterId: null,
     rightCharacterId: null,
     soloCharacterId: null,
@@ -177,6 +179,7 @@ const ensureBlocksForStyle = (rawBlocks: Block[], style: EditorStyle): Block[] =
                     speakerCharacterId: block.characterId,
                     layoutMode: 'stage' as const,
                     backgroundUrl: block.type === 'image' ? block.imageUrl || null : null,
+                    backgroundColor: block.backgroundColor || null,
                     soloCharacterId: null,
                     soloSceneImageUrl: null,
                 };
@@ -287,6 +290,11 @@ const normalizeBlocks = (rawBlocks: unknown, fallbackPrefix: string): Block[] =>
                 : blockObject.backgroundUrl === null
                     ? null
                     : undefined;
+            const backgroundColor = typeof blockObject.backgroundColor === 'string'
+                ? blockObject.backgroundColor
+                : blockObject.backgroundColor === null
+                    ? null
+                    : undefined;
             const leftCharacterId = typeof blockObject.leftCharacterId === 'string' ? blockObject.leftCharacterId : null;
             const rightCharacterId = typeof blockObject.rightCharacterId === 'string' ? blockObject.rightCharacterId : null;
             const soloCharacterId = typeof blockObject.soloCharacterId === 'string' ? blockObject.soloCharacterId : null;
@@ -317,6 +325,7 @@ const normalizeBlocks = (rawBlocks: unknown, fallbackPrefix: string): Block[] =>
                 isFlashback,
                 layoutMode: normalizeSceneLayoutMode(blockObject.layoutMode),
                 backgroundUrl,
+                backgroundColor,
                 leftCharacterId,
                 rightCharacterId,
                 soloCharacterId,
@@ -3833,6 +3842,42 @@ export default function EditChapterPage() {
                                                     </div>
                                                 </div>
                                             )}
+                                        </div>
+
+                                        <div className={styles.visualNovelColorRow}>
+                                            <div className={styles.visualNovelColorInfo}>
+                                                <span className={styles.visualNovelFocusLabel}>สีพื้นหลัง</span>
+                                            </div>
+                                            <div className={styles.visualNovelColorButtons}>
+                                                {([
+                                                    { key: 'none', label: 'ไม่มี (ใส)', color: 'transparent' },
+                                                    { key: '#020617', label: 'Slate 950', color: '#020617' },
+                                                    { key: '#000000', label: 'ดำสนิท', color: '#000000' },
+                                                    { key: '#450a0a', label: 'แดงเข้ม', color: '#450a0a' },
+                                                    { key: '#172554', label: 'น้ำเงินเข้ม', color: '#172554' },
+                                                    { key: '#3b0764', label: 'ม่วงเข้ม', color: '#3b0764' },
+                                                    { key: '#052e16', label: 'เขียวเข้ม', color: '#052e16' },
+                                                    { key: '#f8fafc', label: 'สว่าง (ขาว)', color: '#f8fafc', border: true },
+                                                ] as Array<{ key: string, label: string, color: string, border?: boolean }>).map((option) => {
+                                                    const isActive = (block.backgroundColor || null) === (option.key === 'none' ? null : option.key);
+                                                    return (
+                                                        <button
+                                                            key={option.key}
+                                                            type="button"
+                                                            className={`${styles.visualNovelColorSwatch} ${isActive ? styles.visualNovelColorSwatchActive : ''}`}
+                                                            style={{ 
+                                                                backgroundColor: option.color === 'transparent' ? '#cbd5e1' : option.color, 
+                                                                border: option.border ? '1px solid #94a3b8' : 'none' 
+                                                            }}
+                                                            onClick={() => updateBlock(block.id, { backgroundColor: option.key === 'none' ? null : option.key })}
+                                                            title={option.label}
+                                                        >
+                                                            {isActive && <div className={styles.visualNovelColorSwatchIndicator} />}
+                                                            {option.key === 'none' && !isActive && <div className={styles.visualNovelColorSwatchNoneLine} />}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
 
                                         <label className={styles.visualNovelDialogueField}>

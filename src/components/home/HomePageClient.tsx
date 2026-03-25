@@ -29,6 +29,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { WalletLedgerPanel } from '@/components/profile/WalletLedgerPanel';
 import { useHomeGsapAnimations } from '@/components/home/useHomeGsapAnimations';
+import { useHomeHeroAnimations } from '@/components/home/useHomeHeroAnimations';
 import { SharedNavbar } from '@/components/navigation/SharedNavbar';
 import { StorySearchPanel } from '@/components/navigation/StorySearchPanel';
 import { CoverTiltFrame } from '@/components/story/CoverTiltFrame';
@@ -719,7 +720,9 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
         imageSizes={imageSizes}
         footer={(
           <div className={styles.mainCategoryShelfMetaRow}>
-            {isInteractiveStory ? (
+            {story.writing_style === 'visual_novel' ? (
+              <span className={`${styles.posterModeChip} ${styles.posterVisualNovelChip}`}>Visual Novel</span>
+            ) : isInteractiveStory ? (
               <span className={styles.posterModeChip}>Interactive</span>
             ) : (
               <span className={styles.posterMetric}>
@@ -751,6 +754,8 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
     writerCtaRef: writerCtaSectionRef,
     isGridMode,
   });
+
+  useHomeHeroAnimations({ heroSectionRef: heroSectionRef, heroIndex });
 
   return (
     <main className={styles.main} ref={homeRootRef}>
@@ -807,14 +812,15 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
                     fill
                     priority={heroIndex === 0}
                     sizes="100vw"
+                    data-gsap-hero-backdrop
                   />
                 ) : (
-                  <div className={styles.heroBackdropFallback}>เรื่องเด่นประจำวัน</div>
+                  <div className={styles.heroBackdropFallback} data-gsap-hero-backdrop>เรื่องเด่นประจำวัน</div>
                 )}
 
                 <div className={styles.heroOverlay} />
 
-                <div className={styles.heroContent}>
+                <div className={styles.heroContent} data-gsap-hero-content>
                   <span className={styles.heroBadge} data-gsap-intro>เรื่องเด่นวันนี้</span>
                   <h1 className={styles.heroStoryTitle} data-gsap-intro>{heroStory.title}</h1>
                   <p className={styles.heroStoryPen} data-gsap-intro>โดย {heroStory.pen_name}</p>

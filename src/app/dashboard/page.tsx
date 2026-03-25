@@ -12,7 +12,6 @@ import {
     Bookmark,
     Plus,
     Settings,
-    X,
     Upload,
     Edit3,
     MoreVertical,
@@ -26,6 +25,7 @@ import { MAIN_CATEGORIES } from '@/lib/categories';
 import { useAuth } from '@/contexts/AuthContext';
 import { WalletLedgerPanel } from '@/components/profile/WalletLedgerPanel';
 import { SharedNavbar } from '@/components/navigation/SharedNavbar';
+import { Modal } from '@/components/ui/Modal';
 
 type DBStoryRow = {
     id: string;
@@ -263,6 +263,7 @@ export default function DashboardPage() {
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
     const profileMenuRef = useRef<HTMLDivElement>(null);
     const [activeTab, setActiveTab] = useState<'all' | string>('all');
+    const [writingStyleFilter, setWritingStyleFilter] = useState<'all' | StoryWritingStyle>('all');
     const [searchInput, setSearchInput] = useState('');
     const [debouncedSearchInput, setDebouncedSearchInput] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
@@ -300,6 +301,8 @@ export default function DashboardPage() {
     const [selectedStory, setSelectedStory] = useState<DashboardStory | null>(null);
     const [isUpdatingStoryStatus, setIsUpdatingStoryStatus] = useState<Record<string, boolean>>({});
     const [openStoryMenu, setOpenStoryMenu] = useState<StoryActionMenuState | null>(null);
+    const [storyToDelete, setStoryToDelete] = useState<DashboardStory | null>(null);
+    const [isDeletingStory, setIsDeletingStory] = useState(false);
 
     useEffect(() => {
         if (isLoadingAuth) return;
@@ -318,7 +321,7 @@ export default function DashboardPage() {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [activeTab, debouncedSearchInput]);
+    }, [activeTab, writingStyleFilter, debouncedSearchInput]);
 
     useEffect(() => {
         if (!userId) {
@@ -452,6 +455,10 @@ export default function DashboardPage() {
                 query = query.eq('main_category', activeTab);
             }
 
+            if (writingStyleFilter !== 'all') {
+                query = query.eq('writing_style', writingStyleFilter);
+            }
+
             if (debouncedSearchInput) {
                 query = query.ilike('title', `%${debouncedSearchInput}%`);
             }
@@ -480,7 +487,7 @@ export default function DashboardPage() {
         return () => {
             isActive = false;
         };
-    }, [activeTab, currentPage, debouncedSearchInput, portfolioRefreshKey, userId]);
+    }, [activeTab, writingStyleFilter, currentPage, debouncedSearchInput, portfolioRefreshKey, userId]);
 
     useEffect(() => {
         if (!userId) {
@@ -833,13 +840,16 @@ export default function DashboardPage() {
         setIsUpdatingStoryStatus((prev) => ({ ...prev, [storyId]: false }));
     };
 
-    const handleDeleteStory = async (story: DashboardStory) => {
-        if (!user) return;
-
-        const confirmed = window.confirm(`ต้องการลบเรื่อง "${story.title}" ใช่หรือไม่?\nการลบนี้ไม่สามารถย้อนกลับได้`);
-        if (!confirmed) return;
-
+    const confirmDeleteStory = (story: DashboardStory) => {
+        setStoryToDelete(story);
         setOpenStoryMenu(null);
+    };
+
+    const executeDeleteStory = async () => {
+        if (!user || !storyToDelete) return;
+
+        setIsDeletingStory(true);
+        const story = storyToDelete;
 
         const [{ data: storyRow }, { data: chapterRows }, { data: characterRows }] = await Promise.all([
             supabase
@@ -896,6 +906,7 @@ export default function DashboardPage() {
 
         if (deleteErrors.length > 0) {
             alert('ลบไฟล์รูปภาพของเรื่องไม่สำเร็จ กรุณาลองใหม่');
+            setIsDeletingStory(false);
             return;
         }
 
@@ -907,6 +918,7 @@ export default function DashboardPage() {
 
         if (error) {
             alert('ลบเรื่องไม่สำเร็จ กรุณาลองใหม่');
+            setIsDeletingStory(false);
             return;
         }
 
@@ -930,6 +942,8 @@ export default function DashboardPage() {
         }
 
         setPortfolioRefreshKey((prev) => prev + 1);
+        setStoryToDelete(null);
+        setIsDeletingStory(false);
     };
 
     const handleStoryMenuToggle = useCallback((event: ReactMouseEvent<HTMLButtonElement>, story: DashboardStory) => {
@@ -1060,6 +1074,17 @@ export default function DashboardPage() {
                                             aria-label="ค้นหานิยายจากชื่อเรื่อง"
                                         />
                                     </form>
+                                    <select
+                                        className={styles.filterSelect}
+                                        value={writingStyleFilter}
+                                        onChange={(e) => setWritingStyleFilter(e.target.value as 'all' | StoryWritingStyle)}
+                                        aria-label="ตัวกรองรูปแบบการเขียน"
+                                    >
+                                        <option value="all">ทุกรูปแบบ</option>
+                                        <option value="narrative">บรรยาย</option>
+                                        <option value="visual_novel">วิชวลโนเวล</option>
+                                        <option value="chat">แชท</option>
+                                    </select>
                                     <span className={styles.searchResultMeta}>
                                         {isStoryListLoading ? 'กำลังโหลดรายการ...' : `ผลลัพธ์ ${formatCount(filteredStoriesCount)} เรื่อง`}
                                     </span>
@@ -1226,165 +1251,157 @@ export default function DashboardPage() {
             </div>
 
             {/* Profile Modal */}
-            {isProfileModalOpen && (
-                <div className={styles.modalOverlay}>
-                    <div className={`${styles.modalContent} ${styles.profileModalWide}`}>
-                        <div className={styles.modalHeader}>
-                            <h2>ตั้งค่าโปรไฟล์นักเขียน</h2>
-                            <button className={styles.closeBtn} onClick={() => setIsProfileModalOpen(false)}>
-                                <X size={20} />
-                            </button>
+            <Modal
+                isOpen={isProfileModalOpen}
+                onClose={() => setIsProfileModalOpen(false)}
+                title="ตั้งค่าโปรไฟล์นักเขียน"
+                className={styles.profileModalWide}
+                footer={
+                    <>
+                        <button
+                            className={styles.cancelBtn}
+                            onClick={() => setIsProfileModalOpen(false)}
+                            disabled={isSavingProfile}
+                        >
+                            ยกเลิก
+                        </button>
+                        <button
+                            className={styles.saveBtn}
+                            onClick={handleSaveProfile}
+                            disabled={isSavingProfile || !editProfile.pen_name.trim()}
+                        >
+                            {isSavingProfile ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
+                        </button>
+                    </>
+                }
+            >
+                <div className={styles.avatarSection}>
+                    {avatarPreviewUrl ? (
+                        <img src={avatarPreviewUrl} alt="Preview" className={styles.avatarPreview} />
+                    ) : (
+                        <div className={styles.avatarPlaceholder}>
+                            {editProfile.pen_name.charAt(0).toUpperCase() || 'W'}
                         </div>
-                        <div className={styles.modalBody}>
-                            <div className={styles.avatarSection}>
-                                {avatarPreviewUrl ? (
-                                    <img src={avatarPreviewUrl} alt="Preview" className={styles.avatarPreview} />
-                                ) : (
-                                    <div className={styles.avatarPlaceholder}>
-                                        {editProfile.pen_name.charAt(0).toUpperCase() || 'W'}
-                                    </div>
-                                )}
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    ref={fileInputRef}
-                                    style={{ display: 'none' }}
-                                    onChange={handleAvatarChange}
-                                />
-                                <button className={styles.uploadLabel} onClick={() => fileInputRef.current?.click()}>
-                                    <Upload size={16} /> เปลี่ยนรูปโปรไฟล์
-                                </button>
-                            </div>
-
-                            <div className={styles.formGroup}>
-                                <label>นามปากกาหลัก</label>
-                                <input
-                                    type="text"
-                                    className={styles.inputField}
-                                    value={editProfile.pen_name}
-                                    onChange={(e) => setEditProfile({ ...editProfile, pen_name: e.target.value })}
-                                    placeholder="เช่น Flow Writer"
-                                />
-                            </div>
-
-                            <div className={styles.formGroup}>
-                                <label>ประวัติย่อ / Bio</label>
-                                <textarea
-                                    className={styles.textareaField}
-                                    value={editProfile.bio}
-                                    onChange={(e) => setEditProfile({ ...editProfile, bio: e.target.value })}
-                                    placeholder="เล่าเกี่ยวกับตัวคุณสั้นๆ..."
-                                    rows={3}
-                                />
-                            </div>
-
-                            <WalletLedgerPanel userId={user?.id ?? null} />
-                        </div>
-                        <div className={styles.modalFooter}>
-                            <button
-                                className={styles.cancelBtn}
-                                onClick={() => setIsProfileModalOpen(false)}
-                                disabled={isSavingProfile}
-                            >
-                                ยกเลิก
-                            </button>
-                            <button
-                                className={styles.saveBtn}
-                                onClick={handleSaveProfile}
-                                disabled={isSavingProfile || !editProfile.pen_name.trim()}
-                            >
-                                {isSavingProfile ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
-                            </button>
-                        </div>
-                    </div>
+                    )}
+                    <input
+                        type="file"
+                        accept="image/*"
+                        ref={fileInputRef}
+                        style={{ display: 'none' }}
+                        onChange={handleAvatarChange}
+                    />
+                    <button className={styles.uploadLabel} onClick={() => fileInputRef.current?.click()}>
+                        <Upload size={16} /> เปลี่ยนรูปโปรไฟล์
+                    </button>
                 </div>
-            )}
+
+                <div className={styles.formGroup}>
+                    <label>นามปากกาหลัก</label>
+                    <input
+                        type="text"
+                        className={styles.inputField}
+                        value={editProfile.pen_name}
+                        onChange={(e) => setEditProfile({ ...editProfile, pen_name: e.target.value })}
+                        placeholder="เช่น Flow Writer"
+                    />
+                </div>
+
+                <div className={styles.formGroup}>
+                    <label>ประวัติย่อ / Bio</label>
+                    <textarea
+                        className={styles.textareaField}
+                        value={editProfile.bio}
+                        onChange={(e) => setEditProfile({ ...editProfile, bio: e.target.value })}
+                        placeholder="เล่าเกี่ยวกับตัวคุณสั้นๆ..."
+                        rows={3}
+                    />
+                </div>
+
+                <WalletLedgerPanel userId={user?.id ?? null} />
+            </Modal>
 
             {/* Story Info Modal */}
-            {isStoryInfoModalOpen && selectedStory && (
-                <div className={styles.modalOverlay} onClick={() => setIsStoryInfoModalOpen(false)}>
-                    <div className={`${styles.modalContent} ${styles.storyModal}`} onClick={(e) => e.stopPropagation()}>
-                        <div className={styles.modalHeader}>
-                            <h2>รายละเอียดเรื่อง</h2>
-                            <button className={styles.closeBtn} onClick={() => setIsStoryInfoModalOpen(false)}>
-                                <X size={20} />
-                            </button>
-                        </div>
-                        <div className={styles.modalBody}>
-                            <div className={styles.storyInfoGrid}>
-                                <img src={selectedStory.coverUrl} alt="Cover" className={styles.storyInfoCover} />
-                                <div className={styles.storyInfoDetails}>
-                                    <h3 className={styles.storyInfoTitle}>{selectedStory.title}</h3>
-                                    <div className={styles.titleRow} style={{ marginBottom: '0.5rem' }}>
-                                        {selectedStory.type === 'fanfic' && <span className={styles.badgeFanfic}>Fanfic</span>}
-                                        {selectedStory.type === 'novel' && <span className={styles.badgeNovel}>Original</span>}
-                                        {selectedStory.type === 'cartoon' && <span className={styles.badgeCartoon}>Cartoon</span>}
-                                        {getStoryModeBadges(selectedStory).map((badge) => (
-                                            <span key={`selected-${badge.key}`} className={badge.className}>
-                                                {badge.label}
-                                            </span>
-                                        ))}
-                                        {selectedStory.status === 'draft' && <span className={styles.badgeDraft}>Draft</span>}
-                                        {selectedStory.completionStatus === 'completed' ? (
-                                            <span className={styles.badgeCompleted}>Completed</span>
-                                        ) : (
-                                            <span className={styles.badgeOngoing}>Ongoing</span>
-                                        )}
-                                    </div>
-
-                                    <div className={styles.storyInfoMetaGrid}>
-                                        <div className={styles.storyInfoMetaItem}>
-                                            <span className={styles.storyInfoMetaLabel}>ยอดเข้าชมรวม</span>
-                                            <span className={styles.storyInfoMetaValue}><Eye size={14} /> {formatCount(selectedStory.viewsCount)}</span>
-                                        </div>
-                                        <div className={styles.storyInfoMetaItem}>
-                                            <span className={styles.storyInfoMetaLabel}>ยอดใจรวม</span>
-                                            <span className={styles.storyInfoMetaValue}><Heart size={14} /> {formatCount(selectedStory.likesCount)}</span>
-                                        </div>
-                                        <div className={styles.storyInfoMetaItem}>
-                                            <span className={styles.storyInfoMetaLabel}>เก็บเข้าชั้น</span>
-                                            <span className={styles.storyInfoMetaValue}><Bookmark size={14} /> {formatCount(selectedStory.favoritesCount)}</span>
-                                        </div>
-                                        <div className={styles.storyInfoMetaItem}>
-                                            <span className={styles.storyInfoMetaLabel}>ความคิดเห็น</span>
-                                            <span className={styles.storyInfoMetaValue}><MessageSquare size={14} /> {formatCount(selectedStory.commentsCount)}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className={styles.storyInfoMetaItem} style={{ marginTop: '0.5rem' }}>
-                                        <span className={styles.storyInfoMetaLabel}>อัปเดตล่าสุด</span>
-                                        <span className={styles.storyInfoMetaValue}>
-                                            {selectedStory.createdAt
-                                                ? new Date(selectedStory.createdAt).toLocaleDateString('th-TH', {
-                                                    year: 'numeric',
-                                                    month: 'long',
-                                                    day: 'numeric',
-                                                })
-                                                : '-'}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {selectedStory.synopsis && (
-                                <div className={styles.storyInfoMetaItem}>
-                                    <span className={styles.storyInfoMetaLabel}>คำโปรย</span>
-                                    <div className={styles.storyInfoDesc}>
-                                        {selectedStory.synopsis}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                        <div className={styles.modalFooter}>
-                            <button type="button" className={styles.dangerBtn} onClick={() => handleDeleteStory(selectedStory)}>
+            {selectedStory && (
+                <Modal
+                    isOpen={isStoryInfoModalOpen}
+                    onClose={() => setIsStoryInfoModalOpen(false)}
+                    title="รายละเอียดเรื่อง"
+                    className={styles.storyModal}
+                    footer={
+                        <>
+                            <button type="button" className={styles.dangerBtn} onClick={() => confirmDeleteStory(selectedStory)}>
                                 <Trash2 size={16} /> ลบเรื่องนี้
                             </button>
                             <button type="button" className={styles.cancelBtn} onClick={() => setIsStoryInfoModalOpen(false)}>
                                 ปิด
                             </button>
+                        </>
+                    }
+                >
+                    <div className={styles.storyInfoGrid}>
+                        <img src={selectedStory.coverUrl} alt="Cover" className={styles.storyInfoCover} />
+                        <div className={styles.storyInfoDetails}>
+                            <h3 className={styles.storyInfoTitle}>{selectedStory.title}</h3>
+                            <div className={styles.titleRow} style={{ marginBottom: '0.5rem' }}>
+                                {selectedStory.type === 'fanfic' && <span className={styles.badgeFanfic}>Fanfic</span>}
+                                {selectedStory.type === 'novel' && <span className={styles.badgeNovel}>Original</span>}
+                                {selectedStory.type === 'cartoon' && <span className={styles.badgeCartoon}>Cartoon</span>}
+                                {getStoryModeBadges(selectedStory).map((badge) => (
+                                    <span key={`selected-${badge.key}`} className={badge.className}>
+                                        {badge.label}
+                                    </span>
+                                ))}
+                                {selectedStory.status === 'draft' && <span className={styles.badgeDraft}>Draft</span>}
+                                {selectedStory.completionStatus === 'completed' ? (
+                                    <span className={styles.badgeCompleted}>Completed</span>
+                                ) : (
+                                    <span className={styles.badgeOngoing}>Ongoing</span>
+                                )}
+                            </div>
+
+                            <div className={styles.storyInfoMetaGrid}>
+                                <div className={styles.storyInfoMetaItem}>
+                                    <span className={styles.storyInfoMetaLabel}>ยอดเข้าชมรวม</span>
+                                    <span className={styles.storyInfoMetaValue}><Eye size={14} /> {formatCount(selectedStory.viewsCount)}</span>
+                                </div>
+                                <div className={styles.storyInfoMetaItem}>
+                                    <span className={styles.storyInfoMetaLabel}>ยอดใจรวม</span>
+                                    <span className={styles.storyInfoMetaValue}><Heart size={14} /> {formatCount(selectedStory.likesCount)}</span>
+                                </div>
+                                <div className={styles.storyInfoMetaItem}>
+                                    <span className={styles.storyInfoMetaLabel}>เก็บเข้าชั้น</span>
+                                    <span className={styles.storyInfoMetaValue}><Bookmark size={14} /> {formatCount(selectedStory.favoritesCount)}</span>
+                                </div>
+                                <div className={styles.storyInfoMetaItem}>
+                                    <span className={styles.storyInfoMetaLabel}>ความคิดเห็น</span>
+                                    <span className={styles.storyInfoMetaValue}><MessageSquare size={14} /> {formatCount(selectedStory.commentsCount)}</span>
+                                </div>
+                            </div>
+
+                            <div className={styles.storyInfoMetaItem} style={{ marginTop: '0.5rem' }}>
+                                <span className={styles.storyInfoMetaLabel}>อัปเดตล่าสุด</span>
+                                <span className={styles.storyInfoMetaValue}>
+                                    {selectedStory.createdAt
+                                        ? new Date(selectedStory.createdAt).toLocaleDateString('th-TH', {
+                                            year: 'numeric',
+                                            month: 'long',
+                                            day: 'numeric',
+                                        })
+                                        : '-'}
+                                </span>
+                            </div>
                         </div>
                     </div>
-                </div>
+
+                    {selectedStory.synopsis && (
+                        <div className={styles.storyInfoMetaItem}>
+                            <span className={styles.storyInfoMetaLabel}>คำโปรย</span>
+                            <div className={styles.storyInfoDesc}>
+                                {selectedStory.synopsis}
+                            </div>
+                        </div>
+                    )}
+                </Modal>
             )}
 
             {openStoryMenu && typeof document !== 'undefined' && createPortal(
@@ -1407,13 +1424,45 @@ export default function DashboardPage() {
                     <button
                         type="button"
                         className={`${styles.storyActionMenuItem} ${styles.storyActionMenuItemDanger}`}
-                        onClick={() => handleDeleteStory(openStoryMenu.story)}
+                        onClick={() => confirmDeleteStory(openStoryMenu.story)}
                     >
                         ลบ
                     </button>
                 </div>,
                 document.body
             )}
+
+            {/* Delete Confirmation Modal */}
+            <Modal
+                isOpen={!!storyToDelete}
+                onClose={() => setStoryToDelete(null)}
+                title={<h2 style={{ color: '#fecdd3' }}>ยืนยันการลบเรื่อง</h2>}
+                className={styles.deleteModal}
+                disableClose={isDeletingStory}
+                footer={
+                    <>
+                        <button
+                            className={styles.cancelBtn}
+                            onClick={() => setStoryToDelete(null)}
+                            disabled={isDeletingStory}
+                        >
+                            ยกเลิก
+                        </button>
+                        <button
+                            className={styles.dangerBtn}
+                            onClick={executeDeleteStory}
+                            disabled={isDeletingStory}
+                        >
+                            {isDeletingStory ? 'กำลังลบข้อมูล...' : 'ใช่, ยืนยันการลบ'}
+                        </button>
+                    </>
+                }
+            >
+                <p className={styles.modalBodyText} style={{ marginBottom: '1rem', lineHeight: 1.6 }}>
+                    คุณกำลังจะลบเรื่อง <strong>&quot;{storyToDelete?.title}&quot;</strong><br />
+                    <span style={{ color: 'rgba(239, 68, 68, 0.9)' }}>การกระทำนี้ไม่สามารถย้อนกลับได้ ข้อมูลตอนทั้งหมด รูปโปรไฟล์ตัวละคร และคอมเมนต์จะถูกลบถาวร</span>
+                </p>
+            </Modal>
         </main>
     );
 }

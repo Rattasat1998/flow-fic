@@ -16,6 +16,7 @@ type VisualNovelLayoutMode = 'stage' | 'split' | 'solo';
 type VisualNovelSceneLike = {
     layoutMode?: VisualNovelLayoutMode;
     backgroundUrl?: string | null;
+    backgroundColor?: string | null;
     leftCharacterId?: string | null;
     rightCharacterId?: string | null;
     soloCharacterId?: string | null;
@@ -188,11 +189,29 @@ export function VisualNovelStage({
         </div>
     );
 
+    const backgroundStyle = useMemo(() => {
+        const styles: React.CSSProperties = {};
+        
+        if (backgroundUrl) {
+            styles.backgroundImage = `url(${backgroundUrl})`;
+            styles.backgroundColor = scene.backgroundColor || undefined;
+        } else if (scene.backgroundColor) {
+            styles.backgroundColor = scene.backgroundColor;
+            // Add a subtle overlay gradient to maintain the "Scene" look but let the color show
+            styles.backgroundImage = 'linear-gradient(180deg, rgba(2, 6, 23, 0.12) 0%, rgba(2, 6, 23, 0.34) 100%)';
+        }
+        
+        return styles;
+    }, [backgroundUrl, scene.backgroundColor]);
+
     return (
         <section className={stageClassName}>
             {effectiveLayoutMode === 'split' ? (
                 <>
-                    <div className={styles.splitBackdrop} />
+                    <div 
+                        className={styles.splitBackdrop} 
+                        style={scene.backgroundColor ? { backgroundColor: scene.backgroundColor, backgroundImage: 'none' } : undefined}
+                    />
                     <div className={styles.splitLayer}>
                         {renderSplitPanel('left', leftCharacter, scene.leftSceneImageUrl)}
                         {renderSplitPanel('right', rightCharacter, scene.rightSceneImageUrl)}
@@ -201,14 +220,17 @@ export function VisualNovelStage({
                 </>
             ) : effectiveLayoutMode === 'solo' ? (
                 <>
-                    <div className={styles.soloBackdrop} />
+                    <div 
+                        className={styles.soloBackdrop} 
+                        style={scene.backgroundColor ? { backgroundColor: scene.backgroundColor, backgroundImage: 'none' } : undefined}
+                    />
                     {renderSoloPanel(soloCharacter, scene.soloSceneImageUrl)}
                 </>
             ) : (
                 <>
                     <div
                         className={styles.background}
-                        style={backgroundUrl ? { backgroundImage: `url(${backgroundUrl})` } : undefined}
+                        style={backgroundStyle}
                     />
                     <div className={styles.backgroundShade} />
                     <div className={styles.ambientGlow} />
