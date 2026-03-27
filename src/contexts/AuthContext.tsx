@@ -8,8 +8,8 @@ interface AuthContextType {
     user: User | null;
     session: Session | null;
     isLoading: boolean;
-    signInWithFacebook: () => Promise<void>;
-    signInWithGoogle: () => Promise<void>;
+    signInWithFacebook: (nextPath?: string) => Promise<void>;
+    signInWithGoogle: (nextPath?: string) => Promise<void>;
     signOut: () => Promise<void>;
 }
 
@@ -96,17 +96,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
     }, []);
 
-    const getOAuthRedirectUrl = useCallback(() => {
+    const getOAuthRedirectUrl = useCallback((nextPath = '/') => {
         if (typeof window === 'undefined') return undefined;
-        return `${window.location.origin}/auth/callback`;
+        const normalizedNextPath = nextPath.startsWith('/') && !nextPath.startsWith('//') ? nextPath : '/';
+        const redirectUrl = new URL('/auth/callback', window.location.origin);
+        redirectUrl.searchParams.set('next', normalizedNextPath);
+        return redirectUrl.toString();
     }, []);
 
-    const signInWithFacebook = useCallback(async () => {
+    const signInWithFacebook = useCallback(async (nextPath = '/') => {
         try {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'facebook',
                 options: {
-                    redirectTo: getOAuthRedirectUrl(),
+                    redirectTo: getOAuthRedirectUrl(nextPath),
                     scopes: 'email,public_profile',
                 },
             });
@@ -117,12 +120,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     }, [getOAuthRedirectUrl]);
 
-    const signInWithGoogle = useCallback(async () => {
+    const signInWithGoogle = useCallback(async (nextPath = '/') => {
         try {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: getOAuthRedirectUrl(),
+                    redirectTo: getOAuthRedirectUrl(nextPath),
                 },
             });
             if (error) throw error;

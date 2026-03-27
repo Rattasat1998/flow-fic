@@ -24,6 +24,7 @@ import { SharedNavbar } from '@/components/navigation/SharedNavbar';
 import navbarStyles from '@/components/navigation/SharedNavbar.module.css';
 import { StorySearchPanel } from '@/components/navigation/StorySearchPanel';
 import { StoryMediumCard } from '@/components/story/StoryMediumCard';
+import { useTracking } from '@/hooks/useTracking';
 import type {
   DiscoveryFilters,
   DiscoveryRailKey,
@@ -123,6 +124,7 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoading: isLoadingAuth, signOut } = useAuth();
+  const { trackEvent } = useTracking({ autoPageView: true, pagePath: '/' });
   const userId = user?.id ?? null;
 
   const [authError, setAuthError] = useState<string | null>(null);
@@ -142,6 +144,8 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
   const editorSectionRef = useRef<HTMLElement | null>(null);
   const writerCtaSectionRef = useRef<HTMLElement | null>(null);
   const subCategoryRailRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const lastTrackedSearchRef = useRef<string | null>(null);
+  const hasInitializedSearchTrackingRef = useRef(false);
 
   // Profile Settings State
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -439,6 +443,33 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
     return () => window.removeEventListener('keydown', handleSearchShortcut);
   }, []);
 
+  useEffect(() => {
+    const normalizedQuery = searchInput.trim().replace(/\s+/g, ' ');
+    if (!hasInitializedSearchTrackingRef.current) {
+      hasInitializedSearchTrackingRef.current = true;
+      lastTrackedSearchRef.current = normalizedQuery;
+      return;
+    }
+
+    const shouldTrackSearch = normalizedQuery.length === 0 || normalizedQuery.length >= 2;
+    if (!shouldTrackSearch) return;
+    if (normalizedQuery === lastTrackedSearchRef.current) return;
+
+    const timeoutId = window.setTimeout(() => {
+      if (normalizedQuery === lastTrackedSearchRef.current) return;
+      lastTrackedSearchRef.current = normalizedQuery;
+      trackEvent('filter_change', '/', {
+        metadata: {
+          source: 'home_nav_search',
+          has_query: normalizedQuery.length > 0,
+          query_length: normalizedQuery.length,
+        },
+      });
+    }, 600);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [searchInput, trackEvent]);
+
   const pushLoginPage = useCallback((nextPath: string) => {
     router.push(`/login?next=${encodeURIComponent(nextPath)}`);
   }, [router]);
@@ -453,6 +484,12 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
   const handleDashboardAccess = (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (isLoadingAuth) {
       event.preventDefault();
+      trackEvent('dashboard_access_blocked', '/', {
+        metadata: {
+          source: 'home_navbar_dashboard',
+          blocked_reason: 'auth_loading',
+        },
+      });
       setAuthError(null);
       setDashboardAuthDialogTitle('กำลังตรวจสอบสถานะการเข้าสู่ระบบ');
       setDashboardAuthDialogMessage('กำลังตรวจสอบสถานะการเข้าสู่ระบบ กรุณาลองอีกครั้ง');
@@ -469,6 +506,12 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
     }
 
     event.preventDefault();
+    trackEvent('dashboard_access_blocked', '/', {
+      metadata: {
+        source: 'home_navbar_dashboard',
+        blocked_reason: 'unauthenticated',
+      },
+    });
     setAuthError(null);
     setDashboardAuthDialogTitle('เข้าสู่ระบบก่อนเข้าแดชบอร์ดนักเขียน');
     setDashboardAuthDialogMessage('เข้าสู่ระบบเพื่อดูสถิติ จัดการเรื่อง และตั้งค่าการเผยแพร่ในแดชบอร์ดนักเขียน');

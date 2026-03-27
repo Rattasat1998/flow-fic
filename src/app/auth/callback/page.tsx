@@ -4,10 +4,18 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
+const normalizeNextPath = (value: string | null): string => {
+    if (!value) return '/';
+    if (!value.startsWith('/')) return '/';
+    if (value.startsWith('//')) return '/';
+    return value;
+};
+
 function AuthCallbackContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const nextPath = normalizeNextPath(searchParams.get('next'));
 
     useEffect(() => {
         const handleAuthCallback = async () => {
@@ -26,11 +34,11 @@ function AuthCallbackContent() {
                 }
             }
 
-            router.replace('/');
+            router.replace(nextPath);
         };
 
         handleAuthCallback();
-    }, [router, searchParams]);
+    }, [nextPath, router, searchParams]);
 
     if (errorMessage) {
         return (

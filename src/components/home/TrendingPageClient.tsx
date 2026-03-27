@@ -8,6 +8,7 @@ import { SharedNavbar } from '@/components/navigation/SharedNavbar';
 import { StoryMediumCard } from '@/components/story/StoryMediumCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useTracking } from '@/hooks/useTracking';
 import type { DiscoveryStory } from '@/types/discovery';
 
 import styles from '@/components/home/HomeListPage.module.css';
@@ -21,6 +22,14 @@ type TrendingPageClientProps = {
 export default function TrendingPageClient({ initialStories, currentPage, limit }: TrendingPageClientProps) {
     const router = useRouter();
     const { user, isLoading: isLoadingAuth, signOut } = useAuth();
+    useTracking({
+        autoPageView: true,
+        pagePath: '/trending',
+        autoMeta: {
+            page_type: 'trending',
+            page: currentPage,
+        },
+    });
     const userId = user?.id ?? null;
 
     const [walletCoinBalance, setWalletCoinBalance] = useState<number | null>(null);

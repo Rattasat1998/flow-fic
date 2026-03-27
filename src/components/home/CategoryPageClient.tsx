@@ -8,6 +8,7 @@ import { SharedNavbar } from '@/components/navigation/SharedNavbar';
 import { StoryMediumCard } from '@/components/story/StoryMediumCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useTracking } from '@/hooks/useTracking';
 import type { DiscoveryStory } from '@/types/discovery';
 
 import styles from '@/components/home/HomeListPage.module.css';
@@ -23,6 +24,15 @@ type CategoryPageClientProps = {
 export default function CategoryPageClient({ initialStories, categoryId, categoryLabel, currentPage, limit }: CategoryPageClientProps) {
     const router = useRouter();
     const { user, isLoading: isLoadingAuth, signOut } = useAuth();
+    useTracking({
+        autoPageView: true,
+        pagePath: `/category/${categoryId}`,
+        autoMeta: {
+            page_type: 'category',
+            category_id: categoryId,
+            page: currentPage,
+        },
+    });
     const userId = user?.id ?? null;
 
     const [walletCoinBalance, setWalletCoinBalance] = useState<number | null>(null);

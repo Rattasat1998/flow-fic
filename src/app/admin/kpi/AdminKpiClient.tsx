@@ -60,10 +60,19 @@ const EVENT_LABELS: Record<string, string> = {
   chapter_read: 'อ่านตอน',
   choice_select: 'เลือกเส้นทาง',
   pricing_view: 'ดูราคา',
+  pricing_checkout_start: 'เริ่มชำระเงิน',
+  pricing_checkout_redirect: 'ไปหน้าชำระเงิน',
+  pricing_checkout_failed: 'ชำระเงินไม่สำเร็จ',
   chapter_unlock: 'ปลดล็อกตอน',
   like: 'กดถูกใจ',
   favorite: 'เพิ่มรายการโปรด',
   comment: 'คอมเมนต์',
+  filter_change: 'ค้นหา/กรอง',
+  auth_login_attempt: 'พยายามเข้าสู่ระบบ',
+  auth_login_success: 'เข้าสู่ระบบสำเร็จ',
+  auth_login_failed: 'เข้าสู่ระบบไม่สำเร็จ',
+  auth_oauth_start: 'เริ่ม OAuth',
+  dashboard_access_blocked: 'เข้าแดชบอร์ดถูกบล็อก',
   web_vitals: 'คุณภาพหน้าเว็บ',
 };
 
@@ -392,4 +401,3 @@ export default function AdminKpiClient() {
     </div>
   );
 }
-

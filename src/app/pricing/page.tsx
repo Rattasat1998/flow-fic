@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Check, Sparkles, Coins } from 'lucide-react';
 import styles from './pricing.module.css';
@@ -16,11 +16,32 @@ type VipEntitlementRow = {
 
 type CoinPaymentMethod = 'card' | 'promptpay';
 
+const getCheckoutReasonCode = (error: unknown): string => {
+    if (!(error instanceof Error)) return 'unknown';
+
+    const normalizedMessage = error.message.toLowerCase();
+    const codeMatch = error.message.match(/\(([^()]+)\)\s*$/);
+    if (codeMatch?.[1]) return codeMatch[1].toLowerCase();
+
+    if (normalizedMessage.includes('ไม่พบเซสชันผู้ใช้') || normalizedMessage.includes('เซสชันหมดอายุ')) {
+        return 'session_invalid';
+    }
+    if (normalizedMessage.includes('ขาดค่า supabase environment')) {
+        return 'config_missing';
+    }
+    if (normalizedMessage.includes('สร้างลิงก์ชำระเงินไม่สำเร็จ')) {
+        return 'checkout_create_failed';
+    }
+
+    return 'unknown';
+};
+
 function PricingContent() {
     const { user } = useAuth();
     const userId = user?.id ?? null;
     const searchParams = useSearchParams();
-    useTracking({ autoPageView: true, pagePath: '/pricing' });
+    const { trackEvent } = useTracking();
+    const hasTrackedPricingViewRef = useRef(false);
 
     const [coinBalance, setCoinBalance] = useState(0);
     const [vipEntitlement, setVipEntitlement] = useState<VipEntitlementRow | null>(null);
@@ -30,6 +51,12 @@ function PricingContent() {
     const [checkoutDialogState, setCheckoutDialogState] = useState<'success' | 'failed' | null>(null);
 
     const checkoutStatus = searchParams.get('checkout');
+
+    useEffect(() => {
+        if (hasTrackedPricingViewRef.current) return;
+        hasTrackedPricingViewRef.current = true;
+        trackEvent('pricing_view', '/pricing');
+    }, [trackEvent]);
 
     const fetchWalletData = useCallback(async () => {
         setIsLoadingEntitlement(true);
@@ -103,8 +130,17 @@ function PricingContent() {
             return;
         }
 
+        const checkoutMetadata = {
+            kind: payload.kind,
+            package_id: payload.packageId,
+            payment_method: payload.paymentMethod,
+        };
+
         setCheckoutError(null);
         setIsCheckoutLoading(loadingKey);
+        trackEvent('pricing_checkout_start', '/pricing', {
+            metadata: checkoutMetadata,
+        });
         try {
             const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
             if (sessionError) {
@@ -152,6 +188,9 @@ function PricingContent() {
             }
 
             if (result.checkoutUrl) {
+                trackEvent('pricing_checkout_redirect', '/pricing', {
+                    metadata: checkoutMetadata,
+                });
                 window.location.href = result.checkoutUrl;
                 return;
             }
@@ -168,6 +207,12 @@ function PricingContent() {
             }
             throw new Error(result.error || 'สร้างลิงก์ชำระเงินไม่สำเร็จ');
         } catch (error) {
+            trackEvent('pricing_checkout_failed', '/pricing', {
+                metadata: {
+                    ...checkoutMetadata,
+                    reason_code: getCheckoutReasonCode(error),
+                },
+            });
             setCheckoutError(error instanceof Error ? error.message : 'เกิดข้อผิดพลาดในการสร้างรายการชำระเงิน');
             setIsCheckoutLoading(null);
         }

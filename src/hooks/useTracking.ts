@@ -7,6 +7,16 @@ import { getOrCreateTrackingSessionId } from '@/lib/trackingSession';
 
 // ─── Types ────────────────────────────────────────────
 export interface TrackingMetadata {
+    source?: string;
+    reason_code?: string;
+    provider?: string;
+    page_type?: string;
+    category_id?: string;
+    page?: number;
+    has_query?: boolean;
+    query_length?: number;
+    package_id?: string;
+    blocked_reason?: string;
     referrer?: string;
     search_query?: string;
     category_filter?: string;
@@ -33,12 +43,20 @@ export type EventType =
     | 'story_view'
     | 'chapter_read'
     | 'pricing_view'
+    | 'pricing_checkout_start'
+    | 'pricing_checkout_redirect'
+    | 'pricing_checkout_failed'
     | 'chapter_unlock'
     | 'choice_select'
     | 'like'
     | 'favorite'
     | 'comment'
     | 'filter_change'
+    | 'auth_login_attempt'
+    | 'auth_login_success'
+    | 'auth_login_failed'
+    | 'auth_oauth_start'
+    | 'dashboard_access_blocked'
     | 'web_vitals';
 
 // ─── Device metadata helper ────────────────────────────
