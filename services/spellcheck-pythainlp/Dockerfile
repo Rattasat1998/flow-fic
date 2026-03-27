@@ -9,9 +9,6 @@ COPY services/spellcheck-pythainlp/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 COPY services/spellcheck-pythainlp/app ./app
 
-
-COPY app ./app
-
 ENV PORT=8000
 EXPOSE 8000
 
