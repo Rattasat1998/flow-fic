@@ -317,8 +317,9 @@ export function ReaderLibraryPage({ kind }: { kind: ReaderLibraryKind }) {
     }, []);
 
     const handleOpenLogin = useCallback(() => {
-        router.push('/');
-    }, [router]);
+        const nextPath = kind === 'bookshelf' ? '/bookshelf' : '/loves';
+        router.push(`/login?next=${encodeURIComponent(nextPath)}`);
+    }, [kind, router]);
 
     const handleSignOut = useCallback(async () => {
         try {

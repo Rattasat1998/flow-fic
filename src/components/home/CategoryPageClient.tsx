@@ -91,7 +91,7 @@ export default function CategoryPageClient({ initialStories, categoryId, categor
                 onCloseProfileMenu={() => setIsProfileMenuOpen(false)}
                 onDashboardAccess={() => {}}
                 onSignOut={handleSignOut}
-                onOpenLogin={() => router.push('/')}
+                onOpenLogin={() => router.push(`/login?next=${encodeURIComponent(`/category/${categoryId}`)}`)}
                 lovesLabel="รักเลย"
             />
 

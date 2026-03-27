@@ -1,6 +1,6 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Heart, Settings, List, Eye } from 'lucide-react';
@@ -120,8 +120,9 @@ type HomePageClientProps = {
 };
 
 export default function HomePageClient({ initialDiscovery }: HomePageClientProps) {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, isLoading: isLoadingAuth, signInWithFacebook, signInWithGoogle, signOut } = useAuth();
+  const { user, isLoading: isLoadingAuth, signOut } = useAuth();
   const userId = user?.id ?? null;
 
   const [authError, setAuthError] = useState<string | null>(null);
@@ -438,25 +439,9 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
     return () => window.removeEventListener('keydown', handleSearchShortcut);
   }, []);
 
-  const handleGoogleSignIn = async () => {
-    setAuthError(null);
-    try {
-      await signInWithGoogle();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Google login failed';
-      setAuthError(message);
-    }
-  };
-
-  const handleFacebookSignIn = async () => {
-    setAuthError(null);
-    try {
-      await signInWithFacebook();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Facebook login failed';
-      setAuthError(message);
-    }
-  };
+  const pushLoginPage = useCallback((nextPath: string) => {
+    router.push(`/login?next=${encodeURIComponent(nextPath)}`);
+  }, [router]);
 
   const handleCloseDashboardAuthDialog = () => {
     setIsDashboardAuthDialogOpen(false);
@@ -491,13 +476,12 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
     setIsProfileMenuOpen(false);
   };
 
-  const handleOpenLoginDialog = () => {
+  const handleOpenLoginPage = useCallback(() => {
     setAuthError(null);
-    setDashboardAuthDialogTitle('เข้าสู่ระบบ FlowFic');
-    setDashboardAuthDialogMessage('เข้าสู่ระบบเพื่อบันทึกชั้นหนังสือ กดหัวใจ และปลดล็อกฟีเจอร์นักเขียน');
-    setIsDashboardAuthDialogOpen(true);
+    setIsDashboardAuthDialogOpen(false);
     setIsProfileMenuOpen(false);
-  };
+    pushLoginPage('/');
+  }, [pushLoginPage]);
 
   const heroStories = useMemo(() => {
     const candidates = [...rails.trending.items, ...rails.popular.items, ...rails.new.items];
@@ -775,7 +759,7 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
         profileMenuRef={profileMenuRef}
         onToggleProfileMenu={() => setIsProfileMenuOpen((prev) => !prev)}
         onCloseProfileMenu={() => setIsProfileMenuOpen(false)}
-        onOpenLogin={handleOpenLoginDialog}
+        onOpenLogin={handleOpenLoginPage}
         onSignOut={handleSignOut}
         lovesLabel="รักเลย"
         profileExtraAction={(
@@ -832,7 +816,7 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
             sideStories={editorSideStories}
           />
 
-          <WriterCtaSection sectionRef={writerCtaSectionRef} user={user} onOpenLogin={handleOpenLoginDialog} />
+          <WriterCtaSection sectionRef={writerCtaSectionRef} user={user} onOpenLogin={handleOpenLoginPage} />
         </div>
 
       </div>
@@ -860,8 +844,7 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
         isLoadingAuth={isLoadingAuth}
         isLoggedIn={Boolean(user)}
         onClose={handleCloseDashboardAuthDialog}
-        onGoogleSignIn={handleGoogleSignIn}
-        onFacebookSignIn={handleFacebookSignIn}
+        onOpenLoginPage={() => pushLoginPage('/dashboard')}
       />
     </main>
   );

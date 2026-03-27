@@ -1662,8 +1662,8 @@ export default function StoryManagerPage() {
     }, [router, user]);
 
     const handleOpenLogin = useCallback(() => {
-        router.push('/');
-    }, [router]);
+        router.push(`/login?next=${encodeURIComponent(`/story/manage/${storyId}`)}`);
+    }, [router, storyId]);
 
     const handleSignOut = useCallback(async () => {
         try {

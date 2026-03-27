@@ -1,0 +1,135 @@
+.main {
+    min-height: 100dvh;
+    display: grid;
+    place-items: center;
+    padding: 1.2rem;
+    background:
+        radial-gradient(circle at 12% 8%, rgba(14, 165, 233, 0.14), transparent 36%),
+        radial-gradient(circle at 86% 82%, rgba(249, 115, 22, 0.16), transparent 40%),
+        linear-gradient(180deg, #030712 0%, #060f1f 100%);
+}
+
+.card {
+    width: min(100%, 420px);
+    border-radius: 20px;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(2, 6, 23, 0.95));
+    box-shadow: 0 26px 56px rgba(2, 6, 23, 0.5);
+    padding: 1.25rem;
+}
+
+.brand {
+    color: #fb923c;
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0.45rem;
+}
+
+.title {
+    margin: 0;
+    color: #f8fafc;
+    font-size: 1.46rem;
+    font-weight: 800;
+}
+
+.subtitle {
+    margin: 0.45rem 0 1rem;
+    color: #93c5fd;
+    font-size: 0.88rem;
+    line-height: 1.55;
+}
+
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.field span {
+    color: #cbd5e1;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.field input {
+    width: 100%;
+    border-radius: 11px;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    background: rgba(15, 23, 42, 0.76);
+    color: #f8fafc;
+    font-size: 0.9rem;
+    padding: 0.62rem 0.72rem;
+}
+
+.field input:focus {
+    outline: none;
+    border-color: rgba(249, 115, 22, 0.55);
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.16);
+}
+
+.error {
+    margin: 0;
+    color: #fca5a5;
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+
+.submit {
+    border: none;
+    border-radius: 11px;
+    min-height: 42px;
+    background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+    color: #fff;
+    font-size: 0.88rem;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.42rem;
+    cursor: pointer;
+}
+
+.submit:disabled {
+    opacity: 0.72;
+    cursor: not-allowed;
+}
+
+.spinner {
+    animation: spin 1s linear infinite;
+}
+
+.footer {
+    margin-top: 0.9rem;
+    display: flex;
+    justify-content: center;
+}
+
+.link {
+    color: #93c5fd;
+    font-size: 0.84rem;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.link:hover {
+    color: #bfdbfe;
+    text-decoration: underline;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}

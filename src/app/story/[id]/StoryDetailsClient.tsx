@@ -304,8 +304,6 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
     const {
         user,
         isLoading: isLoadingAuth,
-        signInWithGoogle,
-        signInWithFacebook,
         signOut,
     } = useAuth();
     const userId = user?.id ?? null;
@@ -345,7 +343,6 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
     const [isTopSearchLoading, setIsTopSearchLoading] = useState(false);
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
     const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
-    const [isAuthActionLoading, setIsAuthActionLoading] = useState(false);
     const [authError, setAuthError] = useState<string | null>(null);
     const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
@@ -756,7 +753,6 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
         const timer = window.setTimeout(() => {
             setIsAuthDialogOpen(false);
             setAuthError(null);
-            setIsAuthActionLoading(false);
         }, 0);
 
         return () => {
@@ -874,21 +870,9 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
         router.push(`/?q=${encodeURIComponent(normalizedQuery)}`);
     };
 
-    const handleOAuthLogin = async (provider: 'google' | 'facebook') => {
-        setAuthError(null);
-        setIsAuthActionLoading(true);
-
-        try {
-            if (provider === 'google') {
-                await signInWithGoogle();
-            } else {
-                await signInWithFacebook();
-            }
-        } catch {
-            setAuthError('ไม่สามารถเข้าสู่ระบบได้ กรุณาลองใหม่อีกครั้ง');
-            setIsAuthActionLoading(false);
-        }
-    };
+    const openLoginPage = useCallback((nextPath: string) => {
+        router.push(`/login?next=${encodeURIComponent(nextPath)}`);
+    }, [router]);
 
     const handleSignOut = async () => {
         try {
@@ -1194,7 +1178,7 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
                 onCloseProfileMenu={() => setIsProfileMenuOpen(false)}
                 onOpenLogin={() => {
                     setAuthError(null);
-                    setIsAuthDialogOpen(true);
+                    openLoginPage(`/story/${storyId}`);
                 }}
                 onSignOut={handleSignOut}
             />
@@ -1385,7 +1369,6 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
                 <div
                     className={styles.authDialogOverlay}
                     onClick={() => {
-                        if (isAuthActionLoading) return;
                         setIsAuthDialogOpen(false);
                         setAuthError(null);
                     }}
@@ -1395,7 +1378,6 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
                             type="button"
                             className={styles.authDialogClose}
                             onClick={() => {
-                                if (isAuthActionLoading) return;
                                 setIsAuthDialogOpen(false);
                                 setAuthError(null);
                             }}
@@ -1412,18 +1394,9 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
                             <button
                                 type="button"
                                 className={styles.authDialogPrimaryBtn}
-                                onClick={() => void handleOAuthLogin('google')}
-                                disabled={isAuthActionLoading}
+                                onClick={() => openLoginPage('/dashboard')}
                             >
-                                {isAuthActionLoading ? 'กำลังเชื่อมต่อ...' : 'เข้าสู่ระบบด้วย Google'}
-                            </button>
-                            <button
-                                type="button"
-                                className={styles.authDialogSecondaryBtn}
-                                onClick={() => void handleOAuthLogin('facebook')}
-                                disabled={isAuthActionLoading}
-                            >
-                                เข้าสู่ระบบด้วย Facebook
+                                เข้าสู่ระบบ FlowFic
                             </button>
                         </div>
                     </div>

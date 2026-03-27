@@ -9,8 +9,7 @@ type AuthGuardDialogProps = {
   isLoadingAuth: boolean;
   isLoggedIn: boolean;
   onClose: () => void;
-  onGoogleSignIn: () => void;
-  onFacebookSignIn: () => void;
+  onOpenLoginPage: () => void;
 };
 
 export function AuthGuardDialog({
@@ -21,8 +20,7 @@ export function AuthGuardDialog({
   isLoadingAuth,
   isLoggedIn,
   onClose,
-  onGoogleSignIn,
-  onFacebookSignIn,
+  onOpenLoginPage,
 }: AuthGuardDialogProps) {
   if (!isOpen) return null;
 
@@ -49,29 +47,10 @@ export function AuthGuardDialog({
             <div className={styles.authDialogButtons}>
               <button
                 type="button"
-                onClick={onGoogleSignIn}
-                className={`${styles.authBtn} ${styles.googleBtn}`}
+                onClick={onOpenLoginPage}
+                className={styles.authBtn}
               >
-                <img
-                  src="/google-logo.svg"
-                  alt="G"
-                  className={styles.providerIcon}
-                  onError={(event) => (event.currentTarget.style.display = 'none')}
-                />
-                เข้าสู่ระบบด้วย Google
-              </button>
-              <button
-                type="button"
-                onClick={onFacebookSignIn}
-                className={`${styles.authBtn} ${styles.facebookBtn}`}
-              >
-                <img
-                  src="/facebook-logo.svg"
-                  alt="f"
-                  className={styles.providerIcon}
-                  onError={(event) => (event.currentTarget.style.display = 'none')}
-                />
-                เข้าสู่ระบบด้วย Facebook
+                เข้าสู่ระบบ FlowFic
               </button>
             </div>
           )}

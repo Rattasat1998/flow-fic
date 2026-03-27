@@ -89,7 +89,7 @@ export default function TrendingPageClient({ initialStories, currentPage, limit 
                 onCloseProfileMenu={() => setIsProfileMenuOpen(false)}
                 onDashboardAccess={() => {}}
                 onSignOut={handleSignOut}
-                onOpenLogin={() => router.push('/')}
+                onOpenLogin={() => router.push(`/login?next=${encodeURIComponent('/trending')}`)}
                 lovesLabel="รักเลย"
             />
 

@@ -25,7 +25,7 @@ export default function HelpPage() {
 
                 <div style={{ marginBottom: "1rem" }}>
                     <h3 style={{ fontSize: "1.1rem", marginBottom: "0.3rem" }}>วิธีสมัครสมาชิก</h3>
-                    <p>คุณสามารถสมัครสมาชิกได้โดยการล็อกอินผ่าน Google หรือ Facebook บนหน้าหลักของเว็บไซต์</p>
+                    <p>คุณสามารถสมัครและเข้าสู่ระบบได้ที่หน้า <Link href="/login">เข้าสู่ระบบ FlowFic</Link> ด้วยอีเมลและรหัสผ่าน</p>
                 </div>
 
                 <div style={{ marginBottom: "1rem" }}>

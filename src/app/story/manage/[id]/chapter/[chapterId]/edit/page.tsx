@@ -739,6 +739,7 @@ export default function EditChapterPage() {
             : editorStyle === 'thread'
                 ? 'กระทู้'
                 : 'บรรยาย';
+    const showSpellcheckNavbarAction = false;
     const isBranchingStory = BRANCHING_FEATURE_ENABLED && storyPathMode === 'branching';
     const spellcheckIssueFieldSet = useMemo(() => new Set(spellcheckIssueFieldIds), [spellcheckIssueFieldIds]);
 
@@ -4270,16 +4271,18 @@ export default function EditChapterPage() {
                         {isSaving ? <Loader2 size={16} className={styles.spinner} /> : <Save size={16} />}
                         บันทึกร่าง
                     </button>
-                    <button
-                        type="button"
-                        className={styles.spellcheckBtn}
-                        onClick={handleTriggerSpellcheck}
-                        disabled={isSaving || isRestoringRevision || isSpellcheckRunning}
-                        title="ตรวจคำไทย"
-                    >
-                        {isSpellcheckRunning ? <Loader2 size={16} className={styles.spinner} /> : <CheckCircle2 size={16} />}
-                        {isSpellcheckRunning ? 'กำลังตรวจไทย...' : 'ตรวจคำไทย'}
-                    </button>
+                    {showSpellcheckNavbarAction && (
+                        <button
+                            type="button"
+                            className={styles.spellcheckBtn}
+                            onClick={handleTriggerSpellcheck}
+                            disabled={isSaving || isRestoringRevision || isSpellcheckRunning}
+                            title="ตรวจคำไทย"
+                        >
+                            {isSpellcheckRunning ? <Loader2 size={16} className={styles.spinner} /> : <CheckCircle2 size={16} />}
+                            {isSpellcheckRunning ? 'กำลังตรวจไทย...' : 'ตรวจคำไทย'}
+                        </button>
+                    )}
                     <button
                         className={styles.publishBtn}
                         onClick={() => handleSave(true)}

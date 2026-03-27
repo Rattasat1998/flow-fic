@@ -823,7 +823,7 @@ export default function DashboardPage() {
     }, []);
 
     const handleOpenLogin = useCallback(() => {
-        router.push('/');
+        router.push(`/login?next=${encodeURIComponent('/dashboard')}`);
     }, [router]);
 
     const handleSignOut = useCallback(async () => {
