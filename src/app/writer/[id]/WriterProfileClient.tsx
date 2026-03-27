@@ -1,14 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { BookOpen, Eye, Heart } from 'lucide-react';
 import styles from './writer.module.css';
 import { supabase } from '@/lib/supabase';
-import { BrandLogo } from '@/components/brand/BrandLogo';
+import { SharedNavbar } from '@/components/navigation/SharedNavbar';
 import { StoryMediumCard } from '@/components/story/StoryMediumCard';
 import { ShareButton } from '@/components/share/ShareButton';
 import { useTracking } from '@/hooks/useTracking';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface WriterProfileClientProps {
     writerId: string;
@@ -96,11 +98,18 @@ const writingStyleLabel = (value: 'narrative' | 'chat' | 'thread' | 'visual_nove
 
 export default function WriterProfileClient({ writerId }: WriterProfileClientProps) {
     useTracking({ autoPageView: true, pagePath: `/writer/${writerId}` });
+    const router = useRouter();
+    const { user, isLoading: isLoadingAuth, signOut } = useAuth();
+    const userId = user?.id ?? null;
 
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState('');
     const [author, setAuthor] = useState<AuthorProfile | null>(null);
     const [stories, setStories] = useState<AuthorStory[]>([]);
+    const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+    const [walletCoinBalance, setWalletCoinBalance] = useState<number | null>(null);
+    const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+    const profileMenuRef = useRef<HTMLDivElement>(null);
     const [stats, setStats] = useState<AuthorStats>({
         publishedStoryCount: 0,
         totalViews: 0,
@@ -229,6 +238,64 @@ export default function WriterProfileClient({ writerId }: WriterProfileClientPro
         };
     }, [writerId]);
 
+    useEffect(() => {
+        if (!userId) return;
+
+        const fetchWalletBalance = async () => {
+            const { data } = await supabase
+                .from('wallets')
+                .select('coin_balance')
+                .eq('user_id', userId)
+                .maybeSingle();
+
+            setWalletCoinBalance(typeof data?.coin_balance === 'number' ? data.coin_balance : 0);
+        };
+
+        const fetchUnreadNotificationCount = async () => {
+            const { count } = await supabase
+                .from('notifications')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', userId)
+                .eq('is_read', false);
+
+            setUnreadNotifCount(count || 0);
+        };
+
+        void Promise.all([fetchWalletBalance(), fetchUnreadNotificationCount()]);
+    }, [userId]);
+
+    useEffect(() => {
+        if (!isProfileMenuOpen) return;
+
+        const handlePointerDown = (event: PointerEvent) => {
+            const target = event.target as Node | null;
+            if (!target) return;
+            if (profileMenuRef.current?.contains(target)) return;
+            setIsProfileMenuOpen(false);
+        };
+
+        document.addEventListener('pointerdown', handlePointerDown);
+        return () => document.removeEventListener('pointerdown', handlePointerDown);
+    }, [isProfileMenuOpen]);
+
+    const handleDashboardAccess = useCallback(() => {
+        setIsProfileMenuOpen(false);
+    }, []);
+
+    const handleOpenLogin = useCallback(() => {
+        router.push(`/login?next=${encodeURIComponent(`/writer/${writerId}`)}`);
+    }, [router, writerId]);
+
+    const handleSignOut = useCallback(async () => {
+        try {
+            setIsProfileMenuOpen(false);
+            await signOut();
+            router.push('/');
+        } catch (error) {
+            console.error('[WriterProfile] Sign out failed:', error);
+        }
+    }, [router, signOut]);
+
     const summaryItems = useMemo(() => ([
         {
             label: 'เรื่องที่เผยแพร่',
@@ -247,9 +314,27 @@ export default function WriterProfileClient({ writerId }: WriterProfileClientPro
         },
     ]), [stats]);
 
+    const navbarNode = (
+        <SharedNavbar
+            user={user}
+            isLoadingAuth={isLoadingAuth}
+            coinBalance={userId ? walletCoinBalance : null}
+            unreadNotifCount={userId ? unreadNotifCount : 0}
+            onDashboardAccess={handleDashboardAccess}
+            isProfileMenuOpen={isProfileMenuOpen}
+            profileMenuRef={profileMenuRef}
+            onToggleProfileMenu={() => setIsProfileMenuOpen((prev) => !prev)}
+            onCloseProfileMenu={() => setIsProfileMenuOpen(false)}
+            onOpenLogin={handleOpenLogin}
+            onSignOut={handleSignOut}
+            lovesLabel="รักเลย"
+        />
+    );
+
     if (isLoading) {
         return (
             <main className={`${styles.main} ffStudioShell`}>
+                {navbarNode}
                 <div className={`ffStudioPage ${styles.statePage}`}>
                     <div className={`ffStudioEmpty ${styles.stateCard}`}>กำลังโหลดโปรไฟล์ผู้เขียน...</div>
                 </div>
@@ -260,18 +345,7 @@ export default function WriterProfileClient({ writerId }: WriterProfileClientPro
     if (!author) {
         return (
             <main className={`${styles.main} ffStudioShell`}>
-                <nav className={`ffStudioTopbar ${styles.topbar}`}>
-                    <div className="ffStudioTopbarInner">
-                        <div className={`ffStudioTopbarContext ${styles.topbarContext}`}>
-                            <BrandLogo href="/" size="md" className={styles.topbarLogo} />
-                            <span className={styles.topbarDivider}>/</span>
-                            <div className="ffStudioTopbarCopy">
-                                <span className="ffStudioTopbarEyebrow">Writer Profile</span>
-                                <span className="ffStudioTopbarTitle">โปรไฟล์ผู้เขียน</span>
-                            </div>
-                        </div>
-                    </div>
-                </nav>
+                {navbarNode}
                 <div className={`ffStudioPage ${styles.statePage}`}>
                     <div className={`ffStudioEmpty ${styles.stateCard}`}>
                         <h1 className={styles.stateTitle}>{loadError || 'ไม่พบข้อมูลผู้เขียน'}</h1>
@@ -288,19 +362,7 @@ export default function WriterProfileClient({ writerId }: WriterProfileClientPro
 
     return (
         <main className={`${styles.main} ffStudioShell`}>
-            <nav className={`ffStudioTopbar ${styles.topbar}`}>
-                <div className="ffStudioTopbarInner">
-                    <div className={`ffStudioTopbarContext ${styles.topbarContext}`}>
-                        <BrandLogo href="/" size="md" className={styles.topbarLogo} />
-                        <span className={styles.topbarDivider}>/</span>
-                        <div className="ffStudioTopbarCopy">
-                            <span className="ffStudioTopbarEyebrow">Writer Profile</span>
-                            <span className="ffStudioTopbarTitle">{author.penName}</span>
-                            <span className="ffStudioTopbarMeta">{stats.publishedStoryCount} เรื่องที่เผยแพร่</span>
-                        </div>
-                    </div>
-                </div>
-            </nav>
+            {navbarNode}
 
             <div className={`ffStudioPage ${styles.pageBody}`}>
                 <section className={`${styles.heroSection} ffStudioMasthead`}>

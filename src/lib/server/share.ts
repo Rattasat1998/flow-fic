@@ -111,6 +111,64 @@ export function buildGenericMetadata(path: string): Metadata {
   };
 }
 
+function buildStoryFallbackMetadata(storyId: string): Metadata {
+  const path = `/story/${storyId}`;
+  const title = `เรื่องบน ${DEFAULT_SITE_TITLE}`;
+  const description = 'อ่านเรื่องนี้บน FlowFic';
+  const images = buildMetadataImages(`/story/${storyId}/opengraph-image`, title);
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: path,
+    },
+    openGraph: {
+      type: 'article',
+      siteName: DEFAULT_SITE_TITLE,
+      title,
+      description,
+      url: path,
+      images,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: images.map((image) => image.url),
+    },
+  };
+}
+
+function buildWriterFallbackMetadata(writerId: string): Metadata {
+  const path = `/writer/${writerId}`;
+  const title = `นักเขียนบน ${DEFAULT_SITE_TITLE}`;
+  const description = 'ดูโปรไฟล์นักเขียนบน FlowFic';
+  const images = buildMetadataImages(`/writer/${writerId}/opengraph-image`, title);
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: path,
+    },
+    openGraph: {
+      type: 'profile',
+      siteName: DEFAULT_SITE_TITLE,
+      title,
+      description,
+      url: path,
+      images,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: images.map((image) => image.url),
+    },
+  };
+}
+
 async function fetchStoryShareMeta(storyId: string): Promise<StoryShareMeta | null> {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
@@ -190,7 +248,7 @@ export async function getWriterShareMeta(writerId: string): Promise<WriterShareM
 
 export async function buildStoryMetadata(storyId: string): Promise<Metadata> {
   const story = await getStoryShareMeta(storyId);
-  if (!story) return buildGenericMetadata(`/story/${storyId}`);
+  if (!story) return buildStoryFallbackMetadata(storyId);
 
   const description = truncateText(story.synopsis || 'อ่านเรื่องนี้บน FlowFic', 180);
   const imagePath = `/story/${storyId}/opengraph-image`;
@@ -221,7 +279,7 @@ export async function buildStoryMetadata(storyId: string): Promise<Metadata> {
 
 export async function buildWriterMetadata(writerId: string): Promise<Metadata> {
   const writer = await getWriterShareMeta(writerId);
-  if (!writer) return buildGenericMetadata(`/writer/${writerId}`);
+  if (!writer) return buildWriterFallbackMetadata(writerId);
 
   const description = truncateText(writer.bio || 'ดูโปรไฟล์นักเขียนบน FlowFic', 180);
   const imagePath = `/writer/${writerId}/opengraph-image`;

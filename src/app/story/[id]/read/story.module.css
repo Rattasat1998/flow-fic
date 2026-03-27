@@ -685,16 +685,47 @@
   justify-content: flex-end;
   /* Slide in from right */
   backdrop-filter: blur(4px);
+  --toc-panel-bg: #111827;
+  --toc-panel-border: rgba(71, 85, 105, 0.45);
+  --toc-panel-shadow: -8px 0 32px rgba(2, 6, 23, 0.66);
+  --toc-header-border: rgba(71, 85, 105, 0.48);
+  --toc-title-color: #f8fafc;
+  --toc-close-color: #cbd5e1;
+  --toc-close-hover-bg: rgba(51, 65, 85, 0.72);
+  --toc-close-hover-color: #f8fafc;
+  --toc-story-title-color: #e2e8f0;
+  --toc-total-info-color: #94a3b8;
+  --toc-divider-color: rgba(71, 85, 105, 0.5);
+  --toc-characters-label-color: #94a3b8;
+  --toc-character-chip-border: rgba(253, 186, 116, 0.45);
+  --toc-character-chip-bg: rgba(124, 45, 18, 0.35);
+  --toc-character-chip-color: #fdba74;
+  --toc-item-border: rgba(71, 85, 105, 0.38);
+  --toc-item-bg: rgba(15, 23, 42, 0.82);
+  --toc-item-hover-bg: rgba(30, 41, 59, 0.86);
+  --toc-item-active-bg: rgba(194, 65, 12, 0.24);
+  --toc-item-active-border: rgba(251, 146, 60, 0.52);
+  --toc-item-active-title-color: #fdba74;
+  --toc-item-active-index-color: #fdba74;
+  --toc-item-index-color: #94a3b8;
+  --toc-item-title-color: #e2e8f0;
+  --toc-lock-color: #fdba74;
+  --toc-lock-bg: rgba(124, 45, 18, 0.3);
+  --toc-lock-border: rgba(253, 186, 116, 0.45);
+  --toc-lock-unlocked-color: #fb923c;
+  --toc-lock-unlocked-bg: rgba(194, 65, 12, 0.28);
+  --toc-lock-unlocked-border: rgba(251, 146, 60, 0.55);
 }
 
 .tocModal {
   width: 100%;
   max-width: 400px;
-  background-color: #ffffff;
+  background-color: var(--toc-panel-bg);
+  border-left: 1px solid var(--toc-panel-border);
   height: 100vh;
   display: flex;
   flex-direction: column;
-  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--toc-panel-shadow);
   animation: slideInRight 0.3s ease-out;
 }
 
@@ -713,20 +744,20 @@
   align-items: center;
   justify-content: space-between;
   padding: 1.5rem;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--toc-header-border);
 }
 
 .tocTitle {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--toc-title-color);
 }
 
 .tocCloseBtn {
   background: none;
   border: none;
-  color: #64748b;
+  color: var(--toc-close-color);
   cursor: pointer;
   padding: 0.5rem;
   display: flex;
@@ -737,8 +768,8 @@
 }
 
 .tocCloseBtn:hover {
-  background-color: #f1f5f9;
-  color: #0f172a;
+  background-color: var(--toc-close-hover-bg);
+  color: var(--toc-close-hover-color);
 }
 
 .tocContent {
@@ -750,29 +781,29 @@
 .tocStoryTitle {
   font-size: 1.1rem;
   font-weight: 600;
-  color: #334155;
+  color: var(--toc-story-title-color);
   margin-bottom: 0.5rem;
   line-height: 1.4;
 }
 
 .tocTotalInfo {
   font-size: 0.85rem;
-  color: #64748b;
+  color: var(--toc-total-info-color);
   margin-bottom: 1.5rem;
   padding-bottom: 1rem;
-  border-bottom: 1px dashed #e2e8f0;
+  border-bottom: 1px dashed var(--toc-divider-color);
 }
 
 .tocCharactersSection {
   margin-bottom: 1.25rem;
   padding-bottom: 1rem;
-  border-bottom: 1px dashed #e2e8f0;
+  border-bottom: 1px dashed var(--toc-divider-color);
 }
 
 .tocCharactersLabel {
   font-size: 0.82rem;
   font-weight: 700;
-  color: #64748b;
+  color: var(--toc-characters-label-color);
   margin-bottom: 0.65rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -790,9 +821,9 @@
   max-width: 100%;
   padding: 0.35rem 0.7rem;
   border-radius: 999px;
-  border: 1px solid #fed7aa;
-  background: #fff7ed;
-  color: #9a3412;
+  border: 1px solid var(--toc-character-chip-border);
+  background: var(--toc-character-chip-bg);
+  color: var(--toc-character-chip-color);
   font-size: 0.82rem;
   font-weight: 600;
   line-height: 1.3;
@@ -809,8 +840,8 @@
   align-items: flex-start;
   gap: 1rem;
   padding: 1rem;
-  border: 1px solid transparent;
-  background-color: #ffffff;
+  border: 1px solid var(--toc-item-border);
+  background-color: var(--toc-item-bg);
   border-radius: 8px;
   cursor: pointer;
   text-align: left;
@@ -818,27 +849,27 @@
 }
 
 .tocItem:hover {
-  background-color: #f8fafc;
+  background-color: var(--toc-item-hover-bg);
 }
 
 .tocItemActive {
-  background-color: #fff7ed;
-  border-color: #fed7aa;
+  background-color: var(--toc-item-active-bg);
+  border-color: var(--toc-item-active-border);
 }
 
 .tocItemActive .tocItemTitle {
-  color: #c2410c;
+  color: var(--toc-item-active-title-color);
   font-weight: 600;
 }
 
 .tocItemActive .tocItemIndex {
-  color: #c2410c;
+  color: var(--toc-item-active-index-color);
   font-weight: 600;
 }
 
 .tocItemIndex {
   font-size: 0.9rem;
-  color: #94a3b8;
+  color: var(--toc-item-index-color);
   font-weight: 500;
   width: 30px;
   flex-shrink: 0;
@@ -853,7 +884,7 @@
 
 .tocItemTitle {
   font-size: 0.95rem;
-  color: #334155;
+  color: var(--toc-item-title-color);
   line-height: 1.4;
   flex: 1;
 }
@@ -864,17 +895,17 @@
   width: fit-content;
   font-size: 0.74rem;
   font-weight: 700;
-  color: #b45309;
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
+  color: var(--toc-lock-color);
+  background: var(--toc-lock-bg);
+  border: 1px solid var(--toc-lock-border);
   border-radius: 999px;
   padding: 0.15rem 0.5rem;
 }
 
 .tocLockTagUnlocked {
-  color: #c2410c;
-  background: #fff7ed;
-  border-color: #fed7aa;
+  color: var(--toc-lock-unlocked-color);
+  background: var(--toc-lock-unlocked-bg);
+  border-color: var(--toc-lock-unlocked-border);
 }
 
 .premiumGate {

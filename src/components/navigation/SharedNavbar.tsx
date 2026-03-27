@@ -307,6 +307,8 @@ export function SharedNavbar({
               type="button"
               className={styles.profileAvatarBtn}
               aria-label="เมนูผู้ใช้"
+              aria-haspopup="menu"
+              aria-expanded={isProfileMenuOpen}
               onClick={onToggleProfileMenu}
             >
               {user.user_metadata?.avatar_url ? (
@@ -340,50 +342,50 @@ export function SharedNavbar({
                   </div>
                 </div>
 
-                <div className={styles.profileDropdownDivider} />
+                <div className={styles.profileDropdownMenu}>
+                  <Link href="/dashboard" className={styles.profileDropdownItem} onClick={onDashboardAccess}>
+                    <LayoutDashboard size={16} /> แดชบอร์ดนักเขียน
+                  </Link>
+                  <Link
+                    href="/bookshelf"
+                    className={styles.profileDropdownItem}
+                    onClick={() => {
+                      onCloseProfileMenu();
+                    }}
+                  >
+                    <BookOpen size={16} /> ชั้นหนังสือ
+                  </Link>
+                  <Link
+                    href="/loves"
+                    className={styles.profileDropdownItem}
+                    onClick={() => {
+                      onCloseProfileMenu();
+                    }}
+                  >
+                    <Heart size={16} /> {lovesLabel}
+                  </Link>
+                  <Link
+                    href="/notifications"
+                    className={styles.profileDropdownItem}
+                    onClick={() => {
+                      onCloseProfileMenu();
+                    }}
+                  >
+                    <Bell size={16} /> การแจ้งเตือน
+                  </Link>
 
-                <Link href="/dashboard" className={styles.profileDropdownItem} onClick={onDashboardAccess}>
-                  <LayoutDashboard size={16} /> แดชบอร์ดนักเขียน
-                </Link>
-                <Link
-                  href="/bookshelf"
-                  className={styles.profileDropdownItem}
-                  onClick={() => {
-                    onCloseProfileMenu();
-                  }}
-                >
-                  <BookOpen size={16} /> ชั้นหนังสือ
-                </Link>
-                <Link
-                  href="/loves"
-                  className={styles.profileDropdownItem}
-                  onClick={() => {
-                    onCloseProfileMenu();
-                  }}
-                >
-                  <Heart size={16} /> {lovesLabel}
-                </Link>
-                <Link
-                  href="/notifications"
-                  className={styles.profileDropdownItem}
-                  onClick={() => {
-                    onCloseProfileMenu();
-                  }}
-                >
-                  <Bell size={16} /> การแจ้งเตือน
-                </Link>
+                  {profileExtraAction}
+                </div>
 
-                {profileExtraAction}
-
-                <div className={styles.profileDropdownDivider} />
-
-                <button
-                  type="button"
-                  className={`${styles.profileDropdownItem} ${styles.profileDropdownLogout}`}
-                  onClick={() => void onSignOut()}
-                >
-                  <LogOut size={16} /> ออกจากระบบ
-                </button>
+                <div className={styles.profileDropdownFooter}>
+                  <button
+                    type="button"
+                    className={`${styles.profileDropdownItem} ${styles.profileDropdownLogout}`}
+                    onClick={() => void onSignOut()}
+                  >
+                    <LogOut size={16} /> ออกจากระบบ
+                  </button>
+                </div>
               </div>
             )}
           </div>
