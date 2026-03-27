@@ -85,7 +85,7 @@ export default function OpenGraphImage() {
               gap: 8,
               padding: '8px 12px',
               borderRadius: 999,
-              width: 'fit-content',
+              alignSelf: 'flex-start',
               background: 'rgba(255,255,255,0.12)',
               border: '1px solid rgba(255,255,255,0.2)',
               fontSize: 15,
