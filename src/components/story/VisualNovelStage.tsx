@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 
 import styles from './VisualNovelStage.module.css';
 
@@ -36,6 +36,8 @@ type VisualNovelStageProps = {
     className?: string;
     speakerFallback?: string;
     footerSlot?: ReactNode;
+    hideNarratorFallback?: boolean;
+    dialogueTextOverride?: string | null;
 };
 
 export function VisualNovelStage({
@@ -46,6 +48,8 @@ export function VisualNovelStage({
     className,
     speakerFallback = 'ผู้บรรยาย',
     footerSlot = null,
+    hideNarratorFallback = false,
+    dialogueTextOverride = null,
 }: VisualNovelStageProps) {
     const leftCharacter = characters.find((character) => character.id === scene.leftCharacterId) || null;
     const rightCharacter = characters.find((character) => character.id === scene.rightCharacterId) || null;
@@ -72,12 +76,20 @@ export function VisualNovelStage({
             : speakerCharacter && speakerCharacter.id === rightCharacter?.id
                 ? 'right'
                 : 'none');
-    const dialogueText = scene.text.trim().length > 0
-        ? scene.text
+    const rawDialogueText = typeof dialogueTextOverride === 'string'
+        ? dialogueTextOverride
+        : scene.text;
+    const dialogueText = rawDialogueText.length > 0
+        ? rawDialogueText
         : variant === 'editor'
             ? 'พิมพ์บทพูดของฉากนี้...'
-            : '...';
-    const speakerLabel = speakerCharacter?.name || speakerFallback;
+            : typeof dialogueTextOverride === 'string'
+                ? ''
+                : '...';
+    const hasSpeaker = Boolean(speakerCharacter?.name);
+    const shouldShowSpeakerLabel = hasSpeaker || !hideNarratorFallback;
+    const speakerLabel = hasSpeaker ? (speakerCharacter?.name || speakerFallback) : speakerFallback;
+    const hasFooterSlot = footerSlot !== null && footerSlot !== undefined && footerSlot !== false;
     const stageClassName = [
         styles.stage,
         variant === 'editor' ? styles.editorStage : styles.readerStage,
@@ -244,10 +256,12 @@ export function VisualNovelStage({
 
             <div className={styles.dialogueDock}>
                 <div className={styles.dialogueBox}>
-                    <div className={styles.dialogueHeader}>
-                        <span className={styles.speakerTag}>{speakerLabel}</span>
-                        {footerSlot}
-                    </div>
+                    {(shouldShowSpeakerLabel || hasFooterSlot) && (
+                        <div className={`${styles.dialogueHeader} ${!shouldShowSpeakerLabel ? styles.dialogueHeaderFooterOnly : ''}`}>
+                            {shouldShowSpeakerLabel && <span className={styles.speakerTag}>{speakerLabel}</span>}
+                            {footerSlot}
+                        </div>
+                    )}
                     <p className={styles.dialogueText}>{dialogueText}</p>
                 </div>
             </div>

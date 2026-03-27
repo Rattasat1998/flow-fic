@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 
-import styles from '@/app/home.module.css';
+import styles from '@/components/navigation/StorySearchPanel.module.css';
 import { getMainCategoryLabel, getSubCategoryLabel } from '@/lib/categories';
 import type { DiscoveryStory } from '@/types/discovery';
 

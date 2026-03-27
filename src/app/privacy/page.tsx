@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/support";
 
 export const metadata: Metadata = {
   title: "นโยบายความเป็นส่วนตัว | FlowFic",
@@ -58,7 +59,9 @@ export default function PrivacyPage() {
         <h2>5. การเก็บรักษาและลบข้อมูล</h2>
         <p>
           เราจะเก็บข้อมูลเท่าที่จำเป็นต่อการให้บริการและตามข้อกำหนดทางกฎหมาย หากคุณต้องการแก้ไขหรือลบข้อมูล
-          สามารถติดต่อทีมงานผ่านช่องทางซัพพอร์ตของระบบเพื่อดำเนินการตามคำขอ
+          สามารถติดต่อทีมงานที่{" "}
+          <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>{" "}
+          เพื่อดำเนินการตามคำขอ
         </p>
       </section>
 
@@ -85,7 +88,10 @@ export default function PrivacyPage() {
 
       <section style={{ marginBottom: "2rem" }}>
         <h2>8. ติดต่อเรา</h2>
-        <p>หากมีคำถามเกี่ยวกับความเป็นส่วนตัว กรุณาติดต่อผ่านช่องทางซัพพอร์ตบนเว็บไซต์ FlowFic</p>
+        <p>
+          หากมีคำถามเกี่ยวกับความเป็นส่วนตัว กรุณาติดต่อทีมงานที่{" "}
+          <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>
+        </p>
       </section>
 
       <p style={{ marginBottom: "0.75rem" }}>

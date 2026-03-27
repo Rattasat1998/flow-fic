@@ -1,0 +1,169 @@
+.navSearchPanelSection {
+    display: flex;
+    flex-direction: column;
+    gap: 0.78rem;
+}
+
+.navSearchPanelHeader {
+    padding: 0.1rem 0.2rem 0;
+    color: #ffd7c7;
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.navSearchPanelGrid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.72rem;
+}
+
+@media (min-width: 1080px) {
+    .navSearchPanelGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.navSearchPanelCard {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 0.78rem;
+    align-items: start;
+    padding: 0.72rem;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    text-decoration: none;
+    transition: transform 0.16s ease, border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.navSearchPanelCard:hover {
+    transform: translateY(-1px);
+    border-color: rgba(255, 143, 112, 0.28);
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.navSearchPanelCoverWrap {
+    position: relative;
+    width: 72px;
+    min-width: 72px;
+    aspect-ratio: 3 / 4;
+    border-radius: 14px;
+    overflow: hidden;
+    background: linear-gradient(135deg, rgba(255, 143, 112, 0.2), rgba(77, 130, 112, 0.24));
+}
+
+.navSearchPanelCover {
+    object-fit: cover;
+}
+
+.navSearchPanelCoverFallback {
+    width: 100%;
+    height: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 248, 244, 0.94);
+    font-size: 1.15rem;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+}
+
+.navSearchPanelBody {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.34rem;
+}
+
+.navSearchPanelTags {
+    display: flex;
+    align-items: center;
+    gap: 0.38rem;
+    flex-wrap: wrap;
+}
+
+.navSearchPanelTag,
+.navSearchPanelInteractive {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.3rem;
+    padding: 0 0.46rem;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.navSearchPanelTag {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(242, 246, 255, 0.86);
+}
+
+.navSearchPanelInteractive {
+    background: rgba(56, 189, 248, 0.16);
+    color: #bae6fd;
+}
+
+.navSearchPanelTitle {
+    margin: 0;
+    color: #f8fbff;
+    font-size: 0.96rem;
+    font-weight: 800;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.navSearchPanelAuthor {
+    margin: 0;
+    color: rgba(226, 232, 240, 0.72);
+    font-size: 0.8rem;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.navSearchPanelStatus {
+    margin: 0.08rem 0 0;
+    color: rgba(255, 228, 220, 0.82);
+    font-size: 0.76rem;
+    font-weight: 600;
+    line-height: 1.4;
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.navSearchPanelStatusDot {
+    width: 4px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.32);
+}
+
+.navSearchPanelState {
+    padding: 0.9rem 0.95rem 1rem;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.navSearchPanelStateTitle {
+    margin: 0;
+    color: #f8fbff;
+    font-size: 0.92rem;
+    font-weight: 700;
+}
+
+.navSearchPanelStateText {
+    margin: 0.3rem 0 0;
+    color: rgba(226, 232, 240, 0.7);
+    font-size: 0.79rem;
+    line-height: 1.55;
+}

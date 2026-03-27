@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/support";
 
 export const metadata: Metadata = {
   title: "ข้อมูลติดต่อทางกฎหมายและเวอร์ชันเอกสาร | FlowFic",
@@ -38,7 +39,8 @@ export default function LegalContactAndVersioningPage() {
       <section style={{ marginBottom: "1.5rem" }}>
         <h2>3. ช่องทางติดต่อ</h2>
         <p>
-          สำหรับคำถามหรือข้อกังวลด้านกฎหมายและนโยบาย โปรดติดต่อทีมงานผ่านช่องทางซัพพอร์ตบนเว็บไซต์
+          สำหรับคำถามหรือข้อกังวลด้านกฎหมายและนโยบาย โปรดติดต่อทีมงานที่{" "}
+          <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>{" "}
           พร้อมระบุหัวข้อและรายละเอียดที่เกี่ยวข้องเพื่อให้ทีมงานตรวจสอบได้รวดเร็ว
         </p>
       </section>

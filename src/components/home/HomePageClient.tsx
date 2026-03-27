@@ -1,23 +1,9 @@
 'use client';
 
-import Image from 'next/image';
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  PenTool,
-  Heart,
-  Settings,
-  Upload,
-  X,
-  ArrowRight,
-  ChevronRight,
-  Star,
-  AlertCircle,
-  Inbox,
-  List,
-  Eye,
-} from 'lucide-react';
+import { Heart, Settings, List, Eye } from 'lucide-react';
 import styles from '@/app/home.module.css';
 import { supabase } from '@/lib/supabase';
 import {
@@ -27,12 +13,16 @@ import {
   getSubCategoryLabel,
 } from '@/lib/categories';
 import { useAuth } from '@/contexts/AuthContext';
-import { WalletLedgerPanel } from '@/components/profile/WalletLedgerPanel';
 import { useHomeGsapAnimations } from '@/components/home/useHomeGsapAnimations';
 import { useHomeHeroAnimations } from '@/components/home/useHomeHeroAnimations';
+import { HeroSection } from '@/components/home/sections/HeroSection';
+import { TrendingSection } from '@/components/home/sections/TrendingSection';
+import { CategoryShelvesSection } from '@/components/home/sections/CategoryShelvesSection';
+import { EditorPicksSection } from '@/components/home/sections/EditorPicksSection';
+import { WriterCtaSection } from '@/components/home/sections/WriterCtaSection';
 import { SharedNavbar } from '@/components/navigation/SharedNavbar';
+import navbarStyles from '@/components/navigation/SharedNavbar.module.css';
 import { StorySearchPanel } from '@/components/navigation/StorySearchPanel';
-import { CoverTiltFrame } from '@/components/story/CoverTiltFrame';
 import { StoryMediumCard } from '@/components/story/StoryMediumCard';
 import type {
   DiscoveryFilters,
@@ -40,6 +30,13 @@ import type {
   DiscoveryResponse,
   DiscoveryStory,
 } from '@/types/discovery';
+
+const ProfileSettingsModal = dynamic(
+  () => import('@/components/home/sections/ProfileSettingsModal').then((module) => module.ProfileSettingsModal)
+);
+const AuthGuardDialog = dynamic(
+  () => import('@/components/home/sections/AuthGuardDialog').then((module) => module.AuthGuardDialog)
+);
 
 const DISCOVERY_LIMIT = 12;
 const DISCOVERY_CACHE_PREFIX = 'ff_home_discovery::';
@@ -81,6 +78,7 @@ function buildApiQueryFromFilters(filters: DiscoveryFilters): string {
   if (filters.subCategory !== 'all') params.set('subCategory', filters.subCategory);
   if (filters.completion !== 'all') params.set('completion', filters.completion);
   if (filters.length !== 'all') params.set('length', filters.length);
+  if (filters.offset > 0) params.set('offset', String(filters.offset));
   params.set('focusCore', filters.focusCore ? 'true' : 'false');
   params.set('limit', String(filters.limit));
   return params.toString();
@@ -166,6 +164,7 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
         length: 'all',
         focusCore: false,
         limit: DISCOVERY_LIMIT,
+        offset: 0,
       }),
     []
   );
@@ -782,7 +781,7 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
         profileExtraAction={(
           <button
             type="button"
-            className={styles.profileDropdownItem}
+            className={navbarStyles.profileDropdownItem}
             onClick={() => {
               setIsProfileMenuOpen(false);
               handleOpenProfileModal();
@@ -801,469 +800,69 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
             </div>
           )}
 
-          <section className={styles.heroSection} ref={heroSectionRef} data-gsap-section="hero">
-            {heroStory ? (
-              <div className={styles.heroFrame} data-gsap="hero-frame">
-                {heroStory.cover_wide_url || heroStory.cover_url ? (
-                  <Image
-                    src={heroStory.cover_wide_url || heroStory.cover_url || ''}
-                    alt={heroStory.title}
-                    className={styles.heroBackdrop}
-                    fill
-                    priority={heroIndex === 0}
-                    sizes="100vw"
-                    data-gsap-hero-backdrop
-                  />
-                ) : (
-                  <div className={styles.heroBackdropFallback} data-gsap-hero-backdrop>เรื่องเด่นประจำวัน</div>
-                )}
+          <HeroSection
+            sectionRef={heroSectionRef}
+            stories={heroStories}
+            heroStory={heroStory}
+            heroInfoPills={heroInfoPills}
+            heroIndex={heroIndex}
+            onDotClick={setHeroIndex}
+          />
 
-                <div className={styles.heroOverlay} />
+          <TrendingSection
+            sectionRef={trendingSectionRef}
+            stories={trendingStories}
+            loading={trendingLoading}
+            error={trendingError}
+          />
 
-                <div className={styles.heroContent} data-gsap-hero-content>
-                  <span className={styles.heroBadge} data-gsap-intro>เรื่องเด่นวันนี้</span>
-                  <h1 className={styles.heroStoryTitle} data-gsap-intro>{heroStory.title}</h1>
-                  <p className={styles.heroStoryPen} data-gsap-intro>โดย {heroStory.pen_name}</p>
-                  {heroStory.synopsis && <p className={styles.heroStorySynopsis} data-gsap-intro>{heroStory.synopsis}</p>}
-                  {heroInfoPills.length > 0 && (
-                    <div className={styles.heroInfoPills} data-gsap-intro>
-                      {heroInfoPills.map((pill, index) => (
-                        <span key={`${pill}-${index}`} className={styles.heroInfoPill}>
-                          {pill}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <div className={styles.heroActionRow} data-gsap-intro>
-                    <Link href={`/story/${heroStory.id}`} className={styles.heroCtaButton}>
-                      เริ่มอ่านเรื่องนี้
-                      <ArrowRight size={16} />
-                    </Link>
-                    <div className={styles.heroAuthorMeta}>
-                      <span>ผู้เขียน</span>
-                      <strong>{heroStory.pen_name}</strong>
-                    </div>
-                  </div>
-                </div>
+          <CategoryShelvesSection
+            sectionRef={mainCategoryMapSectionRef}
+            shelves={mainCategoryShelves}
+            isGridMode={isGridMode}
+            selectedCategory={selectedGridCategory}
+            onSetMainCategoryRailRef={setMainCategoryRailRef}
+            onScrollMainCategoryRail={handleScrollMainCategoryRail}
+            renderHomeMediumCard={renderHomeMediumCard}
+          />
 
-                {heroStories.length > 1 && (
-                  <div className={styles.heroDots}>
-                    {heroStories.map((story, index) => (
-                      <button
-                        key={story.id}
-                        type="button"
-                        aria-label={`ดูเรื่องเด่นลำดับที่ ${index + 1}`}
-                        className={`${styles.heroDot} ${index === heroIndex ? styles.activeHeroDot : ''}`}
-                        onClick={() => setHeroIndex(index)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className={styles.heroEmpty}>กำลังโหลดเรื่องแนะนำ...</div>
-            )}
-          </section>
+          <EditorPicksSection
+            sectionRef={editorSectionRef}
+            featuredStory={editorFeaturedStory}
+            sideStories={editorSideStories}
+          />
 
-          <section className={styles.trendingSection} ref={trendingSectionRef} data-gsap-section="trending">
-            <div className={styles.sectionHeader}>
-              <div className={styles.sectionHeaderLeft}>
-                <h2 className={styles.sectionHeadline}>กำลังมาแรง</h2>
-                <p className={styles.sectionSubhead}>เรื่องที่ผู้อ่านกำลังพูดถึงและเปิดอ่านมากที่สุดในตอนนี้</p>
-              </div>
-              <Link href="/" className={styles.sectionActionLink}>
-                ดูอันดับทั้งหมด
-                <ArrowRight size={16} />
-              </Link>
-            </div>
-
-            {trendingLoading ? (
-              <div className={styles.trendingGrid}>
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <div key={`trending-skeleton-${index}`} className={styles.storySkeleton} />
-                ))}
-              </div>
-            ) : trendingError ? (
-              <div className={`${styles.railStateCard} ${styles.railStateError}`}>
-                <AlertCircle size={18} />
-                <div>
-                  <p className={styles.railStateTitle}>โหลดข้อมูลไม่สำเร็จ</p>
-                  <p className={styles.railStateText}>{trendingError}</p>
-                </div>
-              </div>
-            ) : trendingStories.length === 0 ? (
-              <div className={styles.railStateCard}>
-                <Inbox size={18} />
-                <div>
-                  <p className={styles.railStateTitle}>ยังไม่มีข้อมูล</p>
-                  <p className={styles.railStateText}>ยังไม่มีเรื่องกำลังมาแรงที่ตรงกับคำค้นปัจจุบัน</p>
-                </div>
-              </div>
-            ) : (
-              <div className={styles.trendingGrid}>
-                {trendingStories.slice(0, 8).map((story, index) => {
-                  const isInteractiveStory = story.path_mode === 'branching';
-                  const likes = story.total_like_count ?? 0;
-                  const views = Math.max(1, story.total_view_count ?? 0);
-                  const score = Math.min(5, 4 + (likes / views) * 12).toFixed(1);
-
-                  return (
-                    <Link key={`trending-${story.id}`} href={`/story/${story.id}`} className={styles.trendingCard} data-gsap-card="trending">
-                      <CoverTiltFrame className={styles.trendingCoverWrap}>
-                        {story.cover_url || story.cover_wide_url ? (
-                          <Image
-                            src={story.cover_url || story.cover_wide_url || ''}
-                            alt={story.title}
-                            className={styles.trendingCover}
-                            fill
-                            sizes="(max-width: 767px) 47vw, (max-width: 1180px) 31vw, 320px"
-                          />
-                        ) : (
-                          <div className={styles.trendingCoverFallback}>{story.title.slice(0, 2)}</div>
-                        )}
-
-                        {index < 4 && <span className={styles.trendingRankBadge}>#{index + 1}</span>}
-                      </CoverTiltFrame>
-
-                      <div className={styles.trendingBody}>
-                        <h3 className={styles.trendingTitle}>{story.title}</h3>
-                        <p className={styles.trendingAuthor}>{story.pen_name}</p>
-                        <div className={styles.trendingStats}>
-                          <span className={styles.trendingScore}>
-                            <Star size={12} />
-                            {score}
-                          </span>
-                          <span className={styles.trendingReads}>{(story.total_view_count ?? 0).toLocaleString('th-TH')} อ่าน</span>
-                        </div>
-                        <div className={styles.trendingMetaRow}>
-                          {isInteractiveStory ? (
-                            <span className={styles.posterModeChip}>Interactive</span>
-                          ) : (
-                            <span className={styles.posterMetric}>
-                              <List size={12} className={styles.posterMetricIcon} />
-                              {story.published_chapter_count.toLocaleString('th-TH')} ตอน
-                            </span>
-                          )}
-                          <span className={styles.posterMetric}>
-                            <Heart size={12} className={styles.posterMetricIcon} />
-                            {(story.total_like_count ?? 0).toLocaleString('th-TH')}
-                          </span>
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          <section className={styles.mainCategoryMapSection} ref={mainCategoryMapSectionRef} data-gsap-section="main-category-map">
-            {isGridMode ? (
-              selectedGridCategory ? (
-                <div className={styles.shelfGridModeSection} data-gsap-grid-mode>
-                  <div className={styles.shelfGridModeHeader}>
-                    <h3 className={styles.shelfGridModeTitle}>{selectedGridCategory.label}</h3>
-                  </div>
-                  {selectedGridCategory.stories.length === 0 ? (
-                    <div className={styles.railStateCard}>
-                      <Inbox size={18} />
-                      <div>
-                        <p className={styles.railStateTitle}>ยังไม่มีเรื่องในหมวดนี้</p>
-                        <p className={styles.railStateText}>หมวดที่เลือกยังไม่มีเรื่องที่ตรงกับคำค้นปัจจุบัน</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className={styles.shelfGrid}>
-                      {selectedGridCategory.stories.map((story) =>
-                        renderHomeMediumCard(
-                          story,
-                          `${styles.mainCategoryShelfCard} ${styles.shelfGridCard}`,
-                          'grid-category',
-                          '(max-width: 767px) 46vw, (max-width: 1180px) 23vw, 16vw'
-                        )
-                      )}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className={styles.railStateCard}>
-                  <Inbox size={18} />
-                  <div>
-                    <p className={styles.railStateTitle}>ไม่พบหมวดที่เลือก</p>
-                    <p className={styles.railStateText}>กรุณาตรวจสอบลิงก์ แล้วลองเปิดใหม่อีกครั้ง</p>
-                  </div>
-                </div>
-              )
-            ) : mainCategoryShelves.length === 0 ? (
-              <div className={styles.railStateCard}>
-                <Inbox size={18} />
-                <div>
-                  <p className={styles.railStateTitle}>ยังไม่มีเรื่องในหมวดหลักตอนนี้</p>
-                  <p className={styles.railStateText}>ลองค้นหาด้วยคำอื่น แล้วระบบจะแสดงรายการเรื่องที่เกี่ยวข้องให้ทันที</p>
-                </div>
-              </div>
-            ) : (
-              <div className={styles.mainCategoryGroups}>
-                {mainCategoryShelves.map((group) => (
-                  <section key={`category-group-${group.id}`} className={styles.mainCategoryGroup} data-gsap-shelf-group>
-                    <header className={styles.mainCategoryShelfRowHeader}>
-                      <h3 className={styles.mainCategoryGroupTitle}>{group.label}</h3>
-                      <Link
-                        href={`/?view=grid&category=${encodeURIComponent(group.id)}`}
-                        className={styles.mainCategoryShelfViewAll}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        ดูทั้งหมด
-                      </Link>
-                    </header>
-
-                    <div className={styles.mainCategoryShelfRailWrap}>
-                      <div
-                        ref={(node) => setMainCategoryRailRef(group.id, node)}
-                        className={styles.mainCategoryShelfRail}
-                      >
-                        {group.stories.map((story) =>
-                          renderHomeMediumCard(
-                            story,
-                            styles.mainCategoryShelfCard,
-                            'main-category',
-                            '(max-width: 767px) 48vw, (max-width: 1180px) 24vw, 16vw'
-                          )
-                        )}
-                      </div>
-
-                      <button
-                        type="button"
-                        className={styles.mainCategoryShelfArrowButton}
-                        onClick={() => handleScrollMainCategoryRail(group.id)}
-                        aria-label={`เลื่อนไปขวาในหมวด ${group.label}`}
-                      >
-                        <ChevronRight size={18} />
-                      </button>
-                    </div>
-                  </section>
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className={styles.editorSection} ref={editorSectionRef} data-gsap-section="editor">
-            <h2 className={styles.editorSectionTitle}>คัดพิเศษจากบรรณาธิการ</h2>
-            {editorFeaturedStory ? (
-              <div className={styles.editorGrid}>
-                <Link href={`/story/${editorFeaturedStory.id}`} className={styles.editorFeaturedCard} data-gsap-card="editor">
-                  {editorFeaturedStory.cover_wide_url || editorFeaturedStory.cover_url ? (
-                    <Image
-                      src={editorFeaturedStory.cover_wide_url || editorFeaturedStory.cover_url || ''}
-                      alt={editorFeaturedStory.title}
-                      className={styles.editorFeaturedImage}
-                      fill
-                      sizes="(max-width: 1023px) 100vw, 58vw"
-                    />
-                  ) : (
-                    <div className={styles.editorFeaturedFallback}>{editorFeaturedStory.title}</div>
-                  )}
-                  <div className={styles.editorFeaturedOverlay}>
-                    <span className={styles.editorFeaturedBadge}>เรื่องคัดพิเศษ</span>
-                    <h3 className={styles.editorFeaturedTitle}>{editorFeaturedStory.title}</h3>
-                    <p className={styles.editorFeaturedSummary}>
-                      {editorFeaturedStory.synopsis || 'เรื่องเด่นที่บรรณาธิการอยากแนะนำให้คุณเปิดอ่านทันที'}
-                    </p>
-                  </div>
-                </Link>
-
-                <div className={styles.editorSideList}>
-                  {editorSideStories.map((story) => (
-                    <Link key={`editor-side-${story.id}`} href={`/story/${story.id}`} className={styles.editorSideCard} data-gsap-card="editor">
-                      <CoverTiltFrame className={styles.editorSideCoverWrap}>
-                        {story.cover_url || story.cover_wide_url ? (
-                          <Image
-                            src={story.cover_url || story.cover_wide_url || ''}
-                            alt={story.title}
-                            className={styles.editorSideCover}
-                            fill
-                            sizes="220px"
-                          />
-                        ) : (
-                          <div className={styles.editorSideFallback}>{story.title.slice(0, 2)}</div>
-                        )}
-                      </CoverTiltFrame>
-                      <div className={styles.editorSideBody}>
-                        <h4 className={styles.editorSideTitle}>{story.title}</h4>
-                        <p className={styles.editorSideDesc}>{story.synopsis || `${story.pen_name} · เรื่องที่ไม่อยากให้พลาด`}</p>
-                        <span className={styles.editorSideLink}>อ่านรีวิวเรื่องนี้</span>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className={styles.railStateCard}>
-                <Inbox size={18} />
-                <div>
-                  <p className={styles.railStateTitle}>ยังไม่มีเรื่องแนะนำ</p>
-                  <p className={styles.railStateText}>กำลังรวบรวมเรื่องเด่นสำหรับบล็อกคัดพิเศษจากบรรณาธิการ</p>
-                </div>
-              </div>
-            )}
-          </section>
-
-          <section className={styles.writerCtaSection} ref={writerCtaSectionRef} data-gsap-section="writer-cta">
-            <div className={styles.writerCtaCard}>
-              <h2 className={styles.writerCtaTitle}>
-                ทุกปริศนาต้องมี
-                <br />
-                <span className={styles.writerCtaAccent}>นักเขียนผู้วางเกม</span>
-              </h2>
-              <p className={styles.writerCtaText}>
-                ถ้าคุณมีเรื่องลึกลับในหัว ถึงเวลาปล่อยให้ผู้อ่านทั่วแพลตฟอร์มได้ติดตามไปกับมัน
-              </p>
-              {user ? (
-                <Link href="/story/create" className={styles.writerCtaButton}>
-                  เริ่มสร้างนิยายของคุณ
-                  <PenTool size={16} />
-                </Link>
-              ) : (
-                <button type="button" className={styles.writerCtaButton} onClick={handleOpenLoginDialog}>
-                  เข้าสู่ระบบเพื่อเริ่มเขียน
-                  <PenTool size={16} />
-                </button>
-              )}
-            </div>
-          </section>
+          <WriterCtaSection sectionRef={writerCtaSectionRef} user={user} onOpenLogin={handleOpenLoginDialog} />
         </div>
 
       </div>
 
-      {/* Profile Modal */}
-      {isProfileModalOpen && (
-        <div className={styles.modalOverlay}>
-          <div className={`${styles.modalContent} ${styles.profileModalWide}`}>
-            <div className={styles.modalHeader}>
-              <h2>ตั้งค่าโปรไฟล์นักเขียน</h2>
-              <button className={styles.closeBtn} onClick={() => setIsProfileModalOpen(false)} type="button">
-                <X size={20} />
-              </button>
-            </div>
-            <div className={styles.modalBody}>
-              <div className={styles.avatarSection}>
-                {avatarPreviewUrl ? (
-                  <img src={avatarPreviewUrl} alt="Preview" className={styles.avatarPreview} />
-                ) : (
-                  <div className={styles.avatarPlaceholder}>{editProfile.pen_name.charAt(0).toUpperCase() || 'W'}</div>
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  ref={fileInputRef}
-                  style={{ display: 'none' }}
-                  onChange={handleAvatarChange}
-                />
-                <button className={styles.uploadLabel} onClick={() => fileInputRef.current?.click()} type="button">
-                  <Upload size={16} /> เปลี่ยนรูปโปรไฟล์
-                </button>
-              </div>
+      <ProfileSettingsModal
+        isOpen={isProfileModalOpen}
+        userId={user?.id ?? null}
+        profile={editProfile}
+        avatarPreviewUrl={avatarPreviewUrl}
+        isSaving={isSavingProfile}
+        fileInputRef={fileInputRef}
+        onClose={() => setIsProfileModalOpen(false)}
+        onAvatarChange={handleAvatarChange}
+        onOpenFilePicker={() => fileInputRef.current?.click()}
+        onPenNameChange={(value) => setEditProfile((prev) => ({ ...prev, pen_name: value }))}
+        onBioChange={(value) => setEditProfile((prev) => ({ ...prev, bio: value }))}
+        onSave={handleSaveProfile}
+      />
 
-              <div className={styles.formGroup}>
-                <label>นามปากกาหลัก</label>
-                <input
-                  type="text"
-                  className={styles.inputField}
-                  value={editProfile.pen_name}
-                  onChange={(e) => setEditProfile({ ...editProfile, pen_name: e.target.value })}
-                  placeholder="เช่น Flow Writer"
-                />
-              </div>
-
-              <div className={styles.formGroup}>
-                <label>ประวัติย่อ / Bio</label>
-                <textarea
-                  className={styles.textareaField}
-                  value={editProfile.bio}
-                  onChange={(e) => setEditProfile({ ...editProfile, bio: e.target.value })}
-                  placeholder="เล่าเกี่ยวกับตัวคุณสั้นๆ..."
-                  rows={3}
-                />
-              </div>
-
-              <WalletLedgerPanel userId={user?.id ?? null} />
-            </div>
-            <div className={styles.modalFooter}>
-              <button className={styles.cancelBtn} onClick={() => setIsProfileModalOpen(false)} disabled={isSavingProfile}>
-                ยกเลิก
-              </button>
-              <button
-                className={styles.saveBtn}
-                onClick={handleSaveProfile}
-                disabled={isSavingProfile || !editProfile.pen_name.trim()}
-              >
-                {isSavingProfile ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isDashboardAuthDialogOpen && (
-        <div className={styles.modalOverlay} onClick={handleCloseDashboardAuthDialog}>
-          <div
-            className={`${styles.modalContent} ${styles.authGuardDialog}`}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="dashboard-auth-dialog-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className={styles.modalHeader}>
-              <h2 id="dashboard-auth-dialog-title">{dashboardAuthDialogTitle}</h2>
-              <button className={styles.closeBtn} onClick={handleCloseDashboardAuthDialog} type="button">
-                <X size={20} />
-              </button>
-            </div>
-            <div className={styles.modalBody}>
-              <p className={styles.authDialogLead}>
-                {dashboardAuthDialogMessage || 'กรุณาเข้าสู่ระบบก่อนเข้าแดชบอร์ดนักเขียน'}
-              </p>
-              {!isLoadingAuth && !user && (
-                <div className={styles.authDialogButtons}>
-                  <button
-                    type="button"
-                    onClick={handleGoogleSignIn}
-                    className={`${styles.authBtn} ${styles.googleBtn}`}
-                  >
-                    <img
-                      src="/google-logo.svg"
-                      alt="G"
-                      className={styles.providerIcon}
-                      onError={(e) => (e.currentTarget.style.display = 'none')}
-                    />
-                    เข้าสู่ระบบด้วย Google
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleFacebookSignIn}
-                    className={`${styles.authBtn} ${styles.facebookBtn}`}
-                  >
-                    <img
-                      src="/facebook-logo.svg"
-                      alt="f"
-                      className={styles.providerIcon}
-                      onError={(e) => (e.currentTarget.style.display = 'none')}
-                    />
-                    เข้าสู่ระบบด้วย Facebook
-                  </button>
-                </div>
-              )}
-              {authError && <p className={styles.authDialogError}>{authError}</p>}
-            </div>
-            <div className={styles.modalFooter}>
-              <button className={styles.cancelBtn} onClick={handleCloseDashboardAuthDialog} type="button">
-                ปิด
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AuthGuardDialog
+        isOpen={isDashboardAuthDialogOpen}
+        title={dashboardAuthDialogTitle}
+        message={dashboardAuthDialogMessage}
+        authError={authError}
+        isLoadingAuth={isLoadingAuth}
+        isLoggedIn={Boolean(user)}
+        onClose={handleCloseDashboardAuthDialog}
+        onGoogleSignIn={handleGoogleSignIn}
+        onFacebookSignIn={handleFacebookSignIn}
+      />
     </main>
   );
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/support";
 
 export const metadata: Metadata = {
   title: "นโยบายการชำระเงินและคืนเงิน | FlowFic",
@@ -57,7 +58,9 @@ export default function PaymentAndRefundPolicyPage() {
       <section style={{ marginBottom: "2rem" }}>
         <h2>5. ขั้นตอนยื่นคำขอ</h2>
         <p>
-          ผู้ใช้สามารถติดต่อช่องทางซัพพอร์ตของเว็บไซต์ พร้อมแจ้งข้อมูลอย่างน้อย ได้แก่
+          ผู้ใช้สามารถติดต่อทีมงานที่{" "}
+          <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>{" "}
+          พร้อมแจ้งข้อมูลอย่างน้อย ได้แก่
           User ID, รายการที่เกี่ยวข้อง (transaction/session), วันที่ทำรายการ, และรายละเอียดปัญหา
           ทีมงานจะตรวจสอบตามหลักฐานและแจ้งผลการพิจารณา
         </p>

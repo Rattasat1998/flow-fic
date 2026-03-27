@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/support";
 
 export const metadata: Metadata = {
   title: "Data Deletion | FlowFic",
@@ -24,8 +25,9 @@ export default function DataDeletionPage() {
       <section style={{ marginBottom: "1.5rem" }}>
         <h2>How to request deletion</h2>
         <p>
-          If you want to delete your FlowFic account and related personal data, please contact us
-          via the website support channel and include your account email and the phrase
+          If you want to delete your FlowFic account and related personal data, contact us at{" "}
+          <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>{" "}
+          and include your account email and the phrase
           &quot;Delete my data&quot;.
         </p>
       </section>
@@ -49,7 +51,8 @@ export default function DataDeletionPage() {
       <section style={{ marginBottom: "2rem" }}>
         <h2>Need help?</h2>
         <p>
-          For questions about privacy and deletion requests, contact us through FlowFic support.
+          For questions about privacy and deletion requests, contact us at{" "}
+          <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>.
         </p>
       </section>
 

@@ -26,6 +26,7 @@ const DEFAULT_DISCOVERY_FILTERS: DiscoveryFilters = {
   length: 'all',
   focusCore: FEATURE_FLAGS.discoveryCoreFocus,
   limit: DISCOVERY_DEFAULT_LIMIT,
+  offset: 0,
 };
 
 type SearchParamValue = string | string[] | undefined;
@@ -38,6 +39,7 @@ type DiscoveryFilterParseOptions = Partial<{
   defaultLength: DiscoveryLengthFilter;
   defaultFocusCore: boolean;
   defaultLimit: number;
+  defaultOffset: number;
 }>;
 
 function firstValue(value: SearchParamValue): string | null {
@@ -75,7 +77,13 @@ function parseLength(raw: string | null, defaultLength: DiscoveryLengthFilter): 
 function parseLimit(raw: string | null, defaultLimit: number): number {
   const parsed = Number(raw || String(defaultLimit));
   if (!Number.isFinite(parsed)) return defaultLimit;
-  return Math.max(1, Math.min(24, Math.floor(parsed)));
+  return Math.max(1, Math.min(100, Math.floor(parsed)));
+}
+
+function parseOffset(raw: string | null, defaultOffset: number): number {
+  const parsed = Number(raw || String(defaultOffset));
+  if (!Number.isFinite(parsed)) return defaultOffset;
+  return Math.max(0, Math.floor(parsed));
 }
 
 function parseFocusCore(raw: string | null, defaultFocusCore: boolean): boolean {
@@ -112,6 +120,7 @@ export function parseDiscoveryFiltersWithOptions(
     defaultLength: options.defaultLength ?? DEFAULT_DISCOVERY_FILTERS.length,
     defaultFocusCore: options.defaultFocusCore ?? DEFAULT_DISCOVERY_FILTERS.focusCore,
     defaultLimit: options.defaultLimit ?? DEFAULT_DISCOVERY_FILTERS.limit,
+    defaultOffset: options.defaultOffset ?? DEFAULT_DISCOVERY_FILTERS.offset,
   };
 
   return {
@@ -122,6 +131,7 @@ export function parseDiscoveryFiltersWithOptions(
     length: parseLength(readSearchParam(searchParams, 'length'), defaults.defaultLength),
     focusCore: parseFocusCore(readSearchParam(searchParams, 'focusCore'), defaults.defaultFocusCore),
     limit: parseLimit(readSearchParam(searchParams, 'limit'), defaults.defaultLimit),
+    offset: parseOffset(readSearchParam(searchParams, 'offset'), defaults.defaultOffset),
   };
 }
 
@@ -137,6 +147,7 @@ export function parseDiscoveryFiltersFromUrlSearchParams(
     length: searchParams.get('length') || undefined,
     focusCore: searchParams.get('focusCore') || undefined,
     limit: searchParams.get('limit') || undefined,
+    offset: searchParams.get('offset') || undefined,
   }, options);
 }
 
@@ -147,6 +158,7 @@ export function buildDiscoveryQueryString(filters: DiscoveryFilters): string {
   if (filters.subCategory !== 'all') params.set('subCategory', filters.subCategory);
   if (filters.completion !== 'all') params.set('completion', filters.completion);
   if (filters.length !== 'all') params.set('length', filters.length);
+  if (filters.offset > 0) params.set('offset', String(filters.offset));
   params.set('focusCore', filters.focusCore ? 'true' : 'false');
   params.set('limit', String(filters.limit));
   return params.toString();
@@ -167,6 +179,7 @@ async function fetchDiscoveryResponse(filters: DiscoveryFilters): Promise<Discov
         p_length: filters.length,
         p_focus_core: filters.focusCore,
         p_limit: filters.limit,
+        p_offset: filters.offset,
       });
 
       if (error) throw new Error(error.message);

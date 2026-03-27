@@ -98,7 +98,9 @@ type EditFormState = {
     coverWideUrl: string | null;
 };
 
-type UnsplashImage = {
+type ImageSearchSource = 'unsplash' | 'pixabay';
+
+type ImageSearchResult = {
     id: string;
     alt: string;
     thumb: string;
@@ -106,7 +108,9 @@ type UnsplashImage = {
     full: string;
     author: string;
     authorUrl: string;
-    unsplashUrl: string;
+    unsplashUrl?: string;
+    sourceUrl?: string | null;
+    source: ImageSearchSource;
 };
 
 type UnsplashTarget = 'cover' | 'wide';
@@ -551,9 +555,10 @@ export default function StoryManagerPage() {
     const [showUnsplashModal, setShowUnsplashModal] = useState(false);
     const [unsplashTarget, setUnsplashTarget] = useState<UnsplashTarget>('cover');
     const [unsplashQuery, setUnsplashQuery] = useState('');
-    const [unsplashResults, setUnsplashResults] = useState<UnsplashImage[]>([]);
+    const [unsplashResults, setUnsplashResults] = useState<ImageSearchResult[]>([]);
     const [isUnsplashLoading, setIsUnsplashLoading] = useState(false);
     const [unsplashError, setUnsplashError] = useState<string | null>(null);
+    const [imageSearchSource, setImageSearchSource] = useState<ImageSearchSource>('unsplash');
 
     // Character modal state
     const [showCharModal, setShowCharModal] = useState(false);
@@ -1249,8 +1254,9 @@ export default function StoryManagerPage() {
         }
     };
 
-    const handleSearchUnsplash = async (rawQuery?: string) => {
+    const handleSearchImages = async (rawQuery?: string, sourceOverride?: ImageSearchSource) => {
         const query = (rawQuery ?? unsplashQuery).trim();
+        const source = sourceOverride ?? imageSearchSource;
         if (!query) {
             setUnsplashResults([]);
             setUnsplashError(null);
@@ -1261,17 +1267,27 @@ export default function StoryManagerPage() {
         setUnsplashError(null);
 
         try {
-            const response = await fetch(`/api/unsplash/search?q=${encodeURIComponent(query)}&perPage=18`);
+            const endpoint = source === 'pixabay'
+                ? `/api/pixabay/images?q=${encodeURIComponent(query)}&perPage=18`
+                : `/api/unsplash/search?q=${encodeURIComponent(query)}&perPage=18`;
+            const response = await fetch(endpoint);
             const data = await response.json();
 
             if (!response.ok) {
                 throw new Error(data?.error || 'ค้นหารูปไม่สำเร็จ');
             }
 
-            setUnsplashResults((data.results || []) as UnsplashImage[]);
+            const normalizedResults = ((data.results || []) as Array<Omit<ImageSearchResult, 'source'>>).map((item) => ({
+                ...item,
+                source,
+                sourceUrl: item.sourceUrl ?? item.unsplashUrl ?? null,
+            }));
+
+            setUnsplashResults(normalizedResults);
+            setUnsplashError(typeof data?.error === 'string' ? data.error : null);
         } catch (error) {
-            console.error('Unsplash search failed:', error);
-            setUnsplashError('ค้นหารูปไม่สำเร็จ ลองใหม่อีกครั้ง');
+            console.error('Image search failed:', error);
+            setUnsplashError(error instanceof Error ? error.message : 'ค้นหารูปไม่สำเร็จ ลองใหม่อีกครั้ง');
         } finally {
             setIsUnsplashLoading(false);
         }
@@ -1279,6 +1295,7 @@ export default function StoryManagerPage() {
 
     const openUnsplashPicker = (target: UnsplashTarget) => {
         setUnsplashTarget(target);
+        setImageSearchSource('unsplash');
         setShowUnsplashModal(true);
         setUnsplashError(null);
         if (!unsplashQuery) {
@@ -1287,13 +1304,13 @@ export default function StoryManagerPage() {
                     ? 'cinematic anime landscape'
                     : 'novel cover art portrait';
             setUnsplashQuery(defaultQuery);
-            handleSearchUnsplash(defaultQuery);
+            handleSearchImages(defaultQuery, 'unsplash');
         } else if (unsplashResults.length === 0) {
-            handleSearchUnsplash(unsplashQuery);
+            handleSearchImages(unsplashQuery, 'unsplash');
         }
     };
 
-    const handleSelectUnsplashCover = (image: UnsplashImage) => {
+    const handleSelectUnsplashCover = (image: ImageSearchResult) => {
         if (unsplashTarget === 'wide') {
             setEditForm((prev) => ({ ...prev, coverWideUrl: image.regular }));
             setEditCoverWideFile(null);
@@ -1302,6 +1319,21 @@ export default function StoryManagerPage() {
             setEditCoverFile(null);
         }
         setShowUnsplashModal(false);
+    };
+
+    const handleImageSourceChange = (nextSource: ImageSearchSource) => {
+        setImageSearchSource(nextSource);
+        setUnsplashError(null);
+        if (unsplashQuery.trim()) {
+            void handleSearchImages(unsplashQuery, nextSource);
+            return;
+        }
+
+        const defaultQuery = unsplashTarget === 'wide'
+            ? 'cinematic anime landscape'
+            : 'novel cover art portrait';
+        setUnsplashQuery(defaultQuery);
+        void handleSearchImages(defaultQuery, nextSource);
     };
 
     const handleSaveEdit = async () => {
@@ -2275,7 +2307,7 @@ export default function StoryManagerPage() {
                                         onClick={() => openUnsplashPicker('cover')}
                                     >
                                         <Search size={15} />
-                                        เลือกรูปจาก Unsplash
+                                        เลือกรูปจากคลังภาพ
                                     </button>
                                     {editForm.coverUrl && (
                                         <button
@@ -2323,7 +2355,7 @@ export default function StoryManagerPage() {
                                         onClick={() => openUnsplashPicker('wide')}
                                     >
                                         <Search size={15} />
-                                        เลือกภาพแนวกว้างจาก Unsplash
+                                        เลือกภาพแนวกว้างจากคลังภาพ
                                     </button>
                                     {editForm.coverWideUrl && (
                                         <button
@@ -2475,13 +2507,29 @@ export default function StoryManagerPage() {
                     <div className={`${styles.modal} ${styles.unsplashModal}`} onClick={(e) => e.stopPropagation()}>
                         <div className={styles.modalHeader}>
                             <h2 className={styles.modalTitle}>
-                                {unsplashTarget === 'wide' ? 'เลือกภาพปกแนวกว้างจาก Unsplash' : 'เลือกรูปปกจาก Unsplash'}
+                                {unsplashTarget === 'wide' ? 'เลือกภาพปกแนวกว้าง' : 'เลือกรูปปก'}
                             </h2>
                             <button className={styles.iconBtn} onClick={() => setShowUnsplashModal(false)}>
                                 <X size={20} />
                             </button>
                         </div>
                         <div className={styles.modalBody}>
+                            <div className={styles.unsplashSourceTabs}>
+                                <button
+                                    type="button"
+                                    className={`${styles.unsplashSourceTab} ${imageSearchSource === 'unsplash' ? styles.unsplashSourceTabActive : ''}`}
+                                    onClick={() => handleImageSourceChange('unsplash')}
+                                >
+                                    Unsplash
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`${styles.unsplashSourceTab} ${imageSearchSource === 'pixabay' ? styles.unsplashSourceTabActive : ''}`}
+                                    onClick={() => handleImageSourceChange('pixabay')}
+                                >
+                                    Pixabay
+                                </button>
+                            </div>
                             <div className={styles.unsplashSearchRow}>
                                 <input
                                     type="text"
@@ -2490,7 +2538,7 @@ export default function StoryManagerPage() {
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
                                             e.preventDefault();
-                                            handleSearchUnsplash();
+                                            handleSearchImages();
                                         }
                                     }}
                                     className={styles.unsplashSearchInput}
@@ -2503,7 +2551,7 @@ export default function StoryManagerPage() {
                                 <button
                                     type="button"
                                     className={styles.unsplashSearchBtn}
-                                    onClick={() => handleSearchUnsplash()}
+                                    onClick={() => handleSearchImages()}
                                     disabled={isUnsplashLoading || !unsplashQuery.trim()}
                                 >
                                     {isUnsplashLoading ? <Loader2 size={16} className={styles.spinner} /> : 'ค้นหา'}
@@ -2531,7 +2579,12 @@ export default function StoryManagerPage() {
                                             alt={image.alt}
                                             className={`${styles.unsplashThumb} ${unsplashTarget === 'wide' ? styles.unsplashThumbWide : ''}`}
                                         />
-                                        <span className={styles.unsplashCredit}>by {image.author}</span>
+                                        <span className={styles.unsplashCredit}>
+                                            <span>by {image.author}</span>
+                                            <span className={styles.unsplashSourceBadge}>
+                                                {image.source === 'pixabay' ? 'Pixabay' : 'Unsplash'}
+                                            </span>
+                                        </span>
                                     </button>
                                 ))}
                             </div>

@@ -13,6 +13,7 @@ export interface DiscoveryFilters {
   length: DiscoveryLengthFilter;
   focusCore: boolean;
   limit: number;
+  offset: number;
 }
 
 export interface DiscoveryStory {

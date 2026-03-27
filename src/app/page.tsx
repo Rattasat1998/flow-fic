@@ -21,6 +21,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     length: 'all',
     focusCore: false,
     limit: HOME_DISCOVERY_LIMIT,
+    offset: 0,
   };
   const initialDiscovery = await getDiscoveryResponse(initialFilters);
 

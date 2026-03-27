@@ -1,0 +1,151 @@
+.main {
+    --home-shell-max-width: var(--ff-page-max-width, 1220px);
+    --home-shell-padding: var(--ff-page-gutter, clamp(0.95rem, 3vw, 1.8rem));
+    min-height: 100vh;
+    background:
+        radial-gradient(circle at 50% -18%, rgba(77, 130, 112, 0.22) 0%, rgba(77, 130, 112, 0) 56%),
+        radial-gradient(circle at 20% 12%, rgba(255, 143, 112, 0.1) 0%, rgba(255, 143, 112, 0) 42%),
+        #05070b;
+    color: #f4f6fb;
+}
+
+.pageShell {
+    padding-top: 64px;
+}
+
+.sectionHeader {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.9rem;
+    margin-bottom: 1.25rem;
+}
+
+.sectionHeaderLeft {
+    display: flex;
+    flex-direction: column;
+    gap: 0.22rem;
+}
+
+.sectionHeadline {
+    margin: 0;
+    font-family: ui-serif, Georgia, "Times New Roman", serif;
+    font-size: clamp(1.42rem, 2.5vw, 2rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: #ffffff;
+}
+
+.sectionSubhead {
+    margin: 0;
+    color: rgba(232, 238, 250, 0.6);
+    font-size: 0.72rem;
+    line-height: 1.5;
+}
+
+.railStateCard {
+    border-radius: 14px;
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.03);
+    min-height: 92px;
+    display: flex;
+    align-items: center;
+    gap: 0.66rem;
+    padding: 0.86rem 0.92rem;
+    color: rgba(232, 238, 250, 0.82);
+}
+
+.railStateTitle {
+    margin: 0;
+    color: #f6f8ff;
+    font-size: 0.9rem;
+    font-weight: 800;
+}
+
+.railStateText {
+    margin: 0.12rem 0 0;
+    color: rgba(232, 238, 250, 0.66);
+    font-size: 0.82rem;
+    line-height: 1.55;
+}
+
+.posterMetric {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    color: rgba(232, 238, 250, 0.72);
+    font-size: 0.62rem;
+    font-weight: 700;
+}
+
+.posterMetricIcon {
+    color: rgba(232, 238, 250, 0.5);
+}
+
+.mainCategoryShelfMetaRow {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.44rem;
+}
+
+.shelfGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.9rem 0.78rem;
+}
+
+@media (max-width: 960px) {
+    .sectionHeader {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
+
+@media (min-width: 768px) {
+    .shelfGrid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.95rem 0.8rem;
+    }
+}
+
+@media (min-width: 1181px) {
+    .shelfGrid {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 1rem 0.84rem;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1180px) {
+    .posterMetric {
+        font-size: 0.66rem;
+    }
+
+    .mainCategoryShelfMetaRow {
+        gap: 0.3rem;
+    }
+
+    .shelfGrid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.86rem 0.74rem;
+    }
+}
+
+@media (max-width: 767px) {
+    .pageShell {
+        padding-top: 58px;
+    }
+
+    .posterMetric {
+        font-size: 0.64rem;
+    }
+
+    .mainCategoryShelfMetaRow {
+        gap: 0.22rem 0.34rem;
+    }
+
+    .shelfGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.74rem 0.58rem;
+    }
+}

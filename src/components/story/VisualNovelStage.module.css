@@ -395,6 +395,10 @@
     margin-bottom: 0.4rem;
 }
 
+.dialogueHeaderFooterOnly {
+    justify-content: flex-end;
+}
+
 .speakerTag {
     display: inline-flex;
     align-items: center;

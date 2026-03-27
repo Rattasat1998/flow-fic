@@ -17,7 +17,7 @@ import {
   Search,
 } from 'lucide-react';
 
-import styles from '@/app/home.module.css';
+import styles from '@/components/navigation/SharedNavbar.module.css';
 
 type SharedNavbarProps = {
   navRef?: RefObject<HTMLElement | null>;

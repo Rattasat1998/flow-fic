@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/support";
 
 export const metadata: Metadata = {
   title: "นโยบายข้อพิพาทและ Chargeback | FlowFic",
@@ -47,7 +48,9 @@ export default function DisputeAndChargebackPolicyPage() {
       <section style={{ marginBottom: "2rem" }}>
         <h2>4. การติดต่อและหลักฐาน</h2>
         <p>
-          ผู้ใช้สามารถติดต่อช่องทางซัพพอร์ตของเว็บไซต์เพื่อส่งข้อมูลประกอบ เช่น รายการชำระเงินที่เกี่ยวข้อง
+          ผู้ใช้สามารถติดต่อทีมงานที่{" "}
+          <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>{" "}
+          เพื่อส่งข้อมูลประกอบ เช่น รายการชำระเงินที่เกี่ยวข้อง
           วันเวลาทำรายการ และเอกสารจากผู้ให้บริการชำระเงิน เพื่อใช้ในการตรวจสอบ
         </p>
       </section>

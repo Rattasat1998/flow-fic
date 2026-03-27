@@ -71,7 +71,9 @@ type CharSelectorViewportPosition = {
     maxHeight: number;
 };
 
-type UnsplashImage = {
+type ImageSearchSource = 'unsplash' | 'pixabay';
+
+type ImageSearchResult = {
     id: string;
     alt: string;
     thumb: string;
@@ -79,23 +81,85 @@ type UnsplashImage = {
     full: string;
     author: string;
     authorUrl: string;
-    unsplashUrl: string;
+    unsplashUrl?: string;
+    sourceUrl?: string | null;
+    source: ImageSearchSource;
 };
 
 type NoticeState = {
     tone: 'success' | 'error';
     title: string;
     message: string;
+    persistUntilClose?: boolean;
+};
+
+type NoticeOptions = {
+    persistUntilClose?: boolean;
+};
+
+type ChapterSpellcheckFieldInput = {
+    id: string;
+    label: string;
+    text: string;
+};
+
+type ChapterSpellcheckFieldIssue = {
+    id: string;
+    label: string;
+    matches: number;
+    suggestions: string[];
+    examples: string[];
+};
+
+type ChapterSpellcheckResponse = {
+    checkedFields: number;
+    totalMatches: number;
+    fields: ChapterSpellcheckFieldIssue[];
+    error?: string;
+};
+
+type ChapterPublishModerationResponse = {
+    allowed: boolean;
+    score: number;
+    reasons: string[];
+    matchedCategories: string[];
+    error?: string;
+};
+
+type BackgroundSoundSource = 'local' | 'pixabay_external' | 'pixabay_imported' | 'unknown';
+
+type BackgroundSoundMeta = {
+    source: BackgroundSoundSource;
+    trackId?: string | null;
+    title?: string | null;
+    creator?: string | null;
+    creatorUrl?: string | null;
+    sourceUrl?: string | null;
+    attribution?: string | null;
+    license?: string | null;
+    importedAt?: string | null;
+    audioProfile?: string | null;
+    storagePath?: string | null;
+    bytesOriginal?: number | null;
+    bytesCompressed?: number | null;
 };
 
 type ChapterContentPayload = {
     povCharacterId: string | null;
     chatTheme?: string;
-    backgroundSound: null;
+    backgroundSound: string | null;
+    backgroundSoundMeta?: BackgroundSoundMeta | null;
     blocks: Block[];
     branchChoices?: BranchChoiceDraft[];
     isEnding?: boolean;
     choiceTimerSeconds?: number;
+};
+
+type LocalSoundItem = {
+    id: string;
+    fileName: string;
+    label: string;
+    url: string;
 };
 
 type StoryPathMode = 'linear' | 'branching';
@@ -104,6 +168,42 @@ const MAX_BRANCH_CHOICES = 4;
 const MIN_BRANCH_CHOICES = 1;
 const MAX_BRANCH_TIMER_SECONDS = 300;
 const BRANCHING_FEATURE_ENABLED = FEATURE_FLAGS.branching;
+const IMAGE_SEARCH_PER_PAGE = 18;
+const CONTENT_POLICY_BLOCK_PREFIX = 'CONTENT_POLICY_BLOCKED:';
+
+const extractContentPolicyBlockMessage = (error: unknown): string | null => {
+    if (!error || typeof error !== 'object') return null;
+    const errorObject = error as { message?: string; details?: string; hint?: string };
+    const parts = [errorObject.message, errorObject.details, errorObject.hint]
+        .filter((value): value is string => typeof value === 'string' && value.length > 0);
+
+    for (const part of parts) {
+        const markerIndex = part.indexOf(CONTENT_POLICY_BLOCK_PREFIX);
+        if (markerIndex >= 0) {
+            const detail = part.slice(markerIndex + CONTENT_POLICY_BLOCK_PREFIX.length).trim();
+            return detail || 'เนื้อหาไม่ผ่านเกณฑ์ความปลอดภัยสำหรับการเผยแพร่';
+        }
+    }
+
+    return null;
+};
+
+const formatModerationReasons = (reasons: string[] | null | undefined): string => {
+    if (!Array.isArray(reasons) || reasons.length === 0) {
+        return 'ตรวจพบเนื้อหาไม่ผ่านเกณฑ์ความปลอดภัยสำหรับการเผยแพร่ กรุณาปรับเนื้อหาแล้วลองอีกครั้ง';
+    }
+
+    const compactReasons = reasons
+        .map((reason) => reason.trim())
+        .filter((reason) => reason.length > 0)
+        .slice(0, 2);
+
+    if (compactReasons.length === 0) {
+        return 'ตรวจพบเนื้อหาไม่ผ่านเกณฑ์ความปลอดภัยสำหรับการเผยแพร่ กรุณาปรับเนื้อหาแล้วลองอีกครั้ง';
+    }
+
+    return compactReasons.join(' ');
+};
 
 const createBlockId = (prefix: string) =>
     `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -222,6 +322,49 @@ const normalizeChoiceTimerSeconds = (value: unknown): number => {
     const numericValue = Number(value);
     if (!Number.isFinite(numericValue)) return 0;
     return Math.max(0, Math.min(MAX_BRANCH_TIMER_SECONDS, Math.floor(numericValue)));
+};
+
+const normalizeBackgroundSound = (value: unknown): string | null => {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+};
+
+const normalizeBackgroundSoundMeta = (value: unknown): BackgroundSoundMeta | null => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const raw = value as Record<string, unknown>;
+    const normalizedSource = raw.source === 'local'
+        || raw.source === 'pixabay_external'
+        || raw.source === 'pixabay_imported'
+        ? raw.source
+        : 'unknown';
+
+    const normalizeOptionalString = (input: unknown): string | null => {
+        if (typeof input !== 'string') return null;
+        const trimmed = input.trim();
+        return trimmed.length > 0 ? trimmed : null;
+    };
+
+    const normalizeOptionalNumber = (input: unknown): number | null => {
+        const numeric = Number(input);
+        return Number.isFinite(numeric) ? numeric : null;
+    };
+
+    return {
+        source: normalizedSource,
+        trackId: normalizeOptionalString(raw.trackId),
+        title: normalizeOptionalString(raw.title),
+        creator: normalizeOptionalString(raw.creator),
+        creatorUrl: normalizeOptionalString(raw.creatorUrl),
+        sourceUrl: normalizeOptionalString(raw.sourceUrl),
+        attribution: normalizeOptionalString(raw.attribution),
+        license: normalizeOptionalString(raw.license),
+        importedAt: normalizeOptionalString(raw.importedAt),
+        audioProfile: normalizeOptionalString(raw.audioProfile),
+        storagePath: normalizeOptionalString(raw.storagePath),
+        bytesOriginal: normalizeOptionalNumber(raw.bytesOriginal),
+        bytesCompressed: normalizeOptionalNumber(raw.bytesCompressed),
+    };
 };
 
 const normalizeDraftChoices = (rawChoices: unknown): BranchChoiceDraft[] => {
@@ -343,6 +486,8 @@ const parseStoredChapterContent = (rawContent: unknown): ChapterContentPayload =
     let parsedBlocks: Block[] = [];
     let parsedPov: string | null = null;
     let parsedChatTheme = 'white';
+    let parsedBackgroundSound: string | null = null;
+    let parsedBackgroundSoundMeta: BackgroundSoundMeta | null = null;
     let parsedBranchChoices: BranchChoiceDraft[] | undefined;
     let parsedIsEnding = false;
     let parsedChoiceTimerSeconds = 0;
@@ -366,6 +511,8 @@ const parseStoredChapterContent = (rawContent: unknown): ChapterContentPayload =
 
         parsedPov = typeof contentObject.povCharacterId === 'string' ? contentObject.povCharacterId : null;
         parsedChatTheme = typeof contentObject.chatTheme === 'string' ? contentObject.chatTheme : 'white';
+        parsedBackgroundSound = normalizeBackgroundSound(contentObject.backgroundSound);
+        parsedBackgroundSoundMeta = normalizeBackgroundSoundMeta(contentObject.backgroundSoundMeta);
         parsedIsEnding = contentObject.isEnding === true || contentObject.is_ending === true;
         parsedChoiceTimerSeconds = normalizeChoiceTimerSeconds(
             contentObject.choiceTimerSeconds ?? contentObject.choice_timer_seconds
@@ -396,7 +543,8 @@ const parseStoredChapterContent = (rawContent: unknown): ChapterContentPayload =
     const parsedContent: ChapterContentPayload = {
         povCharacterId: parsedPov,
         chatTheme: parsedChatTheme,
-        backgroundSound: null,
+        backgroundSound: parsedBackgroundSound,
+        backgroundSoundMeta: parsedBackgroundSoundMeta,
         blocks: parsedBlocks,
     };
 
@@ -497,6 +645,11 @@ export default function EditChapterPage() {
     const imageInputRef = useRef<HTMLInputElement>(null);
     const [isUploadingImage, setIsUploadingImage] = useState(false);
     const [chatTheme, setChatTheme] = useState<string>('white');
+    const [backgroundSound, setBackgroundSound] = useState<string | null>(null);
+    const [backgroundSoundMeta, setBackgroundSoundMeta] = useState<BackgroundSoundMeta | null>(null);
+    const [localSoundItems, setLocalSoundItems] = useState<LocalSoundItem[]>([]);
+    const [isLoadingLocalSounds, setIsLoadingLocalSounds] = useState(false);
+    const [localSoundError, setLocalSoundError] = useState<string | null>(null);
     const [sceneImageTarget, setSceneImageTarget] = useState<SceneImageTarget | null>(null);
 
     // Track which block has its character selector open (narrative mode)
@@ -513,10 +666,13 @@ export default function EditChapterPage() {
     const [showUnsplashModal, setShowUnsplashModal] = useState(false);
     const [unsplashTarget, setUnsplashTarget] = useState<'chat' | 'character' | 'narrative' | 'visual_novel'>('chat');
     const [unsplashQuery, setUnsplashQuery] = useState('');
-    const [unsplashResults, setUnsplashResults] = useState<UnsplashImage[]>([]);
+    const [unsplashResults, setUnsplashResults] = useState<ImageSearchResult[]>([]);
     const [isUnsplashLoading, setIsUnsplashLoading] = useState(false);
     const [unsplashError, setUnsplashError] = useState<string | null>(null);
+    const [imageSearchSource, setImageSearchSource] = useState<ImageSearchSource>('unsplash');
     const [notice, setNotice] = useState<NoticeState | null>(null);
+    const [isSpellcheckRunning, setIsSpellcheckRunning] = useState(false);
+    const [spellcheckIssueFieldIds, setSpellcheckIssueFieldIds] = useState<string[]>([]);
     const [revisions, setRevisions] = useState<ChapterRevision[]>([]);
     const [isLoadingRevisions, setIsLoadingRevisions] = useState(false);
     const [isRestoringRevision, setIsRestoringRevision] = useState(false);
@@ -551,6 +707,7 @@ export default function EditChapterPage() {
                 ? 'กระทู้'
                 : 'บรรยาย';
     const isBranchingStory = BRANCHING_FEATURE_ENABLED && storyPathMode === 'branching';
+    const spellcheckIssueFieldSet = useMemo(() => new Set(spellcheckIssueFieldIds), [spellcheckIssueFieldIds]);
 
     // ── Auto-Save Hook ──
     const {
@@ -576,14 +733,31 @@ export default function EditChapterPage() {
             blocks,
             povCharacterId,
             chatTheme,
-            backgroundSound: null,
+            backgroundSound: isVisualNovelStyle ? backgroundSound : null,
+            backgroundSoundMeta: isVisualNovelStyle && backgroundSound ? backgroundSoundMeta : null,
             isPremium,
             coinPrice,
             chapterChoices,
             isEndingChapter,
             choiceTimerSeconds,
         });
-    }, [title, blocks, povCharacterId, chatTheme, isPremium, coinPrice, chapterChoices, isEndingChapter, choiceTimerSeconds, isMounted, isLoading, onEditorChange]);
+    }, [
+        title,
+        blocks,
+        povCharacterId,
+        chatTheme,
+        backgroundSound,
+        backgroundSoundMeta,
+        isVisualNovelStyle,
+        isPremium,
+        coinPrice,
+        chapterChoices,
+        isEndingChapter,
+        choiceTimerSeconds,
+        isMounted,
+        isLoading,
+        onEditorChange,
+    ]);
 
     useEffect(() => {
         notifyAutoSave();
@@ -600,6 +774,8 @@ export default function EditChapterPage() {
             blocks,
             povCharacterId,
             chatTheme,
+            backgroundSound,
+            backgroundSoundMeta,
             isPremium,
             coinPrice,
             chapterChoices,
@@ -617,6 +793,8 @@ export default function EditChapterPage() {
         blocks,
         povCharacterId,
         chatTheme,
+        backgroundSound,
+        backgroundSoundMeta,
         isPremium,
         coinPrice,
         chapterChoices,
@@ -633,6 +811,8 @@ export default function EditChapterPage() {
         setBlocks(ensureBlocksForStyle(normalizeBlocks(draft.blocks, 'recovered-block'), editorStyle));
         setPovCharacterId(draft.povCharacterId);
         setChatTheme(draft.chatTheme);
+        setBackgroundSound(normalizeBackgroundSound(draft.backgroundSound));
+        setBackgroundSoundMeta(normalizeBackgroundSoundMeta(draft.backgroundSoundMeta));
         setIsPremium(draft.isPremium);
         setCoinPrice(draft.coinPrice);
         setIsEndingChapter(draft.isEndingChapter === true);
@@ -655,8 +835,73 @@ export default function EditChapterPage() {
         showNotice('success', 'ละทิ้งฉบับร่าง', 'ใช้ข้อมูลจากเซิร์ฟเวอร์แทน');
     };
 
-    const showNotice = useCallback((tone: NoticeState['tone'], title: string, message: string) => {
-        setNotice({ tone, title, message });
+    const showNotice = useCallback((
+        tone: NoticeState['tone'],
+        title: string,
+        message: string,
+        options?: NoticeOptions,
+    ) => {
+        setNotice({
+            tone,
+            title,
+            message,
+            persistUntilClose: options?.persistUntilClose === true,
+        });
+    }, []);
+
+    const showModerationBlockNotice = useCallback((message: string) => {
+        showNotice('error', 'ไม่สามารถเผยแพร่ได้', message, { persistUntilClose: true });
+    }, [showNotice]);
+
+    const runPublishModerationCheck = useCallback(async (
+        moderationPayload: { title: string; draftContent: ChapterContentPayload },
+    ) => {
+        const {
+            data: { session },
+            error: sessionError,
+        } = await supabase.auth.getSession();
+
+        if (sessionError || !session?.access_token) {
+            throw new Error('AUTH_REQUIRED');
+        }
+
+        const response = await fetch('/api/moderation/chapter-publish', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify(moderationPayload),
+            cache: 'no-store',
+        });
+
+        let payload: ChapterPublishModerationResponse | { error?: string } | null = null;
+        try {
+            payload = (await response.json()) as ChapterPublishModerationResponse | { error?: string };
+        } catch {
+            payload = null;
+        }
+
+        if (response.status === 422) {
+            const blockedPayload = payload as ChapterPublishModerationResponse | null;
+            return {
+                allowed: false,
+                reasons: Array.isArray(blockedPayload?.reasons) ? blockedPayload.reasons : [],
+            };
+        }
+
+        if (!response.ok) {
+            const errorMessage = payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string'
+                ? payload.error
+                : 'ตรวจสอบความปลอดภัยก่อนเผยแพร่ไม่สำเร็จ';
+            throw new Error(errorMessage);
+        }
+
+        const successPayload = payload as ChapterPublishModerationResponse | null;
+        return {
+            allowed: successPayload?.allowed !== false,
+            reasons: Array.isArray(successPayload?.reasons) ? successPayload.reasons : [],
+        };
     }, []);
 
     const updateSavedDraftSignature = useCallback((signature: string) => {
@@ -679,6 +924,8 @@ export default function EditChapterPage() {
         setBlocks(ensureBlocksForStyle(normalizeBlocks(snapshot.content.blocks, 'restored-block'), editorStyle));
         setPovCharacterId(snapshot.content.povCharacterId);
         setChatTheme(snapshot.content.chatTheme || 'white');
+        setBackgroundSound(normalizeBackgroundSound(snapshot.content.backgroundSound));
+        setBackgroundSoundMeta(normalizeBackgroundSoundMeta(snapshot.content.backgroundSoundMeta));
         setIsPremium(snapshot.isPremium);
         setCoinPrice(snapshot.coinPrice > 0 ? snapshot.coinPrice : 10);
         setChoiceTimerSeconds(normalizeChoiceTimerSeconds(snapshot.content.choiceTimerSeconds));
@@ -756,6 +1003,61 @@ export default function EditChapterPage() {
         }
     }, [isChatStyle]);
 
+    const applyBackgroundSoundSelection = useCallback((
+        nextUrl: string | null,
+        nextMeta: BackgroundSoundMeta | null,
+    ) => {
+        setBackgroundSound(normalizeBackgroundSound(nextUrl));
+        setBackgroundSoundMeta(nextMeta);
+    }, []);
+
+    const fetchLocalSounds = useCallback(async () => {
+        setIsLoadingLocalSounds(true);
+        setLocalSoundError(null);
+
+        try {
+            const response = await fetch('/api/sounds', { cache: 'no-store' });
+            const payload = await response.json() as { items?: LocalSoundItem[]; error?: string };
+            if (!response.ok) {
+                throw new Error(payload.error || 'โหลดรายการเสียงในเครื่องไม่สำเร็จ');
+            }
+
+            const items = Array.isArray(payload.items) ? payload.items : [];
+            setLocalSoundItems(items);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'โหลดรายการเสียงในเครื่องไม่สำเร็จ';
+            setLocalSoundError(message);
+            setLocalSoundItems([]);
+        } finally {
+            setIsLoadingLocalSounds(false);
+        }
+    }, []);
+
+    const handleSelectLocalSound = useCallback((nextUrl: string | null) => {
+        const normalizedUrl = normalizeBackgroundSound(nextUrl);
+        if (!normalizedUrl) {
+            applyBackgroundSoundSelection(null, null);
+            return;
+        }
+
+        const matched = localSoundItems.find((item) => item.url === normalizedUrl);
+        applyBackgroundSoundSelection(normalizedUrl, {
+            source: 'local',
+            trackId: matched?.id || null,
+            title: matched?.fileName || matched?.label || normalizedUrl,
+            creator: null,
+            creatorUrl: null,
+            sourceUrl: matched?.url || null,
+            attribution: null,
+            license: null,
+        });
+    }, [applyBackgroundSoundSelection, localSoundItems]);
+
+    useEffect(() => {
+        if (!isVisualNovelStyle) return;
+        void fetchLocalSounds();
+    }, [isVisualNovelStyle, fetchLocalSounds]);
+
     const buildDraftContentFromBlocks = useCallback((sourceBlocks: Block[]): ChapterContentPayload => {
         const draftBlocks = ensureBlocksForStyle(sourceBlocks, editorStyle);
         const draftChoices = isBranchingStory && !isEndingChapter
@@ -770,7 +1072,8 @@ export default function EditChapterPage() {
         const draftContent: ChapterContentPayload = {
             povCharacterId: isChatStyle ? povCharacterId : null,
             chatTheme: isChatStyle ? chatTheme : undefined,
-            backgroundSound: null,
+            backgroundSound: isVisualNovelStyle ? backgroundSound : null,
+            backgroundSoundMeta: isVisualNovelStyle && backgroundSound ? backgroundSoundMeta : null,
             blocks: draftBlocks,
             branchChoices: draftChoices,
             isEnding: isBranchingStory ? isEndingChapter : undefined,
@@ -785,8 +1088,11 @@ export default function EditChapterPage() {
         choiceTimerSeconds,
         isBranchingStory,
         isChatStyle,
+        isVisualNovelStyle,
         povCharacterId,
         chatTheme,
+        backgroundSound,
+        backgroundSoundMeta,
     ]);
 
     const buildDraftSnapshotForBlocks = useCallback((sourceBlocks: Block[]) => {
@@ -1726,6 +2032,7 @@ export default function EditChapterPage() {
 
     useEffect(() => {
         if (!notice) return;
+        if (notice.persistUntilClose) return;
         const timeout = setTimeout(() => setNotice(null), 2400);
         return () => clearTimeout(timeout);
     }, [notice]);
@@ -1831,6 +2138,8 @@ export default function EditChapterPage() {
                 setBlocks(ensureBlocksForStyle(normalizeBlocks(parsed.blocks, 'cached-block'), editorStyle));
                 setPovCharacterId(parsed.povCharacterId);
                 setChatTheme(typeof parsed.chatTheme === 'string' ? parsed.chatTheme : 'white');
+                setBackgroundSound(normalizeBackgroundSound(parsed.backgroundSound));
+                setBackgroundSoundMeta(normalizeBackgroundSoundMeta(parsed.backgroundSoundMeta));
                 setIsPremium(!!parsed.isPremium);
                 setCoinPrice(Number.isFinite(parsed.coinPrice) ? Math.max(1, Number(parsed.coinPrice)) : 10);
                 setIsEndingChapter(parsed.isEndingChapter === true);
@@ -1852,7 +2161,8 @@ export default function EditChapterPage() {
                 const cachedDraftContent: ChapterContentPayload = {
                     povCharacterId: parsed.povCharacterId || null,
                     chatTheme: typeof parsed.chatTheme === 'string' ? parsed.chatTheme : 'white',
-                    backgroundSound: null,
+                    backgroundSound: normalizeBackgroundSound(parsed.backgroundSound),
+                    backgroundSoundMeta: normalizeBackgroundSoundMeta(parsed.backgroundSoundMeta),
                     blocks: ensureBlocksForStyle(parsedBlocks, editorStyle),
                     branchChoices: effectiveCachedChoices,
                     isEnding: parsed.isEndingChapter === true,
@@ -1963,6 +2273,8 @@ export default function EditChapterPage() {
                 const parsedBlocks = ensureBlocksForStyle(parsedContent.blocks, editorStyle);
                 const parsedPov = parsedContent.povCharacterId;
                 const parsedChatTheme = parsedContent.chatTheme || 'white';
+                const parsedBackgroundSound = normalizeBackgroundSound(parsedContent.backgroundSound);
+                const parsedBackgroundSoundMeta = normalizeBackgroundSoundMeta(parsedContent.backgroundSoundMeta);
                 const parsedDraftChoices = parsedContent.branchChoices;
                 const parsedIsEnding = parsedContent.isEnding === true;
                 const parsedChoiceTimerSeconds = normalizeChoiceTimerSeconds(parsedContent.choiceTimerSeconds);
@@ -1970,6 +2282,8 @@ export default function EditChapterPage() {
                 setBlocks(parsedBlocks);
                 setPovCharacterId(parsedPov);
                 setChatTheme(parsedChatTheme);
+                setBackgroundSound(parsedBackgroundSound);
+                setBackgroundSoundMeta(parsedBackgroundSoundMeta);
                 setChoiceTimerSeconds(parsedChoiceTimerSeconds);
 
                 let choiceRows: Array<{
@@ -2036,7 +2350,8 @@ export default function EditChapterPage() {
                 const loadedDraftContent: ChapterContentPayload = {
                     povCharacterId: isChatStyle ? parsedPov : null,
                     chatTheme: isChatStyle ? parsedChatTheme : undefined,
-                    backgroundSound: null,
+                    backgroundSound: isVisualNovelStyle ? parsedBackgroundSound : null,
+                    backgroundSoundMeta: isVisualNovelStyle && parsedBackgroundSound ? parsedBackgroundSoundMeta : null,
                     blocks: ensureBlocksForStyle(parsedBlocks, editorStyle),
                     branchChoices: effectiveChoices,
                     isEnding: parsedIsEnding,
@@ -2058,6 +2373,8 @@ export default function EditChapterPage() {
                     blocks: parsedBlocks,
                     povCharacterId: parsedPov,
                     chatTheme: parsedChatTheme,
+                    backgroundSound: parsedBackgroundSound,
+                    backgroundSoundMeta: parsedBackgroundSoundMeta,
                     isPremium: !!data.is_premium,
                     coinPrice: (data.coin_price && data.coin_price > 0) ? data.coin_price : 10,
                     chapterChoices: effectiveChoices,
@@ -2089,6 +2406,7 @@ export default function EditChapterPage() {
         isLoadingAuth,
         router,
         isChatStyle,
+        isVisualNovelStyle,
         editorStyle,
         buildSignatureFromSnapshot,
         buildChoicesSignature,
@@ -2272,7 +2590,8 @@ export default function EditChapterPage() {
         const contentPayload: ChapterContentPayload = {
             povCharacterId: isChatStyle ? povCharacterId : null,
             chatTheme: isChatStyle ? chatTheme : undefined,
-            backgroundSound: null,
+            backgroundSound: isVisualNovelStyle ? backgroundSound : null,
+            backgroundSoundMeta: isVisualNovelStyle && backgroundSound ? backgroundSoundMeta : null,
             blocks: normalizedBlocks,
             isEnding: isBranchingStory ? isEndingChapter : undefined,
             choiceTimerSeconds: isBranchingStory ? choiceTimerSeconds : undefined,
@@ -2287,6 +2606,31 @@ export default function EditChapterPage() {
                 orderIndex: index,
             })),
         };
+
+        if (publish) {
+            try {
+                const moderationResult = await runPublishModerationCheck({
+                    title,
+                    draftContent: draftContentPayload,
+                });
+
+                if (!moderationResult.allowed) {
+                    showModerationBlockNotice(
+                        formatModerationReasons(moderationResult.reasons),
+                    );
+                    return;
+                }
+            } catch (moderationError) {
+                const message = moderationError instanceof Error && moderationError.message === 'AUTH_REQUIRED'
+                    ? 'กรุณาเข้าสู่ระบบใหม่ก่อนเผยแพร่'
+                    : moderationError instanceof Error && moderationError.message
+                        ? moderationError.message
+                        : 'ตรวจสอบความปลอดภัยก่อนเผยแพร่ไม่สำเร็จ';
+                showNotice('error', 'ไม่สามารถเผยแพร่ได้', message);
+                return;
+            }
+        }
+
         const draftSignatureForSave = buildSignatureFromSnapshot({
             title,
             content: draftContentPayload,
@@ -2389,8 +2733,11 @@ export default function EditChapterPage() {
             }
         } catch (err) {
             console.error("Error saving chapter:", err);
+            const contentPolicyMessage = extractContentPolicyBlockMessage(err);
             if (err instanceof Error && err.message === 'CHOICES_RPC_NOT_FOUND') {
                 showNotice('error', 'ระบบยังไม่พร้อม', 'ยังไม่พบ RPC ตัวเลือกเส้นทาง กรุณารัน migration ล่าสุดก่อนใช้งาน');
+            } else if (contentPolicyMessage) {
+                showModerationBlockNotice(contentPolicyMessage);
             } else {
                 showNotice('error', 'บันทึกไม่สำเร็จ', 'เกิดข้อผิดพลาดในการบันทึก กรุณาลองอีกครั้ง');
             }
@@ -2604,8 +2951,23 @@ export default function EditChapterPage() {
         }
     };
 
-    const handleSearchUnsplash = async (rawQuery?: string) => {
+    const getDefaultImageQuery = (
+        target: 'chat' | 'character' | 'narrative' | 'visual_novel',
+        slot?: SceneImageTargetSlot,
+    ) => {
+        if (target === 'chat') return 'cinematic scene';
+        if (target === 'visual_novel') {
+            return slot === 'backgroundUrl'
+                ? 'anime sci-fi background'
+                : 'anime character illustration';
+        }
+        if (target === 'narrative') return 'fantasy landscape';
+        return 'portrait character';
+    };
+
+    const handleSearchImages = async (rawQuery?: string, sourceOverride?: ImageSearchSource) => {
         const query = (rawQuery ?? unsplashQuery).trim();
+        const source = sourceOverride ?? imageSearchSource;
         if (!query) {
             setUnsplashResults([]);
             setUnsplashError(null);
@@ -2616,17 +2978,27 @@ export default function EditChapterPage() {
         setUnsplashError(null);
 
         try {
-            const response = await fetch(`/api/unsplash/search?q=${encodeURIComponent(query)}&perPage=18`);
+            const endpoint = source === 'pixabay'
+                ? `/api/pixabay/images?q=${encodeURIComponent(query)}&perPage=${IMAGE_SEARCH_PER_PAGE}`
+                : `/api/unsplash/search?q=${encodeURIComponent(query)}&perPage=${IMAGE_SEARCH_PER_PAGE}`;
+            const response = await fetch(endpoint);
             const data = await response.json();
 
             if (!response.ok) {
                 throw new Error(data?.error || 'ค้นหารูปไม่สำเร็จ');
             }
 
-            setUnsplashResults((data.results || []) as UnsplashImage[]);
+            const normalizedResults = ((data.results || []) as Array<Omit<ImageSearchResult, 'source'>>).map((item) => ({
+                ...item,
+                source,
+                sourceUrl: item.sourceUrl ?? item.unsplashUrl ?? null,
+            }));
+
+            setUnsplashResults(normalizedResults);
+            setUnsplashError(typeof data?.error === 'string' ? data.error : null);
         } catch (error) {
-            console.error('Unsplash search failed:', error);
-            setUnsplashError('ค้นหารูปไม่สำเร็จ ลองใหม่อีกครั้ง');
+            console.error('Image search failed:', error);
+            setUnsplashError(error instanceof Error ? error.message : 'ค้นหารูปไม่สำเร็จ ลองใหม่อีกครั้ง');
         } finally {
             setIsUnsplashLoading(false);
         }
@@ -2638,6 +3010,7 @@ export default function EditChapterPage() {
         slot?: SceneImageTargetSlot,
     ) => {
         setUnsplashTarget(target);
+        setImageSearchSource('unsplash');
         setSceneImageTarget(
             target === 'visual_novel' && blockId && slot
                 ? { blockId, slot }
@@ -2647,23 +3020,15 @@ export default function EditChapterPage() {
         setUnsplashError(null);
 
         if (!unsplashQuery) {
-            const defaultQuery = target === 'chat'
-                ? 'cinematic scene'
-                : target === 'visual_novel'
-                    ? slot === 'backgroundUrl'
-                        ? 'anime sci-fi background'
-                        : 'anime character illustration'
-                    : target === 'narrative'
-                        ? 'fantasy landscape'
-                        : 'portrait character';
+            const defaultQuery = getDefaultImageQuery(target, slot);
             setUnsplashQuery(defaultQuery);
-            handleSearchUnsplash(defaultQuery);
+            handleSearchImages(defaultQuery, 'unsplash');
         } else if (unsplashResults.length === 0) {
-            handleSearchUnsplash(unsplashQuery);
+            handleSearchImages(unsplashQuery, 'unsplash');
         }
     };
 
-    const handleSelectUnsplashImage = async (image: UnsplashImage) => {
+    const handleSelectUnsplashImage = async (image: ImageSearchResult) => {
         if (unsplashTarget === 'chat') {
             const newId = createBlockId('block');
             const newBlock: Block = {
@@ -2716,6 +3081,23 @@ export default function EditChapterPage() {
 
         setSceneImageTarget(null);
         setShowUnsplashModal(false);
+    };
+
+    const handleImageSourceChange = (nextSource: ImageSearchSource) => {
+        setImageSearchSource(nextSource);
+        setUnsplashError(null);
+
+        if (unsplashQuery.trim()) {
+            void handleSearchImages(unsplashQuery, nextSource);
+            return;
+        }
+
+        const defaultQuery = getDefaultImageQuery(
+            unsplashTarget,
+            unsplashTarget === 'visual_novel' ? sceneImageTarget?.slot : undefined,
+        );
+        setUnsplashQuery(defaultQuery);
+        void handleSearchImages(defaultQuery, nextSource);
     };
 
     const removeBlock = async (id: string) => {
@@ -3066,6 +3448,186 @@ export default function EditChapterPage() {
         showNotice('success', 'ตรวจสอบผ่านแล้ว', 'ทุกทางเลือกพร้อมสำหรับบันทึกหรือเผยแพร่');
     }, [getChoiceValidationError, chapterChoices, isEndingChapter, showNotice]);
 
+    const focusSpellcheckFieldById = useCallback((fieldId: string) => {
+        if (typeof window === 'undefined' || typeof document === 'undefined') return;
+        const target = document.getElementById(fieldId) as HTMLTextAreaElement | HTMLInputElement | null;
+        if (!target || target.disabled || target.readOnly) return;
+
+        try {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+        } catch {
+            target.scrollIntoView();
+        }
+        try {
+            target.focus({ preventScroll: true });
+        } catch {
+            target.focus();
+        }
+
+        if (typeof target.setSelectionRange === 'function') {
+            const end = target.value.length;
+            target.setSelectionRange(end, end);
+        }
+
+        target.classList.remove(styles.spellcheckFocusFlash);
+        // Force reflow so repeated clicks replay the pulse animation.
+        void target.offsetWidth;
+        target.classList.add(styles.spellcheckFocusFlash);
+        window.setTimeout(() => {
+            target.classList.remove(styles.spellcheckFocusFlash);
+        }, 1200);
+    }, []);
+
+    const collectSpellcheckFields = useCallback((): ChapterSpellcheckFieldInput[] => {
+        const fields: ChapterSpellcheckFieldInput[] = [];
+        const seen = new Set<string>();
+
+        const pushField = (field: ChapterSpellcheckFieldInput) => {
+            const text = field.text.trim();
+            if (!text) return;
+            if (seen.has(field.id)) return;
+            seen.add(field.id);
+            fields.push({
+                ...field,
+                text,
+            });
+        };
+
+        pushField({
+            id: 'chapter-title-input',
+            label: 'ชื่อตอน',
+            text: title,
+        });
+
+        let textBlockIndex = 0;
+        let sceneIndex = 0;
+        blocks.forEach((block) => {
+            if (block.type === 'image') return;
+            if (!block.text.trim()) return;
+
+            textBlockIndex += 1;
+            if (isVisualNovelStyle) {
+                sceneIndex += 1;
+                pushField({
+                    id: `scene-text-${block.id}`,
+                    label: `บทพูดฉาก ${sceneIndex}`,
+                    text: block.text,
+                });
+                return;
+            }
+
+            pushField({
+                id: `textarea-${block.id}`,
+                label: isChatStyle ? `ข้อความแชท ${textBlockIndex}` : `เนื้อหา ${textBlockIndex}`,
+                text: block.text,
+            });
+        });
+
+        if (isChatStyle) {
+            pushField({
+                id: 'chat-input-draft',
+                label: 'ช่องพิมพ์แชท',
+                text: chatInputValue,
+            });
+        }
+
+        if (isBranchingStory && !isEndingChapter) {
+            chapterChoices.forEach((choice, index) => {
+                pushField({
+                    id: `choice-text-${choice.id}`,
+                    label: `ทางเลือก ${index + 1}`,
+                    text: choice.choiceText,
+                });
+                pushField({
+                    id: `choice-outcome-${choice.id}`,
+                    label: `ผลลัพธ์ทางเลือก ${index + 1}`,
+                    text: choice.outcomeText,
+                });
+            });
+        }
+
+        return fields;
+    }, [title, blocks, isVisualNovelStyle, isChatStyle, chatInputValue, isBranchingStory, isEndingChapter, chapterChoices]);
+
+    const handleTriggerSpellcheck = useCallback(async () => {
+        if (isSpellcheckRunning) return;
+
+        const fields = collectSpellcheckFields();
+        if (fields.length === 0) {
+            showNotice('error', 'ยังไม่มีข้อความให้ตรวจ', 'เพิ่มเนื้อหาภาษาไทยในตอนก่อนกดตรวจคำไทย');
+            return;
+        }
+
+        setIsSpellcheckRunning(true);
+        setSpellcheckIssueFieldIds([]);
+
+        try {
+            const {
+                data: { session },
+                error: sessionError,
+            } = await supabase.auth.getSession();
+
+            if (sessionError || !session?.access_token) {
+                throw new Error('AUTH_REQUIRED');
+            }
+
+            const response = await fetch('/api/spellcheck/chapter', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({ fields }),
+                cache: 'no-store',
+            });
+
+            let payload: ChapterSpellcheckResponse | { error?: string } | null = null;
+            try {
+                payload = (await response.json()) as ChapterSpellcheckResponse | { error?: string };
+            } catch {
+                payload = null;
+            }
+
+            if (!response.ok) {
+                const message =
+                    payload && typeof payload === 'object' && typeof payload.error === 'string' && payload.error.length > 0
+                        ? payload.error
+                        : 'ไม่สามารถตรวจคำไทยได้ในขณะนี้';
+                throw new Error(message);
+            }
+
+            const result = payload as ChapterSpellcheckResponse;
+            const issueFields = Array.isArray(result.fields) ? result.fields : [];
+
+            if (issueFields.length === 0) {
+                focusSpellcheckFieldById(fields[0].id);
+                showNotice('success', 'ไม่พบคำไทยที่ควรแก้', `ตรวจแล้ว ${result.checkedFields} ฟิลด์`);
+                return;
+            }
+
+            const issueIds = issueFields.map((field) => field.id);
+            setSpellcheckIssueFieldIds(issueIds);
+            focusSpellcheckFieldById(issueIds[0]);
+
+            const compactLabels = issueFields
+                .slice(0, 4)
+                .map((field) => `${field.label} (${field.matches})`)
+                .join(', ');
+            const extraLabel = issueFields.length > 4 ? ` และอีก ${issueFields.length - 4} ฟิลด์` : '';
+            showNotice(
+                'error',
+                'พบคำไทยที่ควรตรวจแก้',
+                `พบ ${result.totalMatches} จุดใน ${issueFields.length} ฟิลด์: ${compactLabels}${extraLabel}`,
+                { persistUntilClose: true },
+            );
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'ไม่สามารถตรวจคำไทยได้';
+            showNotice('error', 'ตรวจคำไทยไม่สำเร็จ', message);
+        } finally {
+            setIsSpellcheckRunning(false);
+        }
+    }, [collectSpellcheckFields, focusSpellcheckFieldById, isSpellcheckRunning, showNotice]);
+
     if (!isMounted) return null;
 
     if (authError) {
@@ -3126,8 +3688,9 @@ export default function EditChapterPage() {
 
                 <div className={styles.headerCenter}>
                     <input
+                        id="chapter-title-input"
                         type="text"
-                        className={styles.headerTitleInput}
+                        className={`${styles.headerTitleInput} ${spellcheckIssueFieldSet.has('chapter-title-input') ? styles.spellcheckFieldError : ''}`}
                         placeholder="ชื่อตอน..."
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
@@ -3183,6 +3746,16 @@ export default function EditChapterPage() {
                     >
                         {isSaving ? <Loader2 size={16} className={styles.spinner} /> : <Save size={16} />}
                         บันทึกร่าง
+                    </button>
+                    <button
+                        type="button"
+                        className={styles.spellcheckBtn}
+                        onClick={handleTriggerSpellcheck}
+                        disabled={isSaving || isRestoringRevision || isSpellcheckRunning}
+                        title="ตรวจคำผิดภาษาไทย"
+                    >
+                        {isSpellcheckRunning ? <Loader2 size={16} className={styles.spinner} /> : <CheckCircle2 size={16} />}
+                        {isSpellcheckRunning ? 'กำลังตรวจไทย...' : 'ตรวจคำไทย'}
                     </button>
                     <button
                         className={styles.publishBtn}
@@ -3289,6 +3862,7 @@ export default function EditChapterPage() {
                                     blockStyles.chatImageBubble,
                                     isSystem ? '' : isPOV ? blockStyles.chatImageBubblePov : blockStyles.chatImageBubbleOther,
                                 ].filter(Boolean).join(' ');
+                                const chatFieldId = `textarea-${block.id}`;
                                 const textBubbleClassName = [
                                     blockStyles.blockTextarea,
                                     blockStyles.chatTextBubble,
@@ -3297,6 +3871,7 @@ export default function EditChapterPage() {
                                         : isPOV
                                             ? blockStyles.chatTextBubblePov
                                             : blockStyles.chatTextBubbleOther,
+                                    spellcheckIssueFieldSet.has(chatFieldId) ? styles.spellcheckFieldError : '',
                                 ].filter(Boolean).join(' ');
                                 const chatActionClassName = [
                                     blockStyles.blockActions,
@@ -3330,9 +3905,11 @@ export default function EditChapterPage() {
                                                     />
                                                 ) : (
                                                     <textarea
-                                                        id={`textarea-${block.id}`}
+                                                        id={chatFieldId}
                                                         className={textBubbleClassName}
                                                         value={block.text}
+                                                        spellCheck={true}
+                                                        lang="th-TH"
                                                         onChange={(e) => {
                                                             updateBlock(block.id, { text: e.target.value });
                                                             e.target.style.height = 'auto';
@@ -3435,7 +4012,7 @@ export default function EditChapterPage() {
                                 <button
                                     type="button"
                                     className={styles.unsplashBtn}
-                                    title="ค้นหารูปจาก Unsplash"
+                                    title="ค้นหารูปจากคลังภาพ (Unsplash/Pixabay)"
                                     onClick={() => openUnsplashPicker('chat')}
                                 >
                                     <Search size={16} />
@@ -3443,8 +4020,11 @@ export default function EditChapterPage() {
 
                                 {/* Text Input */}
                                 <textarea
-                                    className={styles.chatTextInput}
+                                    id="chat-input-draft"
+                                    className={`${styles.chatTextInput} ${spellcheckIssueFieldSet.has('chat-input-draft') ? styles.spellcheckFieldError : ''}`}
                                     value={chatInputValue}
+                                    spellCheck={true}
+                                    lang="th-TH"
                                     onChange={(e) => setChatInputValue(e.target.value)}
                                     onKeyDown={handleChatInputKeyDown}
                                     placeholder={`ส่งข้อความในฐานะ ${activeCharacterId ? characters.find(c => c.id === activeCharacterId)?.name : 'บทบรรยาย'}...`}
@@ -3488,6 +4068,47 @@ export default function EditChapterPage() {
                                     เพิ่มฉากใหม่
                                 </button>
                             </div>
+                        </div>
+
+                        <div className={styles.soundSelector}>
+                            <label htmlFor="visual-novel-bgm">BGM ประจำตอน</label>
+                            <select
+                                id="visual-novel-bgm"
+                                className={styles.soundSelect}
+                                value={localSoundItems.some((item) => item.url === backgroundSound) ? (backgroundSound || '') : ''}
+                                onChange={(event) => handleSelectLocalSound(normalizeBackgroundSound(event.target.value))}
+                                disabled={isLoadingLocalSounds}
+                            >
+                                <option value="">-- ไม่ใช้ BGM --</option>
+                                {localSoundItems.map((item) => (
+                                    <option key={item.id} value={item.url}>
+                                        {item.fileName}
+                                    </option>
+                                ))}
+                            </select>
+                            {isLoadingLocalSounds && (
+                                <span className={styles.soundHelp}>กำลังโหลดรายการเสียงในเครื่อง...</span>
+                            )}
+                            {localSoundError && (
+                                <span className={styles.soundError}>{localSoundError}</span>
+                            )}
+
+                            <span className={styles.soundHelp}>
+                                เพลงสำหรับ Visual Novel รอบนี้เลือกได้จาก local sound library เท่านั้น
+                            </span>
+                            {backgroundSoundMeta?.attribution && (
+                                <span className={styles.soundAttribution}>
+                                    เครดิตที่บันทึก: {backgroundSoundMeta.attribution}
+                                </span>
+                            )}
+                            {backgroundSound && (
+                                <audio
+                                    className={styles.soundPreview}
+                                    controls
+                                    preload="none"
+                                    src={backgroundSound}
+                                />
+                            )}
                         </div>
 
                         <input
@@ -3609,7 +4230,7 @@ export default function EditChapterPage() {
                                                             onClick={() => openUnsplashPicker('visual_novel', block.id, 'leftSceneImageUrl')}
                                                         >
                                                             <Search size={15} />
-                                                            Unsplash
+                                                            คลังภาพ
                                                         </button>
                                                         {block.leftSceneImageUrl && (
                                                             <button
@@ -3661,7 +4282,7 @@ export default function EditChapterPage() {
                                                             onClick={() => openUnsplashPicker('visual_novel', block.id, 'rightSceneImageUrl')}
                                                         >
                                                             <Search size={15} />
-                                                            Unsplash
+                                                            คลังภาพ
                                                         </button>
                                                         {block.rightSceneImageUrl && (
                                                             <button
@@ -3718,7 +4339,7 @@ export default function EditChapterPage() {
                                                         onClick={() => openUnsplashPicker('visual_novel', block.id, 'soloSceneImageUrl')}
                                                     >
                                                         <Search size={15} />
-                                                        Unsplash
+                                                        คลังภาพ
                                                     </button>
                                                     {block.soloSceneImageUrl && (
                                                         <button
@@ -3786,7 +4407,7 @@ export default function EditChapterPage() {
                                                             onClick={() => openUnsplashPicker('visual_novel', block.id, 'backgroundUrl')}
                                                         >
                                                             <Search size={15} />
-                                                            Unsplash
+                                                            คลังภาพ
                                                         </button>
                                                         {block.backgroundUrl && (
                                                             <button
@@ -3884,8 +4505,10 @@ export default function EditChapterPage() {
                                             <span>บทพูด / คำบรรยายของฉาก</span>
                                             <textarea
                                                 id={`scene-text-${block.id}`}
-                                                className={styles.visualNovelTextarea}
+                                                className={`${styles.visualNovelTextarea} ${spellcheckIssueFieldSet.has(`scene-text-${block.id}`) ? styles.spellcheckFieldError : ''}`}
                                                 value={block.text}
+                                                spellCheck={true}
+                                                lang="th-TH"
                                                 onChange={(event) => {
                                                     updateBlock(block.id, { text: event.target.value });
                                                     event.target.style.height = 'auto';
@@ -3929,6 +4552,7 @@ export default function EditChapterPage() {
                                 const isSelectorOpen = openCharSelectorId === block.id;
                                 const isImageBlock = block.type === 'image' && !!block.imageUrl;
                                 const isFlashbackBlock = !isImageBlock && block.isFlashback;
+                                const narrativeFieldId = `textarea-${block.id}`;
                                 const blockRowClassName = [
                                     blockStyles.blockRow,
                                     blockStyles.alignLeft,
@@ -3937,6 +4561,7 @@ export default function EditChapterPage() {
                                 const textareaClassName = [
                                     blockStyles.blockTextarea,
                                     isFlashbackBlock ? blockStyles.blockTextareaFlashback : '',
+                                    spellcheckIssueFieldSet.has(narrativeFieldId) ? styles.spellcheckFieldError : '',
                                 ].filter(Boolean).join(' ');
 
                                 return (
@@ -4054,9 +4679,11 @@ export default function EditChapterPage() {
                                                         </div>
                                                     )}
                                                     <textarea
-                                                        id={`textarea-${block.id}`}
+                                                        id={narrativeFieldId}
                                                         className={textareaClassName}
                                                         value={block.text}
+                                                        spellCheck={true}
+                                                        lang="th-TH"
                                                         onChange={(e) => {
                                                             updateBlock(block.id, { text: e.target.value });
                                                             e.target.style.height = 'auto';
@@ -4105,7 +4732,7 @@ export default function EditChapterPage() {
                                     <Plus size={20} /> เพิ่มบรรทัดใหม่
                                 </button>
                                 <button className={blockStyles.addImageBtn} onClick={() => openUnsplashPicker('narrative')}>
-                                    <Search size={18} /> เพิ่มรูปจาก Unsplash
+                                    <Search size={18} /> เพิ่มรูปจากคลังภาพ
                                 </button>
                             </div>
                         </div>
@@ -4214,10 +4841,13 @@ export default function EditChapterPage() {
                                                     <div className={styles.branchingTreeNodeLabel}>ทางเลือก {index + 1}</div>
                                                     <div className={styles.branchingChoicePrimaryInputs}>
                                                         <input
+                                                            id={`choice-text-${choice.id}`}
                                                             type="text"
-                                                            className={styles.branchingChoiceInput}
+                                                            className={`${styles.branchingChoiceInput} ${spellcheckIssueFieldSet.has(`choice-text-${choice.id}`) ? styles.spellcheckFieldError : ''}`}
                                                             placeholder="ข้อความทางเลือก เช่น เปิดประตูห้องใต้ดิน"
                                                             value={choice.choiceText}
+                                                            spellCheck={true}
+                                                            lang="th-TH"
                                                             onChange={(event) => updateChapterChoice(choice.id, { choiceText: event.target.value })}
                                                         />
                                                         <select
@@ -4233,9 +4863,12 @@ export default function EditChapterPage() {
                                                                 ))}
                                                         </select>
                                                         <textarea
-                                                            className={styles.branchingChoiceInput}
+                                                            id={`choice-outcome-${choice.id}`}
+                                                            className={`${styles.branchingChoiceInput} ${spellcheckIssueFieldSet.has(`choice-outcome-${choice.id}`) ? styles.spellcheckFieldError : ''}`}
                                                             placeholder="Outcome text (ไม่แสดงในหน้าอ่านตอนนี้)"
                                                             value={choice.outcomeText}
+                                                            spellCheck={true}
+                                                            lang="th-TH"
                                                             onChange={(event) => updateChapterChoice(choice.id, { outcomeText: event.target.value })}
                                                             rows={3}
                                                         />
@@ -4591,7 +5224,7 @@ export default function EditChapterPage() {
                                     className={styles.unsplashPickerBtn}
                                     onClick={() => openUnsplashPicker('character')}
                                 >
-                                    เลือกรูปจาก Unsplash
+                                    เลือกรูปจากคลังภาพ
                                 </button>
 
                                 <div className={styles.editField}>
@@ -4626,7 +5259,7 @@ export default function EditChapterPage() {
                 }}>
                     <div className={`${styles.modal} ${styles.unsplashModal}`} onClick={e => e.stopPropagation()}>
                         <div className={styles.modalHeader}>
-                            <h2 className={styles.modalTitle}>ค้นหารูปจาก Unsplash</h2>
+                            <h2 className={styles.modalTitle}>ค้นหารูปภาพ</h2>
                             <button className={styles.iconBtn} onClick={() => {
                                 setShowUnsplashModal(false);
                                 setSceneImageTarget(null);
@@ -4636,6 +5269,22 @@ export default function EditChapterPage() {
                         </div>
 
                         <div className={styles.modalBody}>
+                            <div className={styles.unsplashSourceTabs}>
+                                <button
+                                    type="button"
+                                    className={`${styles.unsplashSourceTab} ${imageSearchSource === 'unsplash' ? styles.unsplashSourceTabActive : ''}`}
+                                    onClick={() => handleImageSourceChange('unsplash')}
+                                >
+                                    Unsplash
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`${styles.unsplashSourceTab} ${imageSearchSource === 'pixabay' ? styles.unsplashSourceTabActive : ''}`}
+                                    onClick={() => handleImageSourceChange('pixabay')}
+                                >
+                                    Pixabay
+                                </button>
+                            </div>
                             <div className={styles.unsplashSearchRow}>
                                 <input
                                     type="text"
@@ -4644,7 +5293,7 @@ export default function EditChapterPage() {
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
                                             e.preventDefault();
-                                            handleSearchUnsplash();
+                                            handleSearchImages();
                                         }
                                     }}
                                     className={styles.unsplashSearchInput}
@@ -4661,7 +5310,7 @@ export default function EditChapterPage() {
                                 <button
                                     type="button"
                                     className={styles.unsplashSearchBtn}
-                                    onClick={() => handleSearchUnsplash()}
+                                    onClick={() => handleSearchImages()}
                                     disabled={isUnsplashLoading || !unsplashQuery.trim()}
                                 >
                                     {isUnsplashLoading ? <Loader2 size={16} className={styles.spinner} /> : 'ค้นหา'}
@@ -4685,7 +5334,12 @@ export default function EditChapterPage() {
                                         onClick={() => handleSelectUnsplashImage(image)}
                                     >
                                         <img src={image.thumb} alt={image.alt} className={styles.unsplashThumb} />
-                                        <span className={styles.unsplashCredit}>by {image.author}</span>
+                                        <span className={styles.unsplashCredit}>
+                                            <span>by {image.author}</span>
+                                            <span className={styles.unsplashSourceBadge}>
+                                                {image.source === 'pixabay' ? 'Pixabay' : 'Unsplash'}
+                                            </span>
+                                        </span>
                                     </button>
                                 ))}
                             </div>

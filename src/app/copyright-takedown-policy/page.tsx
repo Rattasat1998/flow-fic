@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/support";
 
 export const metadata: Metadata = {
   title: "นโยบายลิขสิทธิ์และการแจ้งถอดเนื้อหา | FlowFic",
@@ -23,7 +24,9 @@ export default function CopyrightTakedownPolicyPage() {
         <h2>1. การแจ้งละเมิดลิขสิทธิ์</h2>
         <p>
           หากท่านพบเนื้อหาบนเว็บไซต์ที่อาจละเมิดลิขสิทธิ์หรือสิทธิในทรัพย์สินทางปัญญา
-          สามารถแจ้งทีมงานผ่านช่องทางซัพพอร์ตของเว็บไซต์ โดยระบุลิงก์เนื้อหาที่เกี่ยวข้องและรายละเอียดให้ชัดเจน
+          สามารถแจ้งทีมงานที่{" "}
+          <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>{" "}
+          โดยระบุลิงก์เนื้อหาที่เกี่ยวข้องและรายละเอียดให้ชัดเจน
         </p>
       </section>
 

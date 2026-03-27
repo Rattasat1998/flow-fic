@@ -8,7 +8,7 @@ import { ChatMessage } from '@/types/chat';
 import { VisualNovelStage } from '@/components/story/VisualNovelStage';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { List, Heart, Bookmark, BookmarkCheck, MoreVertical, X, Send, Lock, Coins } from 'lucide-react';
+import { List, Heart, Bookmark, BookmarkCheck, MoreVertical, X, Send, Lock, Coins, Play, Pause, Volume2, VolumeX } from 'lucide-react';
 import { BranchChoiceOverlay, OverlayChoice } from '@/components/story/BranchChoiceOverlay';
 import styles from './story.module.css';
 import { supabase } from '@/lib/supabase';
@@ -28,6 +28,7 @@ import {
 import { getOrCreateTrackingSessionId } from '@/lib/trackingSession';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTracking } from '@/hooks/useTracking';
+import { SUPPORT_EMAIL } from '@/lib/support';
 
 interface StoryPageProps {
   params: Promise<{ id: string }>;
@@ -128,6 +129,7 @@ type ReaderChapter = {
   id: string;
   title: string;
   povCharacterId: string | null;
+  backgroundSound: string | null;
   blocks: Block[];
   chatTheme: string;
   isEnding: boolean;
@@ -293,6 +295,10 @@ const MAX_BRANCH_TIMER_SECONDS = 300;
 const NARRATIVE_BOOKMARK_VIEWPORT_OFFSET = 128;
 const NARRATIVE_BOOKMARK_LONG_PRESS_MS = 400;
 const NARRATIVE_BOOKMARK_LONG_PRESS_MOVE_THRESHOLD = 12;
+const VISUAL_NOVEL_TYPEWRITER_CHAR_MS = 35;
+const VISUAL_NOVEL_AUTOPLAY_DELAY_MS = 900;
+const VISUAL_NOVEL_DEFAULT_BGM = '/sounds/vibehorn-lofi-background-music-479217.mp3';
+const VISUAL_NOVEL_BGM_VOLUME = 0.38;
 
 type StoredManualNarrativeBookmark = {
   chapterId: string;
@@ -353,6 +359,12 @@ const normalizeChoiceTimerSeconds = (value: unknown): number => {
   const numericValue = Number(value);
   if (!Number.isFinite(numericValue)) return 0;
   return Math.max(0, Math.min(MAX_BRANCH_TIMER_SECONDS, Math.floor(numericValue)));
+};
+
+const normalizeBackgroundSound = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 };
 
 const fallbackAvatar = 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=200&q=80';
@@ -419,18 +431,27 @@ const normalizeReaderBlocks = (rawBlocks: unknown): Block[] => {
 
 const parseChapterBlocks = (content: unknown): {
   povCharacterId: string | null;
+  backgroundSound: string | null;
   blocks: Block[];
   chatTheme: string;
   isEnding: boolean;
   choiceTimerSeconds: number;
 } => {
-  if (!content) return { povCharacterId: null, blocks: [], chatTheme: 'white', isEnding: false, choiceTimerSeconds: 0 };
+  if (!content) return {
+    povCharacterId: null,
+    backgroundSound: null,
+    blocks: [],
+    chatTheme: 'white',
+    isEnding: false,
+    choiceTimerSeconds: 0,
+  };
 
   if (typeof content === 'object' && content !== null && 'blocks' in content) {
     const parsedContent = content as Record<string, unknown>;
     const parsedBlocks = normalizeReaderBlocks(parsedContent.blocks);
     return {
       povCharacterId: typeof parsedContent.povCharacterId === 'string' ? parsedContent.povCharacterId : null,
+      backgroundSound: normalizeBackgroundSound(parsedContent.backgroundSound),
       blocks: parsedBlocks,
       chatTheme: typeof parsedContent.chatTheme === 'string' ? parsedContent.chatTheme : 'white',
       isEnding: parsedContent.isEnding === true || parsedContent.is_ending === true,
@@ -449,10 +470,18 @@ const parseChapterBlocks = (content: unknown): {
     textToParse = typeof parsedContent.text === 'string' ? parsedContent.text : '';
   }
 
-  if (!textToParse) return { povCharacterId: null, blocks: [], chatTheme: 'white', isEnding: false, choiceTimerSeconds: 0 };
+  if (!textToParse) return {
+    povCharacterId: null,
+    backgroundSound: null,
+    blocks: [],
+    chatTheme: 'white',
+    isEnding: false,
+    choiceTimerSeconds: 0,
+  };
 
   return {
     povCharacterId: null,
+    backgroundSound: null,
     chatTheme: 'white',
     isEnding: false,
     choiceTimerSeconds: 0,
@@ -535,7 +564,12 @@ export default function StoryPage({ params }: StoryPageProps) {
 
   const [messages, setMessages] = useState<ReaderChatMessage[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isVisualNovelUiHidden, setIsVisualNovelUiHidden] = useState(false);
+  const [typedText, setTypedText] = useState('');
+  const [isTypingComplete, setIsTypingComplete] = useState(true);
+  const [typingSceneIndex, setTypingSceneIndex] = useState<number | null>(null);
+  const [isVisualNovelAutoPlayEnabled, setIsVisualNovelAutoPlayEnabled] = useState(false);
+  const [isVisualNovelBgmEnabled, setIsVisualNovelBgmEnabled] = useState(false);
+  const [visualNovelBgmStartError, setVisualNovelBgmStartError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [dbStory, setDbStory] = useState<DBStory | null>(null);
@@ -584,6 +618,9 @@ export default function StoryPage({ params }: StoryPageProps) {
   const countdownChapterRef = useRef<string | null>(null);
   const currentChapterRef = useRef<ReaderChapter | null>(null);
   const currentChapterChoicesRef = useRef<ReaderChapterChoice[]>([]);
+  const visualNovelTypewriterTimerRef = useRef<number | null>(null);
+  const visualNovelAutoPlayTimerRef = useRef<number | null>(null);
+  const visualNovelBgmAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Like / Favorite / Comment state
   const [likedChapterId, setLikedChapterId] = useState<string | null>(null);
@@ -741,12 +778,20 @@ export default function StoryPage({ params }: StoryPageProps) {
     return rows.map((row) => {
       const parsedContent = row.can_read && row.content_payload
         ? parseChapterBlocks(row.content_payload)
-        : { povCharacterId: null, blocks: [], chatTheme: 'white', isEnding: false, choiceTimerSeconds: 0 };
+        : {
+          povCharacterId: null,
+          backgroundSound: null,
+          blocks: [],
+          chatTheme: 'white',
+          isEnding: false,
+          choiceTimerSeconds: 0,
+        };
 
       return {
         id: row.id,
         title: row.title || 'ไม่มีชื่อ',
         povCharacterId: parsedContent.povCharacterId,
+        backgroundSound: parsedContent.backgroundSound,
         blocks: parsedContent.blocks,
         chatTheme: parsedContent.chatTheme,
         isEnding: parsedContent.isEnding,
@@ -1463,6 +1508,22 @@ export default function StoryPage({ params }: StoryPageProps) {
   const isVisualNovelStyle = activeWritingStyle === 'visual_novel';
   const isSequentialReader = isChatStyle || isVisualNovelStyle;
   const allowTocInReader = !(isBranchingPath && !isChatStyle);
+
+  useEffect(() => {
+    if (!isVisualNovelStyle) return;
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, [isVisualNovelStyle]);
+
   const activeChatThemeClass = useMemo(() => {
     const rawTheme = (dbChapters[selectedChapterIndex]?.chatTheme || 'white').toLowerCase();
     if (rawTheme === 'pink' || rawTheme === 'mint' || rawTheme === 'midnight') return rawTheme;
@@ -1495,6 +1556,7 @@ export default function StoryPage({ params }: StoryPageProps) {
   );
   const isLoadingChoicesForRead = activeChapterId !== null && loadingChoicesChapterId === activeChapterId && isLoadingChoices;
   const activeChapterChoiceTimerSeconds = normalizeChoiceTimerSeconds(activeChapter?.choiceTimerSeconds);
+  const isActiveChapterLocked = !!activeChapter && !canReadChapter(activeChapter);
   const isNarrativeChoicePanelVisible = !!activeChapter && narrativeChoicePanelVisibleChapterId === activeChapter.id;
 
   const activeStory = useMemo(
@@ -1545,6 +1607,17 @@ export default function StoryPage({ params }: StoryPageProps) {
   const currentVisualNovelScene = visualNovelScenes.length > 0
     ? visualNovelScenes[Math.min(currentIndex, visualNovelScenes.length - 1)]
     : null;
+  const visualNovelBgmSource = useMemo(() => {
+    if (!isVisualNovelStyle) return null;
+    const chapterBgm = normalizeBackgroundSound(activeChapter?.backgroundSound);
+    return chapterBgm || VISUAL_NOVEL_DEFAULT_BGM;
+  }, [activeChapter?.backgroundSound, isVisualNovelStyle]);
+  const visualNovelTypedDialogueText = useMemo(() => {
+    if (!currentVisualNovelScene) return '';
+    if (currentIndex >= visualNovelScenes.length) return currentVisualNovelScene.text;
+    if (typingSceneIndex !== currentIndex) return '';
+    return typedText;
+  }, [currentVisualNovelScene, currentIndex, visualNovelScenes.length, typingSceneIndex, typedText]);
   const tocCharacters = useMemo(
     () => characters.filter((character) => character.name.trim().length > 0),
     [characters]
@@ -1603,6 +1676,29 @@ export default function StoryPage({ params }: StoryPageProps) {
   useEffect(() => {
     currentChapterChoicesRef.current = chapterChoicesForRead;
   }, [chapterChoicesForRead]);
+
+  const clearVisualNovelTypewriterTimer = useCallback(() => {
+    if (visualNovelTypewriterTimerRef.current) {
+      window.clearTimeout(visualNovelTypewriterTimerRef.current);
+      visualNovelTypewriterTimerRef.current = null;
+    }
+  }, []);
+
+  const clearVisualNovelAutoPlayTimer = useCallback(() => {
+    if (visualNovelAutoPlayTimerRef.current) {
+      window.clearTimeout(visualNovelAutoPlayTimerRef.current);
+      visualNovelAutoPlayTimerRef.current = null;
+    }
+  }, []);
+
+  const applyVisualNovelTypingState = useCallback(
+    (nextTypedText: string, nextIsTypingComplete: boolean, nextTypingSceneIndex: number | null) => {
+      setTypedText((previous) => (previous === nextTypedText ? previous : nextTypedText));
+      setIsTypingComplete((previous) => (previous === nextIsTypingComplete ? previous : nextIsTypingComplete));
+      setTypingSceneIndex((previous) => (previous === nextTypingSceneIndex ? previous : nextTypingSceneIndex));
+    },
+    []
+  );
 
   const resetChoiceCountdown = useCallback((nextRemainingMs: number | null = null) => {
     if (countdownIntervalRef.current) {
@@ -2084,6 +2180,71 @@ export default function StoryPage({ params }: StoryPageProps) {
     saveReadingProgress,
   ]);
 
+  // Typewriter state intentionally updates on scene transitions.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!isVisualNovelStyle || isPreviewMode) {
+      clearVisualNovelTypewriterTimer();
+      applyVisualNovelTypingState('', true, null);
+      return;
+    }
+
+    const chapter = dbChapters[selectedChapterIndex];
+    if (!chapter || !canReadChapter(chapter) || !currentVisualNovelScene) {
+      clearVisualNovelTypewriterTimer();
+      applyVisualNovelTypingState('', true, null);
+      return;
+    }
+
+    const fullSceneText = currentVisualNovelScene.text || '';
+
+    if (currentIndex >= visualNovelScenes.length) {
+      clearVisualNovelTypewriterTimer();
+      applyVisualNovelTypingState(fullSceneText, true, currentIndex);
+      return;
+    }
+
+    clearVisualNovelTypewriterTimer();
+    applyVisualNovelTypingState('', false, currentIndex);
+
+    if (fullSceneText.length === 0) {
+      applyVisualNovelTypingState('', true, currentIndex);
+      return;
+    }
+    let nextCharIndex = 0;
+
+    const typeNextCharacter = () => {
+      nextCharIndex += 1;
+      setTypedText(fullSceneText.slice(0, nextCharIndex));
+
+      if (nextCharIndex >= fullSceneText.length) {
+        visualNovelTypewriterTimerRef.current = null;
+        setIsTypingComplete(true);
+        return;
+      }
+
+      visualNovelTypewriterTimerRef.current = window.setTimeout(typeNextCharacter, VISUAL_NOVEL_TYPEWRITER_CHAR_MS);
+    };
+
+    visualNovelTypewriterTimerRef.current = window.setTimeout(typeNextCharacter, VISUAL_NOVEL_TYPEWRITER_CHAR_MS);
+
+    return () => {
+      clearVisualNovelTypewriterTimer();
+    };
+  }, [
+    isVisualNovelStyle,
+    isPreviewMode,
+    dbChapters,
+    selectedChapterIndex,
+    canReadChapter,
+    currentVisualNovelScene,
+    currentIndex,
+    visualNovelScenes.length,
+    clearVisualNovelTypewriterTimer,
+    applyVisualNovelTypingState,
+  ]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   useEffect(() => {
     if (!isChatStyle || isPreviewMode) return;
     if (!activeChapter || !canReadChapter(activeChapter)) return;
@@ -2124,11 +2285,28 @@ export default function StoryPage({ params }: StoryPageProps) {
     if (!activeStory) return;
     const currentChapter = dbChapters[selectedChapterIndex];
     if (!currentChapter || !canReadChapter(currentChapter)) return;
+
     if (isVisualNovelStyle) {
+      if (showChoiceOverlay) return;
       if (currentIndex >= visualNovelScenes.length) return;
+
+      const activeScene = visualNovelScenes[currentIndex];
+      const activeSceneText = activeScene?.text || '';
+      const isSceneTextFullyRendered = typingSceneIndex === currentIndex && typedText === activeSceneText;
+
+      if (!isSceneTextFullyRendered) {
+        clearVisualNovelTypewriterTimer();
+        setTypingSceneIndex(currentIndex);
+        setTypedText(activeSceneText);
+        setIsTypingComplete(true);
+        return;
+      }
+
+      clearVisualNovelAutoPlayTimer();
       setCurrentIndex((prev) => prev + 1);
       return;
     }
+
     if (!isChatStyle || currentIndex >= chatScript.length) return;
 
     const nextMessage = chatScript[currentIndex];
@@ -2142,9 +2320,14 @@ export default function StoryPage({ params }: StoryPageProps) {
     canReadChapter,
     isVisualNovelStyle,
     currentIndex,
-    visualNovelScenes.length,
+    visualNovelScenes,
+    typingSceneIndex,
+    typedText,
     isChatStyle,
     chatScript,
+    showChoiceOverlay,
+    clearVisualNovelTypewriterTimer,
+    clearVisualNovelAutoPlayTimer,
   ]);
 
   useEffect(() => {
@@ -2174,6 +2357,91 @@ export default function StoryPage({ params }: StoryPageProps) {
     canReadChapter,
     handleNextLine,
   ]);
+
+  useEffect(() => {
+    clearVisualNovelAutoPlayTimer();
+
+    if (!isVisualNovelStyle || isPreviewMode) return;
+    if (!isVisualNovelAutoPlayEnabled) return;
+    if (!activeChapter || !canReadChapter(activeChapter)) return;
+    if (showChoiceOverlay) return;
+    if (currentIndex >= visualNovelScenes.length) return;
+    if (!isTypingComplete) return;
+
+    const activeSceneText = visualNovelScenes[currentIndex]?.text || '';
+    const isSceneTextFullyRendered = typingSceneIndex === currentIndex && typedText === activeSceneText;
+    if (!isSceneTextFullyRendered) return;
+
+    visualNovelAutoPlayTimerRef.current = window.setTimeout(() => {
+      handleNextLine();
+    }, VISUAL_NOVEL_AUTOPLAY_DELAY_MS);
+
+    return () => {
+      clearVisualNovelAutoPlayTimer();
+    };
+  }, [
+    isVisualNovelStyle,
+    isPreviewMode,
+    isVisualNovelAutoPlayEnabled,
+    activeChapter,
+    canReadChapter,
+    showChoiceOverlay,
+    currentIndex,
+    visualNovelScenes,
+    isTypingComplete,
+    typingSceneIndex,
+    typedText,
+    handleNextLine,
+    clearVisualNovelAutoPlayTimer,
+  ]);
+
+  useEffect(() => {
+    const audio = visualNovelBgmAudioRef.current;
+    if (!audio) return;
+
+    audio.volume = VISUAL_NOVEL_BGM_VOLUME;
+    audio.loop = true;
+
+    if (
+      !isVisualNovelStyle
+      || isPreviewMode
+      || isActiveChapterLocked
+      || !isVisualNovelBgmEnabled
+      || !visualNovelBgmSource
+    ) {
+      audio.pause();
+      return;
+    }
+
+    const playPromise = audio.play();
+    if (!playPromise || typeof playPromise.catch !== 'function') return;
+
+    playPromise
+      .then(() => {
+        setVisualNovelBgmStartError(null);
+      })
+      .catch(() => {
+        setVisualNovelBgmStartError('แตะปุ่ม BGM อีกครั้งเพื่อเริ่มเพลง');
+      });
+  }, [
+    isVisualNovelStyle,
+    isPreviewMode,
+    isActiveChapterLocked,
+    isVisualNovelBgmEnabled,
+    visualNovelBgmSource,
+  ]);
+
+  useEffect(() => {
+    const audio = visualNovelBgmAudioRef.current;
+
+    return () => {
+      clearVisualNovelTypewriterTimer();
+      clearVisualNovelAutoPlayTimer();
+      if (audio) {
+        audio.pause();
+      }
+    };
+  }, [clearVisualNovelTypewriterTimer, clearVisualNovelAutoPlayTimer]);
 
   // Interaction handlers
   const handleToggleLike = async () => {
@@ -2370,9 +2638,9 @@ export default function StoryPage({ params }: StoryPageProps) {
       if (result?.message === 'INSUFFICIENT_COINS') {
         setUnlockError('เหรียญไม่พอสำหรับปลดล็อกตอนนี้');
       } else if (result?.message === 'FINANCE_RESTRICTED') {
-        setUnlockError('บัญชีของคุณถูกจำกัดการทำธุรกรรมชั่วคราว กรุณาลองใหม่ภายหลัง');
+        setUnlockError(`บัญชีของคุณถูกจำกัดการทำธุรกรรมชั่วคราว กรุณาลองใหม่ภายหลัง หรือติดต่อทีมงานที่ ${SUPPORT_EMAIL}`);
       } else if (result?.message === 'FINANCE_BANNED') {
-        setUnlockError('บัญชีของคุณถูกระงับสิทธิ์ด้านการเงิน กรุณาติดต่อทีมงาน');
+        setUnlockError(`บัญชีของคุณถูกระงับสิทธิ์ด้านการเงิน กรุณาติดต่อทีมงานที่ ${SUPPORT_EMAIL}`);
       } else if (result?.message === 'AUTH_REQUIRED') {
         setUnlockError('กรุณาเข้าสู่ระบบก่อนปลดล็อก');
       } else if (result?.message === 'CHAPTER_NOT_FOUND') {
@@ -2528,6 +2796,50 @@ export default function StoryPage({ params }: StoryPageProps) {
       });
     }, 100);
   }, [handleSelectBranchChoice, resetChoiceCountdown]);
+
+  const handleToggleVisualNovelBgm = useCallback(() => {
+    const nextEnabled = !isVisualNovelBgmEnabled;
+    setIsVisualNovelBgmEnabled(nextEnabled);
+
+    const audio = visualNovelBgmAudioRef.current;
+    if (!audio) return;
+
+    if (!nextEnabled) {
+      audio.pause();
+      setVisualNovelBgmStartError(null);
+      return;
+    }
+
+    if (
+      !isVisualNovelStyle
+      || isPreviewMode
+      || isActiveChapterLocked
+      || !visualNovelBgmSource
+    ) {
+      return;
+    }
+
+    audio.volume = VISUAL_NOVEL_BGM_VOLUME;
+    const playPromise = audio.play();
+    if (!playPromise || typeof playPromise.catch !== 'function') {
+      setVisualNovelBgmStartError(null);
+      return;
+    }
+
+    playPromise
+      .then(() => {
+        setVisualNovelBgmStartError(null);
+      })
+      .catch(() => {
+        setVisualNovelBgmStartError('เบราว์เซอร์บล็อกเสียงอัตโนมัติ ลองกด BGM อีกครั้ง');
+      });
+  }, [
+    isVisualNovelBgmEnabled,
+    isVisualNovelStyle,
+    isPreviewMode,
+    isActiveChapterLocked,
+    visualNovelBgmSource,
+  ]);
 
   useEffect(() => {
     countdownChapterRef.current = null;
@@ -2753,6 +3065,19 @@ export default function StoryPage({ params }: StoryPageProps) {
   const visualNovelProgressLabel = visualNovelScenes.length > 0
     ? `ฉาก ${visualNovelDisplayedIndex}/${visualNovelScenes.length}`
     : 'ไม่มีฉาก';
+  const isVisualNovelSceneTextComplete = currentIndex >= visualNovelScenes.length
+    || (
+      typingSceneIndex === currentIndex
+      && typedText === (currentVisualNovelScene?.text || '')
+    );
+  const isVisualNovelTypingBlocked = isVisualNovelStyle
+    && currentIndex < visualNovelScenes.length
+    && !isVisualNovelSceneTextComplete;
+  const visualNovelTapHint = currentIndex >= visualNovelScenes.length
+    ? 'ฉากจบแล้ว เลือกทางต่อหรือเปลี่ยนตอนจากเมนู'
+    : isVisualNovelTypingBlocked
+      ? 'แตะเพื่อแสดงข้อความเต็ม'
+      : 'แตะเพื่อไปฉากถัดไป';
   const readerContextTitle = isBranchingPath
     ? activeStory?.title || ''
     : currentChapter?.title?.trim()
@@ -3013,62 +3338,84 @@ export default function StoryPage({ params }: StoryPageProps) {
         ) : isVisualNovelStyle ? (
           <>
             <div className={styles.visualNovelViewport}>
-              {!isVisualNovelUiHidden && (
-                <div className={styles.visualNovelTopbar}>
-                  <div className={styles.visualNovelContext}>
-                    <span className={styles.visualNovelStoryTitle}>{activeStory.title}</span>
-                    <span className={styles.visualNovelChapterTitle}>
-                      {currentChapter?.title?.trim()
-                        ? `ตอนที่ ${selectedChapterIndex + 1}: ${currentChapter.title}`
-                        : `ตอนที่ ${selectedChapterIndex + 1}`}
-                    </span>
-                  </div>
-
-                  <div className={styles.visualNovelTopbarActions}>
-                    {allowTocInReader && (
-                      <button
-                        type="button"
-                        className={styles.visualNovelTopbarBtn}
-                        onClick={() => setIsTocOpen(!isTocOpen)}
-                      >
-                        <List size={18} />
-                        <span>สารบัญ</span>
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className={styles.visualNovelTopbarBtn}
-                      onClick={handleToggleLike}
-                    >
-                      <Heart size={18} fill={isCurrentChapterLiked ? 'currentColor' : 'none'} />
-                      <span>{storySettings.hideHeartCount ? 'หัวใจ' : likeCount}</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.visualNovelTopbarBtn}
-                      onClick={handleToggleFavorite}
-                    >
-                      {isCurrentChapterFavorited ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}
-                      <span>{isCurrentChapterFavorited ? 'อยู่ในชั้น' : 'เก็บเข้าชั้น'}</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.visualNovelTopbarBtn}
-                      onClick={() => setCurrentIndex(visualNovelScenes.length)}
-                      disabled={visualNovelScenes.length === 0 || currentIndex >= visualNovelScenes.length}
-                    >
-                      <span>ข้ามไปท้ายตอน</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.visualNovelTopbarBtn}
-                      onClick={() => setIsVisualNovelUiHidden(true)}
-                    >
-                      <span>ซ่อน UI</span>
-                    </button>
-                  </div>
+              <div className={styles.visualNovelTopbar}>
+                <div className={styles.visualNovelContext}>
+                  <span className={styles.visualNovelStoryTitle}>{activeStory.title}</span>
+                  <span className={styles.visualNovelChapterTitle}>
+                    {currentChapter?.title?.trim()
+                      ? `ตอนที่ ${selectedChapterIndex + 1}: ${currentChapter.title}`
+                      : `ตอนที่ ${selectedChapterIndex + 1}`}
+                  </span>
+                  <span className={styles.visualNovelTapHint}>{visualNovelTapHint}</span>
                 </div>
-              )}
+
+                <div className={styles.visualNovelTopbarActions}>
+                  {visualNovelBgmSource && (
+                    <audio
+                      ref={visualNovelBgmAudioRef}
+                      src={visualNovelBgmSource}
+                      preload="none"
+                      loop
+                      playsInline
+                      className={styles.visualNovelHiddenAudio}
+                    />
+                  )}
+                  {allowTocInReader && (
+                    <button
+                      type="button"
+                      className={styles.visualNovelTopbarBtn}
+                      onClick={() => setIsTocOpen(!isTocOpen)}
+                    >
+                      <List size={18} />
+                      <span>สารบัญ</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className={styles.visualNovelTopbarBtn}
+                    onClick={handleToggleLike}
+                  >
+                    <Heart size={18} fill={isCurrentChapterLiked ? 'currentColor' : 'none'} />
+                    <span>{storySettings.hideHeartCount ? 'หัวใจ' : likeCount}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.visualNovelTopbarBtn}
+                    onClick={handleToggleFavorite}
+                  >
+                    {isCurrentChapterFavorited ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}
+                    <span>{isCurrentChapterFavorited ? 'อยู่ในชั้น' : 'เก็บเข้าชั้น'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.visualNovelTopbarBtn} ${isVisualNovelBgmEnabled ? styles.visualNovelTopbarBtnActive : ''}`}
+                    onClick={handleToggleVisualNovelBgm}
+                    disabled={!visualNovelBgmSource}
+                  >
+                    {isVisualNovelBgmEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+                    <span>{isVisualNovelBgmEnabled ? 'BGM: ON' : 'BGM: OFF'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.visualNovelTopbarBtn} ${isVisualNovelAutoPlayEnabled ? styles.visualNovelTopbarBtnActive : ''}`}
+                    onClick={() => setIsVisualNovelAutoPlayEnabled((prev) => !prev)}
+                  >
+                    {isVisualNovelAutoPlayEnabled ? <Pause size={18} /> : <Play size={18} />}
+                    <span>{isVisualNovelAutoPlayEnabled ? 'Auto Play: ON' : 'Auto Play: OFF'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.visualNovelTopbarBtn}
+                    onClick={() => setCurrentIndex(visualNovelScenes.length)}
+                    disabled={visualNovelScenes.length === 0 || currentIndex >= visualNovelScenes.length}
+                  >
+                    <span>ข้ามไปท้ายตอน</span>
+                  </button>
+                </div>
+                {visualNovelBgmStartError && (
+                  <span className={styles.visualNovelTapHint}>{visualNovelBgmStartError}</span>
+                )}
+              </div>
 
               {isCurrentChapterLocked ? (
                 <div className={styles.visualNovelGateWrap}>{premiumGateJSX}</div>
@@ -3087,34 +3434,10 @@ export default function StoryPage({ params }: StoryPageProps) {
                     fallbackBackgroundUrl={activeStory.wideCoverUrl}
                     variant="reader"
                     className={styles.visualNovelStage}
+                    hideNarratorFallback
+                    dialogueTextOverride={visualNovelTypedDialogueText}
                     footerSlot={<span className={styles.visualNovelProgressPill}>{visualNovelProgressLabel}</span>}
                   />
-
-                  {!isVisualNovelUiHidden && currentIndex < visualNovelScenes.length && (
-                    <button
-                      type="button"
-                      className={styles.visualNovelAdvanceHint}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleNextLine();
-                      }}
-                    >
-                      แตะหรือกด Space เพื่อไปต่อ
-                    </button>
-                  )}
-
-                  {isVisualNovelUiHidden && (
-                    <button
-                      type="button"
-                      className={styles.visualNovelRevealUi}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setIsVisualNovelUiHidden(false);
-                      }}
-                    >
-                      แสดง UI
-                    </button>
-                  )}
 
                   {showVisualNovelBranchSection && !showChoiceOverlay && (
                     <div
@@ -3161,41 +3484,6 @@ export default function StoryPage({ params }: StoryPageProps) {
                 <div className={styles.emptyState}>ตอนนี้ยังไม่มีฉาก</div>
               )}
             </div>
-
-            {!isVisualNovelUiHidden && !isBranchingPath && (
-              <div className={styles.visualNovelFooterArea}>
-                <div className={styles.chapterNav}>
-                  <button
-                    type="button"
-                    className={styles.chapterNavBtn}
-                    onClick={() => {
-                      navigateToChapter(selectedChapterIndex - 1);
-                    }}
-                    disabled={selectedChapterIndex === 0}
-                  >
-                    ตอนก่อนหน้า
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.chapterNavBtn}
-                    onClick={() => {
-                      navigateToChapter(selectedChapterIndex + 1);
-                    }}
-                    disabled={selectedChapterIndex === dbChapters.length - 1}
-                  >
-                    ตอนถัดไป
-                  </button>
-                </div>
-
-                {storySettings.allowComments && !isCurrentChapterLocked && isLastChapter && commentSectionJSX}
-              </div>
-            )}
-
-            {!isVisualNovelUiHidden && (
-              <div className="ffMobileActionBar">
-                {readerMobileActions}
-              </div>
-            )}
           </>
         ) : (
           <>

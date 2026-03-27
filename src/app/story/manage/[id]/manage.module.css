@@ -1021,6 +1021,31 @@
     max-width: 920px;
 }
 
+.unsplashSourceTabs {
+    display: inline-flex;
+    gap: 0.45rem;
+}
+
+.unsplashSourceTab {
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #334155;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 0.32rem 0.78rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.unsplashSourceTabActive {
+    background: #0f172a;
+    border-color: #0f172a;
+    color: #f8fafc;
+}
+
 .unsplashSearchRow {
     display: flex;
     gap: 0.6rem;
@@ -1107,13 +1132,31 @@
 }
 
 .unsplashCredit {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem;
     font-size: 0.7rem;
     color: #64748b;
     padding: 0.35rem 0.45rem 0.45rem;
+}
+
+.unsplashCredit > span:first-child {
+    min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.unsplashSourceBadge {
+    border: 1px solid #d1d5db;
+    border-radius: 999px;
+    padding: 0.08rem 0.42rem;
+    font-size: 0.64rem;
+    font-weight: 700;
+    color: #475569;
+    background: #f8fafc;
+    flex-shrink: 0;
 }
 
 @keyframes spin {
@@ -1155,6 +1198,11 @@
 
     .unsplashSearchBtn {
         min-width: 72px;
+    }
+
+    .unsplashSourceTab {
+        width: 100%;
+        justify-content: center;
     }
 }
 

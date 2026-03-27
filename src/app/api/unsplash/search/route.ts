@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { applyInMemoryRateLimit, getRequestIp } from '@/lib/server/request-rate-limit';
 
 type UnsplashPhoto = {
     id: string;
@@ -26,6 +27,31 @@ type UnsplashSearchResponse = {
     results: UnsplashPhoto[];
 };
 
+type UnsplashSearchItem = {
+    id: string;
+    alt: string;
+    thumb: string;
+    regular: string;
+    full: string;
+    author: string;
+    authorUrl: string;
+    unsplashUrl: string;
+};
+
+type UnsplashSearchPayload = {
+    total: number;
+    totalPages: number;
+    results: UnsplashSearchItem[];
+    error?: string;
+    rateLimited?: boolean;
+};
+
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_CONTROL_HEADER = 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400';
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT_MAX_REQUESTS = 90;
+const inMemoryCache = new Map<string, { expiresAt: number; payload: UnsplashSearchPayload }>();
+
 export async function GET(request: NextRequest) {
     const accessKey = process.env.UNSPLASH_ACCESS_KEY;
     if (!accessKey) {
@@ -38,7 +64,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const query = (searchParams.get('q') || '').trim();
     if (!query) {
-        return NextResponse.json({ total: 0, totalPages: 0, results: [] });
+        return NextResponse.json(
+            { total: 0, totalPages: 0, results: [] } satisfies UnsplashSearchPayload,
+            { headers: { 'Cache-Control': CACHE_CONTROL_HEADER } }
+        );
     }
 
     const rawPage = Number(searchParams.get('page') || '1');
@@ -47,6 +76,43 @@ export async function GET(request: NextRequest) {
     const perPage = Number.isFinite(rawPerPage)
         ? Math.min(Math.max(rawPerPage, 1), 30)
         : 18;
+    const normalizedQuery = query.toLowerCase();
+    const cacheKey = `${normalizedQuery}::${page}::${perPage}`;
+
+    const cached = inMemoryCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+        return NextResponse.json(cached.payload, {
+            headers: {
+                'Cache-Control': CACHE_CONTROL_HEADER,
+            },
+        });
+    }
+
+    const clientIp = getRequestIp(request.headers);
+    const rateLimit = applyInMemoryRateLimit(
+        `unsplash-search:${clientIp}`,
+        RATE_LIMIT_MAX_REQUESTS,
+        RATE_LIMIT_WINDOW_MS,
+    );
+
+    if (!rateLimit.allowed) {
+        return NextResponse.json(
+            {
+                total: 0,
+                totalPages: 0,
+                results: [],
+                error: 'Too many image searches. Please wait a moment and try again.',
+                rateLimited: true,
+            } satisfies UnsplashSearchPayload,
+            {
+                status: 429,
+                headers: {
+                    'Cache-Control': 'no-store',
+                    'Retry-After': String(rateLimit.retryAfterSeconds),
+                },
+            }
+        );
+    }
 
     const url = new URL('https://api.unsplash.com/search/photos');
     url.searchParams.set('query', query);
@@ -81,9 +147,21 @@ export async function GET(request: NextRequest) {
         unsplashUrl: photo.links.html
     }));
 
-    return NextResponse.json({
+    const payload: UnsplashSearchPayload = {
         total: data.total,
         totalPages: data.total_pages,
         results
+    };
+
+    inMemoryCache.set(cacheKey, {
+        expiresAt: Date.now() + CACHE_TTL_MS,
+        payload,
+    });
+
+    return NextResponse.json(payload, {
+        headers: {
+            'Cache-Control': CACHE_CONTROL_HEADER,
+            'X-RateLimit-Remaining': String(rateLimit.remaining),
+        },
     });
 }

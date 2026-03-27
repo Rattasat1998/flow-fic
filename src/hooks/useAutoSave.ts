@@ -28,6 +28,7 @@ export interface AutoSaveDraft {
     povCharacterId: string | null;
     chatTheme: string;
     backgroundSound: string | null;
+    backgroundSoundMeta?: unknown;
     isPremium: boolean;
     coinPrice: number;
     chapterChoices?: unknown;
@@ -43,6 +44,7 @@ interface AutoSaveState {
     povCharacterId: string | null;
     chatTheme: string;
     backgroundSound: string | null;
+    backgroundSoundMeta?: unknown;
     isPremium: boolean;
     coinPrice: number;
     chapterChoices?: unknown;
@@ -90,6 +92,7 @@ function serializeState(state: AutoSaveState): string {
         povCharacterId: state.povCharacterId,
         chatTheme: state.chatTheme,
         backgroundSound: state.backgroundSound,
+        backgroundSoundMeta: state.backgroundSoundMeta,
         isPremium: state.isPremium,
         coinPrice: state.coinPrice,
         chapterChoices: state.chapterChoices,
@@ -105,6 +108,7 @@ function serializeDraft(draft: AutoSaveDraft): string {
         povCharacterId: draft.povCharacterId,
         chatTheme: draft.chatTheme,
         backgroundSound: draft.backgroundSound,
+        backgroundSoundMeta: draft.backgroundSoundMeta,
         isPremium: draft.isPremium,
         coinPrice: draft.coinPrice,
         chapterChoices: draft.chapterChoices,

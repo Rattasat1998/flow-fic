@@ -111,6 +111,8 @@ type StoryIdRow = {
 
 type ChapterContentRow = {
     content: unknown;
+    draft_content?: unknown;
+    published_content?: unknown;
 };
 
 type CharacterImageRow = {
@@ -131,7 +133,7 @@ type StoryActionMenuState = {
 const STORIES_PER_PAGE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
 
-const extractStoragePath = (publicUrl: string | null | undefined, bucket: 'covers' | 'characters' | 'comics') => {
+const extractStoragePath = (publicUrl: string | null | undefined, bucket: 'covers' | 'characters' | 'comics' | 'sounds') => {
     if (!publicUrl) return null;
     const marker = `/public/${bucket}/`;
     const markerIndex = publicUrl.indexOf(marker);
@@ -191,7 +193,39 @@ const collectMediaUrlsFromChapterContent = (content: unknown) => {
     return urls;
 };
 
-const removeStoragePaths = async (bucket: 'covers' | 'characters' | 'comics', paths: string[]) => {
+const collectSoundStoragePathsFromChapterContent = (content: unknown) => {
+    const paths: string[] = [];
+    if (typeof content === 'string') {
+        try {
+            return collectSoundStoragePathsFromChapterContent(JSON.parse(content));
+        } catch {
+            return paths;
+        }
+    }
+    if (!content || typeof content !== 'object') return paths;
+
+    const record = content as Record<string, unknown>;
+    const rawBackgroundSound = record.backgroundSound;
+    if (typeof rawBackgroundSound === 'string') {
+        const parsedPath = extractStoragePath(rawBackgroundSound, 'sounds');
+        if (parsedPath) {
+            paths.push(parsedPath);
+        }
+    }
+
+    const rawBackgroundSoundMeta = record.backgroundSoundMeta;
+    if (rawBackgroundSoundMeta && typeof rawBackgroundSoundMeta === 'object' && !Array.isArray(rawBackgroundSoundMeta)) {
+        const meta = rawBackgroundSoundMeta as Record<string, unknown>;
+        const storagePath = typeof meta.storagePath === 'string' ? meta.storagePath.trim() : '';
+        if (storagePath.length > 0) {
+            paths.push(storagePath);
+        }
+    }
+
+    return paths;
+};
+
+const removeStoragePaths = async (bucket: 'covers' | 'characters' | 'comics' | 'sounds', paths: string[]) => {
     const uniquePaths = Array.from(new Set(paths.filter(Boolean)));
     if (uniquePaths.length === 0) return { ok: true as const };
 
@@ -860,7 +894,7 @@ export default function DashboardPage() {
                 .maybeSingle(),
             supabase
                 .from('chapters')
-                .select('content')
+                .select('content, draft_content, published_content')
                 .eq('story_id', story.id),
             supabase
                 .from('characters')
@@ -871,6 +905,7 @@ export default function DashboardPage() {
         const coverPaths: string[] = [];
         const characterPaths: string[] = [];
         const comicPaths: string[] = [];
+        const soundPaths: string[] = [];
 
         const coverPath = extractStoragePath((storyRow as StoryCoverRow | null)?.cover_url, 'covers');
         if (coverPath) coverPaths.push(coverPath);
@@ -883,29 +918,39 @@ export default function DashboardPage() {
         });
 
         (chapterRows as ChapterContentRow[] | null)?.forEach((row) => {
-            const mediaUrls = collectMediaUrlsFromChapterContent(row.content);
-            mediaUrls.forEach((url) => {
-                const coverMediaPath = extractStoragePath(url, 'covers');
-                if (coverMediaPath) coverPaths.push(coverMediaPath);
+            const payloads = [row.content, row.draft_content, row.published_content];
+            payloads.forEach((payload) => {
+                const mediaUrls = collectMediaUrlsFromChapterContent(payload);
+                mediaUrls.forEach((url) => {
+                    const coverMediaPath = extractStoragePath(url, 'covers');
+                    if (coverMediaPath) coverPaths.push(coverMediaPath);
 
-                const comicMediaPath = extractStoragePath(url, 'comics');
-                if (comicMediaPath) comicPaths.push(comicMediaPath);
+                    const comicMediaPath = extractStoragePath(url, 'comics');
+                    if (comicMediaPath) comicPaths.push(comicMediaPath);
+                });
+
+                const chapterSoundPaths = collectSoundStoragePathsFromChapterContent(payload);
+                chapterSoundPaths.forEach((path) => {
+                    soundPaths.push(path);
+                });
             });
         });
 
-        const [coversResult, charactersResult, comicsResult] = await Promise.all([
+        const [coversResult, charactersResult, comicsResult, soundsResult] = await Promise.all([
             removeStoragePaths('covers', coverPaths),
             removeStoragePaths('characters', characterPaths),
             removeStoragePaths('comics', comicPaths),
+            removeStoragePaths('sounds', soundPaths),
         ]);
 
         const deleteErrors: string[] = [];
         if (!coversResult.ok) deleteErrors.push(coversResult.error);
         if (!charactersResult.ok) deleteErrors.push(charactersResult.error);
         if (!comicsResult.ok) deleteErrors.push(comicsResult.error);
+        if (!soundsResult.ok) deleteErrors.push(soundsResult.error);
 
         if (deleteErrors.length > 0) {
-            alert('ลบไฟล์รูปภาพของเรื่องไม่สำเร็จ กรุณาลองใหม่');
+            alert('ลบไฟล์สื่อของเรื่อง (ภาพ/เสียง) ไม่สำเร็จ กรุณาลองใหม่');
             setIsDeletingStory(false);
             return;
         }

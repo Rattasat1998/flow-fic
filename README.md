@@ -34,9 +34,17 @@ CRON_SECRET=your_random_secret_for_vercel_cron
 RECONCILIATION_MISMATCH_THRESHOLD=0
 UNSPLASH_ACCESS_KEY=your_unsplash_access_key
 UNSPLASH_SECRET_KEY=your_unsplash_secret_key
+PIXABAY_API_KEY=your_pixabay_api_key
+SPELLCHECK_SERVICE_URL=https://your-spellcheck-service.up.railway.app
+SPELLCHECK_SERVICE_TOKEN=shared_secret_between_next_and_spellcheck_service
+SPELLCHECK_TIMEOUT_MS=7000
 ```
 
 `UNSPLASH_ACCESS_KEY` is required for image search in the editor.
+`PIXABAY_API_KEY` is required for Pixabay image search in editor image pickers.
+`SPELLCHECK_SERVICE_URL` points to the external PyThaiNLP spellcheck service (`/v1/spellcheck/chapter`).
+`SPELLCHECK_SERVICE_TOKEN` is sent as `X-Spellcheck-Token` from Next.js to the spellcheck service.
+`SPELLCHECK_TIMEOUT_MS` controls upstream timeout for spellcheck requests (default `7000` ms).
 `SUPABASE_SERVICE_ROLE_KEY` must NOT be a publishable key (`sb_publishable_*`).
 `STRIPE_SECRET_KEY` must be a Stripe secret key (`sk_*`), not publishable (`pk_*`).
 `FINANCE_ADMIN_USER_IDS` controls access to admin payment operations APIs.
@@ -89,6 +97,30 @@ This endpoint requires header:
 `Authorization: Bearer <CRON_SECRET>`
 
 Vercel automatically sends this header for cron jobs when `CRON_SECRET` is configured in the project environment.
+
+## Thai Spellcheck Service (Railway)
+
+The chapter editor spellcheck uses an external Python service powered by PyThaiNLP.
+
+1. Deploy `services/spellcheck-pythainlp` to Railway as a Docker service.
+2. Set Railway env:
+   - `SPELLCHECK_SERVICE_TOKEN` (same value as Vercel `SPELLCHECK_SERVICE_TOKEN`)
+3. Confirm health endpoint:
+   - `GET /healthz` returns `{"ok": true, ...}`
+4. Set Vercel env:
+   - `SPELLCHECK_SERVICE_URL=https://<railway-host>`
+   - `SPELLCHECK_SERVICE_TOKEN=<shared-secret>`
+   - `SPELLCHECK_TIMEOUT_MS=7000` (or your desired timeout)
+
+Local dev example:
+
+```bash
+cd services/spellcheck-pythainlp
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
