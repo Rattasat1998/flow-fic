@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, type MouseEvent as ReactMouseEvent } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { Save, Loader2, Plus, X, Trash2, Image as ImageIcon, Search, CheckCircle2, AlertCircle, RotateCcw, Clock, History, Maximize2, Minimize2, ExternalLink, ChevronUp, ChevronDown } from 'lucide-react';
@@ -109,6 +109,14 @@ type ChapterSpellcheckFieldIssue = {
     matches: number;
     suggestions: string[];
     examples: string[];
+    issues?: ChapterSpellcheckWordIssue[];
+};
+
+type ChapterSpellcheckWordIssue = {
+    start: number;
+    end: number;
+    word: string;
+    suggestions: string[];
 };
 
 type ChapterSpellcheckResponse = {
@@ -116,6 +124,21 @@ type ChapterSpellcheckResponse = {
     totalMatches: number;
     fields: ChapterSpellcheckFieldIssue[];
     error?: string;
+};
+
+type SpellcheckSuggestionPopoverState = {
+    fieldId: string;
+    start: number;
+    end: number;
+    word: string;
+    suggestions: string[];
+    clientX: number;
+    clientY: number;
+};
+
+type InlineSpellSegment = {
+    text: string;
+    issue: ChapterSpellcheckWordIssue | null;
 };
 
 type ChapterPublishModerationResponse = {
@@ -170,6 +193,10 @@ const MAX_BRANCH_TIMER_SECONDS = 300;
 const BRANCHING_FEATURE_ENABLED = FEATURE_FLAGS.branching;
 const IMAGE_SEARCH_PER_PAGE = 18;
 const CONTENT_POLICY_BLOCK_PREFIX = 'CONTENT_POLICY_BLOCKED:';
+const LIVE_SPELLCHECK_DEBOUNCE_MS = 900;
+const LIVE_SPELLCHECK_MIN_LENGTH = 6;
+const LIVE_SPELLCHECK_FAIL_NOTICE_COOLDOWN_MS = 12000;
+const THAI_CHARACTER_PATTERN = /[ก-๙]/;
 
 const extractContentPolicyBlockMessage = (error: unknown): string | null => {
     if (!error || typeof error !== 'object') return null;
@@ -673,6 +700,12 @@ export default function EditChapterPage() {
     const [notice, setNotice] = useState<NoticeState | null>(null);
     const [isSpellcheckRunning, setIsSpellcheckRunning] = useState(false);
     const [spellcheckIssueFieldIds, setSpellcheckIssueFieldIds] = useState<string[]>([]);
+    const [liveSpellcheckByFieldId, setLiveSpellcheckByFieldId] = useState<Record<string, ChapterSpellcheckWordIssue[]>>({});
+    const [activeSpellcheckFieldId, setActiveSpellcheckFieldId] = useState<string | null>(null);
+    const [activeSuggestionPopover, setActiveSuggestionPopover] = useState<SpellcheckSuggestionPopoverState | null>(null);
+    const liveSpellcheckDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const liveSpellcheckRequestSequenceRef = useRef(0);
+    const liveSpellcheckFailureNoticeAtRef = useRef(0);
     const [revisions, setRevisions] = useState<ChapterRevision[]>([]);
     const [isLoadingRevisions, setIsLoadingRevisions] = useState(false);
     const [isRestoringRevision, setIsRestoringRevision] = useState(false);
@@ -3478,6 +3511,247 @@ export default function EditChapterPage() {
         }, 1200);
     }, []);
 
+    const normalizeWordIssues = useCallback((issues: ChapterSpellcheckWordIssue[] | null | undefined, textLength: number) => {
+        if (!Array.isArray(issues) || issues.length === 0) return [] as ChapterSpellcheckWordIssue[];
+
+        const normalized = issues
+            .map((issue) => {
+                const start = Math.max(0, Math.floor(Number(issue.start)));
+                const end = Math.min(textLength, Math.max(0, Math.floor(Number(issue.end))));
+                const word = typeof issue.word === 'string' ? issue.word : '';
+                const suggestions = Array.isArray(issue.suggestions)
+                    ? issue.suggestions
+                        .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+                        .map((item) => item.trim())
+                        .slice(0, 6)
+                    : [];
+                if (!word || end <= start) return null;
+                return { start, end, word, suggestions };
+            })
+            .filter((issue): issue is ChapterSpellcheckWordIssue => issue !== null)
+            .sort((a, b) => a.start - b.start || a.end - b.end);
+
+        const deduped: ChapterSpellcheckWordIssue[] = [];
+        let lastEnd = -1;
+        for (const issue of normalized) {
+            if (issue.start < lastEnd) continue;
+            deduped.push(issue);
+            lastEnd = issue.end;
+        }
+        return deduped;
+    }, []);
+
+    const buildInlineSpellSegments = useCallback((text: string, issues: ChapterSpellcheckWordIssue[]): InlineSpellSegment[] => {
+        if (!text) return [{ text: '\u00a0', issue: null }];
+        if (issues.length === 0) return [{ text, issue: null }];
+
+        const segments: InlineSpellSegment[] = [];
+        let cursor = 0;
+
+        for (const issue of issues) {
+            if (issue.start > cursor) {
+                segments.push({
+                    text: text.slice(cursor, issue.start),
+                    issue: null,
+                });
+            }
+            segments.push({
+                text: text.slice(issue.start, issue.end),
+                issue,
+            });
+            cursor = issue.end;
+        }
+
+        if (cursor < text.length) {
+            segments.push({
+                text: text.slice(cursor),
+                issue: null,
+            });
+        }
+
+        return segments.length > 0 ? segments : [{ text: '\u00a0', issue: null }];
+    }, []);
+
+    const findLiveIssueAtCaret = useCallback((fieldId: string, caret: number) => {
+        const issues = liveSpellcheckByFieldId[fieldId] || [];
+        if (issues.length === 0) return null;
+        const normalizedCaret = Math.max(0, caret);
+        return issues.find((issue) => (
+            normalizedCaret >= issue.start && normalizedCaret <= issue.end
+        )) || issues.find((issue) => (
+            normalizedCaret >= issue.start - 1 && normalizedCaret <= issue.end
+        )) || null;
+    }, [liveSpellcheckByFieldId]);
+
+    const hasSpellcheckIssue = useCallback((fieldId: string) => {
+        if (spellcheckIssueFieldSet.has(fieldId)) return true;
+        const liveIssues = liveSpellcheckByFieldId[fieldId];
+        return Array.isArray(liveIssues) && liveIssues.length > 0;
+    }, [liveSpellcheckByFieldId, spellcheckIssueFieldSet]);
+
+    const getSpellcheckFieldById = useCallback((fieldId: string): ChapterSpellcheckFieldInput | null => {
+        if (fieldId === 'chapter-title-input') {
+            return {
+                id: fieldId,
+                label: 'ชื่อตอน',
+                text: title,
+            };
+        }
+
+        if (fieldId === 'chat-input-draft' && isChatStyle) {
+            return {
+                id: fieldId,
+                label: 'ช่องพิมพ์แชท',
+                text: chatInputValue,
+            };
+        }
+
+        if (fieldId.startsWith('scene-text-') && isVisualNovelStyle) {
+            const blockId = fieldId.slice('scene-text-'.length);
+            const sceneIndex = blocks.findIndex((block) => block.id === blockId);
+            if (sceneIndex === -1) return null;
+            return {
+                id: fieldId,
+                label: `บทพูดฉาก ${sceneIndex + 1}`,
+                text: blocks[sceneIndex].text,
+            };
+        }
+
+        if (fieldId.startsWith('textarea-')) {
+            const blockId = fieldId.slice('textarea-'.length);
+            const textBlocks = blocks.filter((block) => block.type !== 'image');
+            const textIndex = textBlocks.findIndex((block) => block.id === blockId);
+            if (textIndex === -1) return null;
+            return {
+                id: fieldId,
+                label: isChatStyle ? `ข้อความแชท ${textIndex + 1}` : `เนื้อหา ${textIndex + 1}`,
+                text: textBlocks[textIndex].text,
+            };
+        }
+
+        if (fieldId.startsWith('choice-text-') && isBranchingStory && !isEndingChapter) {
+            const choiceId = fieldId.slice('choice-text-'.length);
+            const choiceIndex = chapterChoices.findIndex((choice) => choice.id === choiceId);
+            if (choiceIndex === -1) return null;
+            return {
+                id: fieldId,
+                label: `ทางเลือก ${choiceIndex + 1}`,
+                text: chapterChoices[choiceIndex].choiceText,
+            };
+        }
+
+        if (fieldId.startsWith('choice-outcome-') && isBranchingStory && !isEndingChapter) {
+            const choiceId = fieldId.slice('choice-outcome-'.length);
+            const choiceIndex = chapterChoices.findIndex((choice) => choice.id === choiceId);
+            if (choiceIndex === -1) return null;
+            return {
+                id: fieldId,
+                label: `ผลลัพธ์ทางเลือก ${choiceIndex + 1}`,
+                text: chapterChoices[choiceIndex].outcomeText,
+            };
+        }
+
+        return null;
+    }, [
+        title,
+        isChatStyle,
+        chatInputValue,
+        isVisualNovelStyle,
+        blocks,
+        isBranchingStory,
+        isEndingChapter,
+        chapterChoices,
+    ]);
+
+    const activeLiveSpellIssues = useMemo(() => {
+        if (!activeSpellcheckFieldId) return [] as ChapterSpellcheckWordIssue[];
+        const activeField = getSpellcheckFieldById(activeSpellcheckFieldId);
+        if (!activeField) return [] as ChapterSpellcheckWordIssue[];
+        const fieldIssues = liveSpellcheckByFieldId[activeSpellcheckFieldId];
+        return normalizeWordIssues(fieldIssues, activeField.text.length);
+    }, [activeSpellcheckFieldId, getSpellcheckFieldById, liveSpellcheckByFieldId, normalizeWordIssues]);
+
+    const openSuggestionPopoverAtCaret = useCallback((
+        fieldId: string,
+        caretPosition: number,
+        clientX: number,
+        clientY: number,
+    ) => {
+        const issue = findLiveIssueAtCaret(fieldId, caretPosition);
+        if (!issue) {
+            setActiveSuggestionPopover(null);
+            return;
+        }
+        const suggestions = issue.suggestions
+            .filter((item) => item && item !== issue.word)
+            .slice(0, 6);
+        setActiveSuggestionPopover({
+            fieldId,
+            start: issue.start,
+            end: issue.end,
+            word: issue.word,
+            suggestions,
+            clientX,
+            clientY,
+        });
+    }, [findLiveIssueAtCaret]);
+
+    const handleSpellcheckFieldFocus = useCallback((fieldId: string) => {
+        setActiveSpellcheckFieldId(fieldId);
+    }, []);
+
+    const handleSpellcheckFieldBlur = useCallback((fieldId: string) => {
+        if (typeof window === 'undefined' || typeof document === 'undefined') return;
+        window.setTimeout(() => {
+            const activeElement = document.activeElement as HTMLElement | null;
+            if (activeElement?.id === fieldId) return;
+            if (activeElement?.closest('[data-spellcheck-popover="true"]')) return;
+            setActiveSpellcheckFieldId((prev) => (prev === fieldId ? null : prev));
+        }, 0);
+    }, []);
+
+    const handleSpellcheckFieldMouseUp = useCallback((
+        fieldId: string,
+        event: ReactMouseEvent<HTMLTextAreaElement | HTMLInputElement>,
+    ) => {
+        const target = event.currentTarget;
+        const caret = typeof target.selectionStart === 'number' ? target.selectionStart : 0;
+        openSuggestionPopoverAtCaret(fieldId, caret, event.clientX, event.clientY);
+    }, [openSuggestionPopoverAtCaret]);
+
+    const renderSpellcheckOverlay = useCallback((
+        fieldId: string,
+        text: string,
+        mirrorClassName: string,
+        singleLine = false,
+    ) => {
+        if (activeSpellcheckFieldId !== fieldId) return null;
+        if (!text) return null;
+        const issues = activeLiveSpellIssues;
+        if (issues.length === 0) return null;
+
+        const segments = buildInlineSpellSegments(text, issues);
+        return (
+            <div
+                className={`${styles.spellcheckInlineOverlay} ${mirrorClassName} ${singleLine ? styles.spellcheckInlineOverlaySingleLine : ''}`}
+                aria-hidden="true"
+            >
+                {segments.map((segment, index) => (
+                    segment.issue ? (
+                        <span
+                            key={`${segment.issue.start}-${segment.issue.end}-${index}`}
+                            className={styles.spellcheckInlineWord}
+                        >
+                            {segment.text}
+                        </span>
+                    ) : (
+                        <span key={`plain-${index}`}>{segment.text}</span>
+                    )
+                ))}
+            </div>
+        );
+    }, [activeSpellcheckFieldId, activeLiveSpellIssues, buildInlineSpellSegments]);
+
     const collectSpellcheckFields = useCallback((): ChapterSpellcheckFieldInput[] => {
         const fields: ChapterSpellcheckFieldInput[] = [];
         const seen = new Set<string>();
@@ -3549,6 +3823,237 @@ export default function EditChapterPage() {
         return fields;
     }, [title, blocks, isVisualNovelStyle, isChatStyle, chatInputValue, isBranchingStory, isEndingChapter, chapterChoices]);
 
+    const applySuggestionToField = useCallback((
+        fieldId: string,
+        start: number,
+        end: number,
+        replacement: string,
+    ) => {
+        const applyRange = (text: string) => {
+            const safeStart = Math.max(0, Math.min(start, text.length));
+            const safeEnd = Math.max(safeStart, Math.min(end, text.length));
+            return `${text.slice(0, safeStart)}${replacement}${text.slice(safeEnd)}`;
+        };
+
+        if (fieldId === 'chapter-title-input') {
+            setTitle((prev) => applyRange(prev));
+        } else if (fieldId === 'chat-input-draft') {
+            setChatInputValue((prev) => applyRange(prev));
+        } else if (fieldId.startsWith('scene-text-')) {
+            const blockId = fieldId.slice('scene-text-'.length);
+            setBlocks((prev) => prev.map((block) => (
+                block.id === blockId ? { ...block, text: applyRange(block.text) } : block
+            )));
+        } else if (fieldId.startsWith('textarea-')) {
+            const blockId = fieldId.slice('textarea-'.length);
+            setBlocks((prev) => prev.map((block) => (
+                block.id === blockId ? { ...block, text: applyRange(block.text) } : block
+            )));
+        } else if (fieldId.startsWith('choice-text-')) {
+            const choiceId = fieldId.slice('choice-text-'.length);
+            setChapterChoices((prev) => prev.map((choice, index) => (
+                choice.id === choiceId
+                    ? { ...choice, choiceText: applyRange(choice.choiceText), orderIndex: index }
+                    : { ...choice, orderIndex: index }
+            )));
+        } else if (fieldId.startsWith('choice-outcome-')) {
+            const choiceId = fieldId.slice('choice-outcome-'.length);
+            setChapterChoices((prev) => prev.map((choice, index) => (
+                choice.id === choiceId
+                    ? { ...choice, outcomeText: applyRange(choice.outcomeText), orderIndex: index }
+                    : { ...choice, orderIndex: index }
+            )));
+        }
+
+        if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+            const nextCaret = Math.max(0, start) + replacement.length;
+            window.requestAnimationFrame(() => {
+                const target = document.getElementById(fieldId) as HTMLTextAreaElement | HTMLInputElement | null;
+                if (!target || target.disabled || target.readOnly) return;
+                target.focus();
+                if (typeof target.setSelectionRange === 'function') {
+                    target.setSelectionRange(nextCaret, nextCaret);
+                }
+            });
+        }
+    }, []);
+
+    const handleApplySuggestion = useCallback((suggestion: string) => {
+        if (!activeSuggestionPopover) return;
+        applySuggestionToField(
+            activeSuggestionPopover.fieldId,
+            activeSuggestionPopover.start,
+            activeSuggestionPopover.end,
+            suggestion,
+        );
+        setActiveSuggestionPopover(null);
+    }, [activeSuggestionPopover, applySuggestionToField]);
+
+    useEffect(() => {
+        if (!activeSpellcheckFieldId) return;
+
+        const activeField = getSpellcheckFieldById(activeSpellcheckFieldId);
+        if (!activeField) {
+            setLiveSpellcheckByFieldId((prev) => {
+                if (!prev[activeSpellcheckFieldId]) return prev;
+                const next = { ...prev };
+                delete next[activeSpellcheckFieldId];
+                return next;
+            });
+            return;
+        }
+
+        if (typeof document !== 'undefined') {
+            const focusedElement = document.activeElement as HTMLElement | null;
+            if (!focusedElement || focusedElement.id !== activeSpellcheckFieldId) {
+                return;
+            }
+        }
+
+        const normalizedText = activeField.text.replace(/\r\n/g, '\n');
+        if (normalizedText.trim().length < LIVE_SPELLCHECK_MIN_LENGTH || !THAI_CHARACTER_PATTERN.test(normalizedText)) {
+            setLiveSpellcheckByFieldId((prev) => {
+                if (!prev[activeField.id]) return prev;
+                const next = { ...prev };
+                delete next[activeField.id];
+                return next;
+            });
+            if (activeSuggestionPopover?.fieldId === activeField.id) {
+                setActiveSuggestionPopover(null);
+            }
+            return;
+        }
+
+        if (liveSpellcheckDebounceRef.current) {
+            clearTimeout(liveSpellcheckDebounceRef.current);
+            liveSpellcheckDebounceRef.current = null;
+        }
+
+        const requestSequence = ++liveSpellcheckRequestSequenceRef.current;
+        liveSpellcheckDebounceRef.current = setTimeout(() => {
+            void (async () => {
+                try {
+                    const {
+                        data: { session },
+                        error: sessionError,
+                    } = await supabase.auth.getSession();
+
+                    if (sessionError || !session?.access_token) return;
+
+                    const response = await fetch('/api/spellcheck/chapter', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Authorization: `Bearer ${session.access_token}`,
+                        },
+                        body: JSON.stringify({
+                            mode: 'realtime',
+                            fields: [activeField],
+                        }),
+                        cache: 'no-store',
+                    });
+
+                    let payload: ChapterSpellcheckResponse | { error?: string } | null = null;
+                    try {
+                        payload = (await response.json()) as ChapterSpellcheckResponse | { error?: string };
+                    } catch {
+                        payload = null;
+                    }
+
+                    if (!response.ok) {
+                        throw new Error(
+                            payload && typeof payload === 'object' && typeof payload.error === 'string'
+                                ? payload.error
+                                : 'ตรวจคำไทยชั่วคราวไม่พร้อม',
+                        );
+                    }
+
+                    if (requestSequence !== liveSpellcheckRequestSequenceRef.current) return;
+                    if (typeof document !== 'undefined') {
+                        const focusedElement = document.activeElement as HTMLElement | null;
+                        if (!focusedElement || focusedElement.id !== activeField.id) return;
+                    }
+
+                    const result = payload as ChapterSpellcheckResponse;
+                    const fieldIssue = Array.isArray(result.fields)
+                        ? result.fields.find((item) => item.id === activeField.id)
+                        : undefined;
+                    const issues = normalizeWordIssues(fieldIssue?.issues, activeField.text.length);
+
+                    setLiveSpellcheckByFieldId((prev) => ({
+                        ...prev,
+                        [activeField.id]: issues,
+                    }));
+                } catch {
+                    if (requestSequence !== liveSpellcheckRequestSequenceRef.current) return;
+                    setLiveSpellcheckByFieldId((prev) => {
+                        if (!prev[activeField.id]) return prev;
+                        const next = { ...prev };
+                        delete next[activeField.id];
+                        return next;
+                    });
+
+                    const now = Date.now();
+                    if (now - liveSpellcheckFailureNoticeAtRef.current >= LIVE_SPELLCHECK_FAIL_NOTICE_COOLDOWN_MS) {
+                        liveSpellcheckFailureNoticeAtRef.current = now;
+                        showNotice(
+                            'error',
+                            'ตรวจคำไทยชั่วคราวไม่พร้อม',
+                            'ระบบตรวจคำไทยชั่วคราวไม่พร้อม คุณยังบันทึก/เผยแพร่ได้ตามปกติ',
+                        );
+                    }
+                }
+            })();
+        }, LIVE_SPELLCHECK_DEBOUNCE_MS);
+
+        return () => {
+            if (liveSpellcheckDebounceRef.current) {
+                clearTimeout(liveSpellcheckDebounceRef.current);
+                liveSpellcheckDebounceRef.current = null;
+            }
+        };
+    }, [activeSpellcheckFieldId, getSpellcheckFieldById, activeSuggestionPopover?.fieldId, normalizeWordIssues, showNotice]);
+
+    useEffect(() => {
+        if (!activeSuggestionPopover) return;
+        const currentFieldIssues = liveSpellcheckByFieldId[activeSuggestionPopover.fieldId] || [];
+        const stillExists = currentFieldIssues.some((issue) => (
+            issue.start === activeSuggestionPopover.start && issue.end === activeSuggestionPopover.end
+        ));
+        if (!stillExists) {
+            setActiveSuggestionPopover(null);
+        }
+    }, [activeSuggestionPopover, liveSpellcheckByFieldId]);
+
+    useEffect(() => {
+        if (!activeSuggestionPopover) return;
+
+        const handlePointerDown = (event: MouseEvent) => {
+            const target = event.target as HTMLElement | null;
+            if (target?.closest('[data-spellcheck-popover="true"]')) return;
+            setActiveSuggestionPopover(null);
+        };
+
+        const handleAnyScroll = () => {
+            setActiveSuggestionPopover(null);
+        };
+
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setActiveSuggestionPopover(null);
+            }
+        };
+
+        window.addEventListener('mousedown', handlePointerDown);
+        window.addEventListener('keydown', handleEscape);
+        window.addEventListener('scroll', handleAnyScroll, true);
+        return () => {
+            window.removeEventListener('mousedown', handlePointerDown);
+            window.removeEventListener('keydown', handleEscape);
+            window.removeEventListener('scroll', handleAnyScroll, true);
+        };
+    }, [activeSuggestionPopover]);
+
     const handleTriggerSpellcheck = useCallback(async () => {
         if (isSpellcheckRunning) return;
 
@@ -3577,7 +4082,7 @@ export default function EditChapterPage() {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${session.access_token}`,
                 },
-                body: JSON.stringify({ fields }),
+                body: JSON.stringify({ mode: 'manual', fields }),
                 cache: 'no-store',
             });
 
@@ -3627,6 +4132,18 @@ export default function EditChapterPage() {
             setIsSpellcheckRunning(false);
         }
     }, [collectSpellcheckFields, focusSpellcheckFieldById, isSpellcheckRunning, showNotice]);
+
+    const suggestionPopoverPosition = useMemo(() => {
+        if (!activeSuggestionPopover || typeof window === 'undefined') return null;
+        const width = 320;
+        const height = 220;
+        const margin = 12;
+        const maxLeft = Math.max(margin, window.innerWidth - width - margin);
+        const maxTop = Math.max(margin, window.innerHeight - height - margin);
+        const left = Math.min(maxLeft, Math.max(margin, activeSuggestionPopover.clientX + 10));
+        const top = Math.min(maxTop, Math.max(margin, activeSuggestionPopover.clientY + 10));
+        return { left, top };
+    }, [activeSuggestionPopover]);
 
     if (!isMounted) return null;
 
@@ -3687,14 +4204,20 @@ export default function EditChapterPage() {
                 </div>
 
                 <div className={styles.headerCenter}>
-                    <input
-                        id="chapter-title-input"
-                        type="text"
-                        className={`${styles.headerTitleInput} ${spellcheckIssueFieldSet.has('chapter-title-input') ? styles.spellcheckFieldError : ''}`}
-                        placeholder="ชื่อตอน..."
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                    />
+                    <div className={styles.spellcheckInlineFieldFull}>
+                        {renderSpellcheckOverlay('chapter-title-input', title, styles.headerTitleInput, true)}
+                        <input
+                            id="chapter-title-input"
+                            type="text"
+                            className={`${styles.headerTitleInput} ${hasSpellcheckIssue('chapter-title-input') ? styles.spellcheckFieldError : ''} ${styles.spellcheckInlineTarget}`}
+                            placeholder="ชื่อตอน..."
+                            value={title}
+                            onFocus={() => handleSpellcheckFieldFocus('chapter-title-input')}
+                            onBlur={() => handleSpellcheckFieldBlur('chapter-title-input')}
+                            onMouseUp={(event) => handleSpellcheckFieldMouseUp('chapter-title-input', event)}
+                            onChange={(e) => setTitle(e.target.value)}
+                        />
+                    </div>
                 </div>
 
                 <div className={styles.headerActions}>
@@ -3752,7 +4275,7 @@ export default function EditChapterPage() {
                         className={styles.spellcheckBtn}
                         onClick={handleTriggerSpellcheck}
                         disabled={isSaving || isRestoringRevision || isSpellcheckRunning}
-                        title="ตรวจคำผิดภาษาไทย"
+                        title="ตรวจคำไทย"
                     >
                         {isSpellcheckRunning ? <Loader2 size={16} className={styles.spinner} /> : <CheckCircle2 size={16} />}
                         {isSpellcheckRunning ? 'กำลังตรวจไทย...' : 'ตรวจคำไทย'}
@@ -3863,7 +4386,7 @@ export default function EditChapterPage() {
                                     isSystem ? '' : isPOV ? blockStyles.chatImageBubblePov : blockStyles.chatImageBubbleOther,
                                 ].filter(Boolean).join(' ');
                                 const chatFieldId = `textarea-${block.id}`;
-                                const textBubbleClassName = [
+                                const textBubbleBaseClassName = [
                                     blockStyles.blockTextarea,
                                     blockStyles.chatTextBubble,
                                     isSystem
@@ -3871,7 +4394,11 @@ export default function EditChapterPage() {
                                         : isPOV
                                             ? blockStyles.chatTextBubblePov
                                             : blockStyles.chatTextBubbleOther,
-                                    spellcheckIssueFieldSet.has(chatFieldId) ? styles.spellcheckFieldError : '',
+                                ].filter(Boolean).join(' ');
+                                const textBubbleClassName = [
+                                    textBubbleBaseClassName,
+                                    hasSpellcheckIssue(chatFieldId) ? styles.spellcheckFieldError : '',
+                                    styles.spellcheckInlineTarget,
                                 ].filter(Boolean).join(' ');
                                 const chatActionClassName = [
                                     blockStyles.blockActions,
@@ -3904,21 +4431,27 @@ export default function EditChapterPage() {
                                                         className={imageBubbleClassName}
                                                     />
                                                 ) : (
-                                                    <textarea
-                                                        id={chatFieldId}
-                                                        className={textBubbleClassName}
-                                                        value={block.text}
-                                                        spellCheck={true}
-                                                        lang="th-TH"
-                                                        onChange={(e) => {
-                                                            updateBlock(block.id, { text: e.target.value });
-                                                            e.target.style.height = 'auto';
-                                                            e.target.style.height = e.target.scrollHeight + 'px';
-                                                        }}
-                                                        onKeyDown={(e) => handleKeyDown(e, block.id)}
-                                                        placeholder={isSystem ? 'บรรยาย...' : '...'}
-                                                        rows={1}
-                                                    />
+                                                    <div className={styles.spellcheckInlineFieldFit}>
+                                                        {renderSpellcheckOverlay(chatFieldId, block.text, textBubbleBaseClassName)}
+                                                        <textarea
+                                                            id={chatFieldId}
+                                                            className={textBubbleClassName}
+                                                            value={block.text}
+                                                            spellCheck={true}
+                                                            lang="th-TH"
+                                                            onFocus={() => handleSpellcheckFieldFocus(chatFieldId)}
+                                                            onBlur={() => handleSpellcheckFieldBlur(chatFieldId)}
+                                                            onMouseUp={(event) => handleSpellcheckFieldMouseUp(chatFieldId, event)}
+                                                            onChange={(e) => {
+                                                                updateBlock(block.id, { text: e.target.value });
+                                                                e.target.style.height = 'auto';
+                                                                e.target.style.height = e.target.scrollHeight + 'px';
+                                                            }}
+                                                            onKeyDown={(e) => handleKeyDown(e, block.id)}
+                                                            placeholder={isSystem ? 'บรรยาย...' : '...'}
+                                                            rows={1}
+                                                        />
+                                                    </div>
                                                 )}
                                                 <div className={chatActionClassName}>
                                                     <button className={blockStyles.actionBtn} onClick={() => moveBlockUp(block.id)} title="เลื่อนขึ้น">
@@ -4019,17 +4552,23 @@ export default function EditChapterPage() {
                                 </button>
 
                                 {/* Text Input */}
-                                <textarea
-                                    id="chat-input-draft"
-                                    className={`${styles.chatTextInput} ${spellcheckIssueFieldSet.has('chat-input-draft') ? styles.spellcheckFieldError : ''}`}
-                                    value={chatInputValue}
-                                    spellCheck={true}
-                                    lang="th-TH"
-                                    onChange={(e) => setChatInputValue(e.target.value)}
-                                    onKeyDown={handleChatInputKeyDown}
-                                    placeholder={`ส่งข้อความในฐานะ ${activeCharacterId ? characters.find(c => c.id === activeCharacterId)?.name : 'บทบรรยาย'}...`}
-                                    rows={1}
-                                />
+                                <div className={styles.spellcheckInlineFieldFull}>
+                                    {renderSpellcheckOverlay('chat-input-draft', chatInputValue, styles.chatTextInput)}
+                                    <textarea
+                                        id="chat-input-draft"
+                                        className={`${styles.chatTextInput} ${hasSpellcheckIssue('chat-input-draft') ? styles.spellcheckFieldError : ''} ${styles.spellcheckInlineTarget}`}
+                                        value={chatInputValue}
+                                        spellCheck={true}
+                                        lang="th-TH"
+                                        onFocus={() => handleSpellcheckFieldFocus('chat-input-draft')}
+                                        onBlur={() => handleSpellcheckFieldBlur('chat-input-draft')}
+                                        onMouseUp={(event) => handleSpellcheckFieldMouseUp('chat-input-draft', event)}
+                                        onChange={(e) => setChatInputValue(e.target.value)}
+                                        onKeyDown={handleChatInputKeyDown}
+                                        placeholder={`ส่งข้อความในฐานะ ${activeCharacterId ? characters.find(c => c.id === activeCharacterId)?.name : 'บทบรรยาย'}...`}
+                                        rows={1}
+                                    />
+                                </div>
 
                                 <button
                                     className={styles.sendBtn}
@@ -4503,21 +5042,27 @@ export default function EditChapterPage() {
 
                                         <label className={styles.visualNovelDialogueField}>
                                             <span>บทพูด / คำบรรยายของฉาก</span>
-                                            <textarea
-                                                id={`scene-text-${block.id}`}
-                                                className={`${styles.visualNovelTextarea} ${spellcheckIssueFieldSet.has(`scene-text-${block.id}`) ? styles.spellcheckFieldError : ''}`}
-                                                value={block.text}
-                                                spellCheck={true}
-                                                lang="th-TH"
-                                                onChange={(event) => {
-                                                    updateBlock(block.id, { text: event.target.value });
-                                                    event.target.style.height = 'auto';
-                                                    event.target.style.height = `${event.target.scrollHeight}px`;
-                                                }}
-                                                onKeyDown={(event) => handleKeyDown(event, block.id)}
-                                                placeholder="พิมพ์บทพูดหรือคำบรรยายของฉากนี้..."
-                                                rows={2}
-                                            />
+                                            <div className={styles.spellcheckInlineFieldFull}>
+                                                {renderSpellcheckOverlay(`scene-text-${block.id}`, block.text, styles.visualNovelTextarea)}
+                                                <textarea
+                                                    id={`scene-text-${block.id}`}
+                                                    className={`${styles.visualNovelTextarea} ${hasSpellcheckIssue(`scene-text-${block.id}`) ? styles.spellcheckFieldError : ''} ${styles.spellcheckInlineTarget}`}
+                                                    value={block.text}
+                                                    spellCheck={true}
+                                                    lang="th-TH"
+                                                    onFocus={() => handleSpellcheckFieldFocus(`scene-text-${block.id}`)}
+                                                    onBlur={() => handleSpellcheckFieldBlur(`scene-text-${block.id}`)}
+                                                    onMouseUp={(event) => handleSpellcheckFieldMouseUp(`scene-text-${block.id}`, event)}
+                                                    onChange={(event) => {
+                                                        updateBlock(block.id, { text: event.target.value });
+                                                        event.target.style.height = 'auto';
+                                                        event.target.style.height = `${event.target.scrollHeight}px`;
+                                                    }}
+                                                    onKeyDown={(event) => handleKeyDown(event, block.id)}
+                                                    placeholder="พิมพ์บทพูดหรือคำบรรยายของฉากนี้..."
+                                                    rows={2}
+                                                />
+                                            </div>
                                         </label>
 
                                         <div className={styles.visualNovelSceneActions}>
@@ -4558,10 +5103,14 @@ export default function EditChapterPage() {
                                     blockStyles.alignLeft,
                                     isFlashbackBlock ? blockStyles.blockRowFlashback : '',
                                 ].filter(Boolean).join(' ');
-                                const textareaClassName = [
+                                const textareaBaseClassName = [
                                     blockStyles.blockTextarea,
                                     isFlashbackBlock ? blockStyles.blockTextareaFlashback : '',
-                                    spellcheckIssueFieldSet.has(narrativeFieldId) ? styles.spellcheckFieldError : '',
+                                ].filter(Boolean).join(' ');
+                                const textareaClassName = [
+                                    textareaBaseClassName,
+                                    hasSpellcheckIssue(narrativeFieldId) ? styles.spellcheckFieldError : '',
+                                    styles.spellcheckInlineTarget,
                                 ].filter(Boolean).join(' ');
 
                                 return (
@@ -4678,27 +5227,33 @@ export default function EditChapterPage() {
                                                             )}
                                                         </div>
                                                     )}
-                                                    <textarea
-                                                        id={narrativeFieldId}
-                                                        className={textareaClassName}
-                                                        value={block.text}
-                                                        spellCheck={true}
-                                                        lang="th-TH"
-                                                        onChange={(e) => {
-                                                            updateBlock(block.id, { text: e.target.value });
-                                                            e.target.style.height = 'auto';
-                                                            e.target.style.height = e.target.scrollHeight + 'px';
-                                                        }}
-                                                        onKeyDown={(e) => handleKeyDown(e, block.id)}
-                                                        placeholder={
-                                                            isFlashbackBlock
-                                                                ? 'พิมพ์ฉากเล่าความหลัง...'
-                                                                : assignedChar
-                                                                    ? `พิมพ์บทพูดของ ${assignedChar.name}...`
-                                                                    : 'พิมพ์บทบรรยาย...'
-                                                        }
-                                                        rows={1}
-                                                    />
+                                                    <div className={styles.spellcheckInlineFieldFull}>
+                                                        {renderSpellcheckOverlay(narrativeFieldId, block.text, textareaBaseClassName)}
+                                                        <textarea
+                                                            id={narrativeFieldId}
+                                                            className={textareaClassName}
+                                                            value={block.text}
+                                                            spellCheck={true}
+                                                            lang="th-TH"
+                                                            onFocus={() => handleSpellcheckFieldFocus(narrativeFieldId)}
+                                                            onBlur={() => handleSpellcheckFieldBlur(narrativeFieldId)}
+                                                            onMouseUp={(event) => handleSpellcheckFieldMouseUp(narrativeFieldId, event)}
+                                                            onChange={(e) => {
+                                                                updateBlock(block.id, { text: e.target.value });
+                                                                e.target.style.height = 'auto';
+                                                                e.target.style.height = e.target.scrollHeight + 'px';
+                                                            }}
+                                                            onKeyDown={(e) => handleKeyDown(e, block.id)}
+                                                            placeholder={
+                                                                isFlashbackBlock
+                                                                    ? 'พิมพ์ฉากเล่าความหลัง...'
+                                                                    : assignedChar
+                                                                        ? `พิมพ์บทพูดของ ${assignedChar.name}...`
+                                                                        : 'พิมพ์บทบรรยาย...'
+                                                            }
+                                                            rows={1}
+                                                        />
+                                                    </div>
                                                     <div className={blockStyles.blockActions}>
                                                         <button
                                                             className={`${blockStyles.actionBtn} ${isFlashbackBlock ? blockStyles.actionBtnActive : ''}`}
@@ -4840,16 +5395,22 @@ export default function EditChapterPage() {
                                                 <div key={choice.id} className={styles.branchingChoiceTreeNode}>
                                                     <div className={styles.branchingTreeNodeLabel}>ทางเลือก {index + 1}</div>
                                                     <div className={styles.branchingChoicePrimaryInputs}>
-                                                        <input
-                                                            id={`choice-text-${choice.id}`}
-                                                            type="text"
-                                                            className={`${styles.branchingChoiceInput} ${spellcheckIssueFieldSet.has(`choice-text-${choice.id}`) ? styles.spellcheckFieldError : ''}`}
-                                                            placeholder="ข้อความทางเลือก เช่น เปิดประตูห้องใต้ดิน"
-                                                            value={choice.choiceText}
-                                                            spellCheck={true}
-                                                            lang="th-TH"
-                                                            onChange={(event) => updateChapterChoice(choice.id, { choiceText: event.target.value })}
-                                                        />
+                                                        <div className={styles.spellcheckInlineFieldFull}>
+                                                            {renderSpellcheckOverlay(`choice-text-${choice.id}`, choice.choiceText, styles.branchingChoiceInput, true)}
+                                                            <input
+                                                                id={`choice-text-${choice.id}`}
+                                                                type="text"
+                                                                className={`${styles.branchingChoiceInput} ${hasSpellcheckIssue(`choice-text-${choice.id}`) ? styles.spellcheckFieldError : ''} ${styles.spellcheckInlineTarget}`}
+                                                                placeholder="ข้อความทางเลือก เช่น เปิดประตูห้องใต้ดิน"
+                                                                value={choice.choiceText}
+                                                                spellCheck={true}
+                                                                lang="th-TH"
+                                                                onFocus={() => handleSpellcheckFieldFocus(`choice-text-${choice.id}`)}
+                                                                onBlur={() => handleSpellcheckFieldBlur(`choice-text-${choice.id}`)}
+                                                                onMouseUp={(event) => handleSpellcheckFieldMouseUp(`choice-text-${choice.id}`, event)}
+                                                                onChange={(event) => updateChapterChoice(choice.id, { choiceText: event.target.value })}
+                                                            />
+                                                        </div>
                                                         <select
                                                             className={styles.branchingChoiceSelect}
                                                             value={choice.toChapterId || ''}
@@ -4862,16 +5423,22 @@ export default function EditChapterPage() {
                                                                     </option>
                                                                 ))}
                                                         </select>
-                                                        <textarea
-                                                            id={`choice-outcome-${choice.id}`}
-                                                            className={`${styles.branchingChoiceInput} ${spellcheckIssueFieldSet.has(`choice-outcome-${choice.id}`) ? styles.spellcheckFieldError : ''}`}
-                                                            placeholder="Outcome text (ไม่แสดงในหน้าอ่านตอนนี้)"
-                                                            value={choice.outcomeText}
-                                                            spellCheck={true}
-                                                            lang="th-TH"
-                                                            onChange={(event) => updateChapterChoice(choice.id, { outcomeText: event.target.value })}
-                                                            rows={3}
-                                                        />
+                                                        <div className={styles.spellcheckInlineFieldFull}>
+                                                            {renderSpellcheckOverlay(`choice-outcome-${choice.id}`, choice.outcomeText, styles.branchingChoiceInput)}
+                                                            <textarea
+                                                                id={`choice-outcome-${choice.id}`}
+                                                                className={`${styles.branchingChoiceInput} ${hasSpellcheckIssue(`choice-outcome-${choice.id}`) ? styles.spellcheckFieldError : ''} ${styles.spellcheckInlineTarget}`}
+                                                                placeholder="Outcome text (ไม่แสดงในหน้าอ่านตอนนี้)"
+                                                                value={choice.outcomeText}
+                                                                spellCheck={true}
+                                                                lang="th-TH"
+                                                                onFocus={() => handleSpellcheckFieldFocus(`choice-outcome-${choice.id}`)}
+                                                                onBlur={() => handleSpellcheckFieldBlur(`choice-outcome-${choice.id}`)}
+                                                                onMouseUp={(event) => handleSpellcheckFieldMouseUp(`choice-outcome-${choice.id}`, event)}
+                                                                onChange={(event) => updateChapterChoice(choice.id, { outcomeText: event.target.value })}
+                                                                rows={3}
+                                                            />
+                                                        </div>
                                                     </div>
                                                     <div className={styles.branchingChoiceAdvancedRow}>
                                                         <button
@@ -5346,6 +5913,41 @@ export default function EditChapterPage() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {activeSuggestionPopover && suggestionPopoverPosition && createPortal(
+                <div
+                    className={styles.spellcheckSuggestionPopover}
+                    style={{
+                        left: `${suggestionPopoverPosition.left}px`,
+                        top: `${suggestionPopoverPosition.top}px`,
+                    }}
+                    data-spellcheck-popover="true"
+                >
+                    <div className={styles.spellcheckSuggestionTitle}>
+                        คำที่ควรตรวจ: <strong>{activeSuggestionPopover.word}</strong>
+                    </div>
+                    {activeSuggestionPopover.suggestions.length > 0 ? (
+                        <div className={styles.spellcheckSuggestionList}>
+                            {activeSuggestionPopover.suggestions.map((suggestion) => (
+                                <button
+                                    key={suggestion}
+                                    type="button"
+                                    className={styles.spellcheckSuggestionItem}
+                                    onMouseDown={(event) => event.preventDefault()}
+                                    onClick={() => handleApplySuggestion(suggestion)}
+                                >
+                                    {suggestion}
+                                </button>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className={styles.spellcheckSuggestionEmpty}>
+                            ไม่พบคำแนะนำอัตโนมัติ ลองพิมพ์แก้ด้วยตนเอง
+                        </div>
+                    )}
+                </div>,
+                document.body
             )}
 
             {notice && (

@@ -1,6 +1,5 @@
 import os
 import re
-from collections import Counter
 from functools import lru_cache
 from typing import Any
 
@@ -16,6 +15,7 @@ MAX_FIELDS = int(os.getenv("SPELLCHECK_MAX_FIELDS", "120"))
 MAX_TOTAL_CHARS = int(os.getenv("SPELLCHECK_MAX_TOTAL_CHARS", "60000"))
 MAX_SUGGESTIONS_PER_FIELD = int(os.getenv("SPELLCHECK_MAX_SUGGESTIONS_PER_FIELD", "6"))
 MAX_EXAMPLES_PER_FIELD = int(os.getenv("SPELLCHECK_MAX_EXAMPLES_PER_FIELD", "3"))
+MAX_ISSUES_PER_FIELD = int(os.getenv("SPELLCHECK_MAX_ISSUES_PER_FIELD", "80"))
 TOKENIZE_ENGINE = os.getenv("SPELLCHECK_TOKENIZE_ENGINE", "newmm").strip() or "newmm"
 SERVICE_TOKEN = os.getenv("SPELLCHECK_SERVICE_TOKEN", "").strip()
 
@@ -36,6 +36,14 @@ class SpellcheckFieldInput(BaseModel):
 class SpellcheckRequest(BaseModel):
     fields: list[SpellcheckFieldInput] = Field(default_factory=list)
     language: str | None = None
+    mode: str | None = None
+
+
+class WordIssue(BaseModel):
+    start: int
+    end: int
+    word: str
+    suggestions: list[str] = Field(default_factory=list)
 
 
 class FieldIssue(BaseModel):
@@ -44,6 +52,7 @@ class FieldIssue(BaseModel):
     matches: int
     suggestions: list[str] = Field(default_factory=list)
     examples: list[str] = Field(default_factory=list)
+    issues: list[WordIssue] = Field(default_factory=list)
 
 
 class SpellcheckResponse(BaseModel):
@@ -120,13 +129,9 @@ def unique_limited(values: list[str], max_items: int) -> list[str]:
     return result
 
 
-def make_example(text: str, token: str) -> str:
-    index = text.find(token)
-    if index < 0:
-        return token
-
-    start = max(0, index - 14)
-    end = min(len(text), index + len(token) + 14)
+def make_example(text: str, start_index: int, end_index: int) -> str:
+    start = max(0, start_index - 14)
+    end = min(len(text), end_index + 14)
     excerpt = text[start:end].replace("\n", " ").strip()
     prefix = "…" if start > 0 else ""
     suffix = "…" if end < len(text) else ""
@@ -160,21 +165,39 @@ def lookup_spell_suggestions(token: str) -> tuple[str, ...]:
 
 
 def evaluate_field(field: SpellcheckFieldInput) -> FieldIssue | None:
-    tokens = word_tokenize(field.text, engine=TOKENIZE_ENGINE, keep_whitespace=False)
-    candidate_counts = Counter(token for token in tokens if is_candidate_token(token))
-    if not candidate_counts:
+    tokens_with_whitespace = word_tokenize(field.text, engine=TOKENIZE_ENGINE, keep_whitespace=True)
+
+    cursor = 0
+    token_segments: list[tuple[str, int, int]] = []
+    for token in tokens_with_whitespace:
+        start = cursor
+        end = start + len(token)
+        cursor = end
+        token_segments.append((token, start, end))
+
+    candidate_segments = [
+        (token, start, end)
+        for token, start, end in token_segments
+        if is_candidate_token(token)
+    ]
+    if not candidate_segments:
         return None
+
+    positions_by_token: dict[str, list[tuple[int, int]]] = {}
+    for token, start, end in candidate_segments:
+        positions_by_token.setdefault(token, []).append((start, end))
 
     suggestions: list[str] = []
     examples: list[str] = []
+    word_issues: list[WordIssue] = []
     total_matches = 0
 
-    for token, count in candidate_counts.items():
+    for token, positions in positions_by_token.items():
         candidates = list(lookup_spell_suggestions(token))
         if token in candidates:
             continue
 
-        total_matches += count
+        total_matches += len(positions)
 
         cleaned_suggestions = unique_limited(
             [candidate for candidate in candidates if candidate != token],
@@ -186,13 +209,21 @@ def evaluate_field(field: SpellcheckFieldInput) -> FieldIssue | None:
                 if len(suggestions) >= MAX_SUGGESTIONS_PER_FIELD:
                     break
 
-        example = make_example(field.text, token)
-        if (
-            example
-            and example not in examples
-            and len(examples) < MAX_EXAMPLES_PER_FIELD
-        ):
-            examples.append(example)
+        for start, end in positions:
+            if len(word_issues) < MAX_ISSUES_PER_FIELD:
+                word_issues.append(
+                    WordIssue(
+                        start=start,
+                        end=end,
+                        word=token,
+                        suggestions=cleaned_suggestions[:MAX_SUGGESTIONS_PER_FIELD],
+                    )
+                )
+
+            if len(examples) < MAX_EXAMPLES_PER_FIELD:
+                example = make_example(field.text, start, end)
+                if example and example not in examples:
+                    examples.append(example)
 
     if total_matches <= 0:
         return None
@@ -203,6 +234,7 @@ def evaluate_field(field: SpellcheckFieldInput) -> FieldIssue | None:
         matches=total_matches,
         suggestions=suggestions[:MAX_SUGGESTIONS_PER_FIELD],
         examples=examples[:MAX_EXAMPLES_PER_FIELD],
+        issues=word_issues[:MAX_ISSUES_PER_FIELD],
     )
 
 

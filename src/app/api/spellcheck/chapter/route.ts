@@ -11,6 +11,7 @@ type SpellcheckFieldInput = {
 type SpellcheckRequestBody = {
   fields?: SpellcheckFieldInput[];
   language?: unknown;
+  mode?: unknown;
 };
 
 type NormalizedField = {
@@ -25,6 +26,14 @@ type ServiceSpellcheckFieldIssue = {
   matches?: unknown;
   suggestions?: unknown;
   examples?: unknown;
+  issues?: unknown;
+};
+
+type ServiceSpellcheckWordIssue = {
+  start?: unknown;
+  end?: unknown;
+  word?: unknown;
+  suggestions?: unknown;
 };
 
 type ServiceSpellcheckResponse = {
@@ -40,6 +49,14 @@ type PublicSpellcheckFieldIssue = {
   matches: number;
   suggestions: string[];
   examples: string[];
+  issues?: PublicSpellcheckWordIssue[];
+};
+
+type PublicSpellcheckWordIssue = {
+  start: number;
+  end: number;
+  word: string;
+  suggestions: string[];
 };
 
 const NO_STORE_HEADERS = {
@@ -49,7 +66,10 @@ const NO_STORE_HEADERS = {
 const MAX_FIELDS = 120;
 const MAX_TOTAL_TEXT_LENGTH = 60_000;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
-const RATE_LIMIT_MAX_REQUESTS = 20;
+const RATE_LIMIT_MAX_REQUESTS_MANUAL = 20;
+const RATE_LIMIT_MAX_REQUESTS_REALTIME = 140;
+
+type SpellcheckMode = 'manual' | 'realtime';
 
 const resolveServiceUrl = (): string | null => {
   const raw = process.env.SPELLCHECK_SERVICE_URL?.trim();
@@ -138,6 +158,29 @@ const parseStringArray = (value: unknown, max: number): string[] => {
   return result;
 };
 
+const normalizeSpellcheckMode = (value: unknown): SpellcheckMode => {
+  if (value === 'realtime') return 'realtime';
+  return 'manual';
+};
+
+const normalizeServiceWordIssue = (value: ServiceSpellcheckWordIssue): PublicSpellcheckWordIssue | null => {
+  const startRaw = Number(value.start);
+  const endRaw = Number(value.end);
+  const word = typeof value.word === 'string' ? value.word.trim() : '';
+  if (!Number.isFinite(startRaw) || !Number.isFinite(endRaw)) return null;
+
+  const start = Math.max(0, Math.floor(startRaw));
+  const end = Math.max(0, Math.floor(endRaw));
+  if (end <= start || !word) return null;
+
+  return {
+    start,
+    end,
+    word,
+    suggestions: parseStringArray(value.suggestions, 6),
+  };
+};
+
 const normalizeServiceFieldIssue = (value: ServiceSpellcheckFieldIssue): PublicSpellcheckFieldIssue | null => {
   const id = typeof value.id === 'string' ? value.id.trim() : '';
   if (!id) return null;
@@ -152,6 +195,12 @@ const normalizeServiceFieldIssue = (value: ServiceSpellcheckFieldIssue): PublicS
     matches,
     suggestions: parseStringArray(value.suggestions, 6),
     examples: parseStringArray(value.examples, 4),
+    issues: Array.isArray(value.issues)
+      ? (value.issues as ServiceSpellcheckWordIssue[])
+          .map(normalizeServiceWordIssue)
+          .filter((item): item is PublicSpellcheckWordIssue => item !== null)
+          .sort((a, b) => a.start - b.start)
+      : undefined,
   };
 };
 
@@ -162,10 +211,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: NO_STORE_HEADERS });
     }
 
+    let body: SpellcheckRequestBody;
+    try {
+      body = (await request.json()) as SpellcheckRequestBody;
+    } catch {
+      return NextResponse.json({ error: 'Invalid spellcheck payload' }, { status: 400, headers: NO_STORE_HEADERS });
+    }
+
+    const mode = normalizeSpellcheckMode(body.mode);
     const clientIp = getRequestIp(request.headers);
+    const maxRequests = mode === 'realtime'
+      ? RATE_LIMIT_MAX_REQUESTS_REALTIME
+      : RATE_LIMIT_MAX_REQUESTS_MANUAL;
     const rateLimit = applyInMemoryRateLimit(
-      `spellcheck:${user.id}:${clientIp}`,
-      RATE_LIMIT_MAX_REQUESTS,
+      `spellcheck:${mode}:${user.id}:${clientIp}`,
+      maxRequests,
       RATE_LIMIT_WINDOW_MS,
     );
     if (!rateLimit.allowed) {
@@ -179,13 +239,6 @@ export async function POST(request: NextRequest) {
           },
         },
       );
-    }
-
-    let body: SpellcheckRequestBody;
-    try {
-      body = (await request.json()) as SpellcheckRequestBody;
-    } catch {
-      return NextResponse.json({ error: 'Invalid spellcheck payload' }, { status: 400, headers: NO_STORE_HEADERS });
     }
 
     const fields = normalizeFields(body.fields);
@@ -228,6 +281,7 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({
           fields,
           language: 'th',
+          mode,
         }),
         cache: 'no-store',
         signal: controller.signal,

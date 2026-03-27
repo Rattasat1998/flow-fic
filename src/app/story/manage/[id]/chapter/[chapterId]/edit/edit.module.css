@@ -226,6 +226,116 @@
     box-shadow: 0 0 0 2px rgba(251, 113, 133, 0.18) !important;
 }
 
+.spellcheckInlineFieldFull,
+.spellcheckInlineFieldFit {
+    position: relative;
+    isolation: isolate;
+}
+
+.spellcheckInlineFieldFull {
+    display: block;
+    width: 100%;
+}
+
+.spellcheckInlineFieldFit {
+    display: inline-block;
+    max-width: 100%;
+}
+
+.spellcheckInlineTarget {
+    position: relative;
+    z-index: 2;
+    background-color: transparent;
+}
+
+.spellcheckInlineOverlay {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    color: transparent !important;
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.spellcheckInlineOverlaySingleLine {
+    white-space: pre;
+    overflow: hidden;
+    text-overflow: clip;
+}
+
+.spellcheckInlineOverlay::placeholder {
+    color: transparent !important;
+}
+
+.spellcheckInlineWord {
+    color: transparent;
+    text-decoration-line: underline;
+    text-decoration-style: wavy;
+    text-decoration-color: #f43f5e;
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 2px;
+}
+
+.spellcheckSuggestionPopover {
+    position: fixed;
+    z-index: 180;
+    width: min(320px, calc(100vw - 24px));
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    border-radius: 12px;
+    border: 1px solid rgba(15, 23, 42, 0.16);
+    background: #ffffff;
+    box-shadow: 0 18px 38px rgba(15, 23, 42, 0.28);
+    padding: 0.65rem;
+}
+
+.spellcheckSuggestionTitle {
+    color: #0f172a;
+    font-size: 0.78rem;
+    line-height: 1.4;
+}
+
+.spellcheckSuggestionTitle strong {
+    color: #be123c;
+    font-weight: 800;
+}
+
+.spellcheckSuggestionList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.spellcheckSuggestionItem {
+    border: 1px solid #fecdd3;
+    background: #fff1f2;
+    color: #9f1239;
+    border-radius: 999px;
+    padding: 0.25rem 0.62rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.18s, border-color 0.18s, color 0.18s;
+}
+
+.spellcheckSuggestionItem:hover {
+    border-color: #fb7185;
+    background: #ffe4e6;
+    color: #881337;
+}
+
+.spellcheckSuggestionEmpty {
+    color: #64748b;
+    font-size: 0.77rem;
+    line-height: 1.4;
+}
+
 @keyframes spellcheckFocusPulse {
     0% {
         box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.32);
@@ -4181,6 +4291,40 @@
 .noticeClose:hover {
     background: rgba(15, 23, 42, 0.92);
     color: #fdba74;
+}
+
+.spellcheckInlineWord {
+    text-decoration-color: #fb7185;
+}
+
+.spellcheckSuggestionPopover {
+    border-color: rgba(255, 255, 255, 0.12);
+    background: linear-gradient(180deg, rgba(10, 17, 32, 0.98), rgba(5, 9, 19, 0.995));
+    box-shadow: 0 22px 44px rgba(2, 6, 23, 0.48);
+}
+
+.spellcheckSuggestionTitle {
+    color: #e2e8f0;
+}
+
+.spellcheckSuggestionTitle strong {
+    color: #fda4af;
+}
+
+.spellcheckSuggestionItem {
+    border-color: rgba(244, 63, 94, 0.3);
+    background: rgba(136, 19, 55, 0.22);
+    color: #fecdd3;
+}
+
+.spellcheckSuggestionItem:hover {
+    border-color: rgba(251, 113, 133, 0.46);
+    background: rgba(136, 19, 55, 0.36);
+    color: #ffe4e6;
+}
+
+.spellcheckSuggestionEmpty {
+    color: rgba(191, 208, 228, 0.74);
 }
 
 .recoveryBanner {
