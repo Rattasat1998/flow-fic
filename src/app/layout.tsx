@@ -13,6 +13,7 @@ import {
   ROOT_SHARE_IMAGE_PATH,
   getMetadataBase,
 } from "@/lib/server/share";
+import { buildOrganizationJsonLd, buildWebSiteJsonLd, serializeJsonLd } from "@/lib/server/seo";
 
 const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "G-YCCV3630X1";
 
@@ -26,11 +27,25 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const organizationJsonLd = buildOrganizationJsonLd();
+const webSiteJsonLd = buildWebSiteJsonLd();
+
 export const metadata: Metadata = {
   metadataBase: getMetadataBase(),
   title: DEFAULT_SITE_TITLE,
   applicationName: DEFAULT_SITE_TITLE,
   description: DEFAULT_SITE_DESCRIPTION,
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-snippet": -1,
+      "max-image-preview": "large",
+      "max-video-preview": -1,
+    },
+  },
   icons: {
     icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
     shortcut: [{ url: "/icon.svg", type: "image/svg+xml" }],
@@ -64,6 +79,14 @@ export default function RootLayout({
   return (
     <html lang="th">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(organizationJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(webSiteJsonLd) }}
+        />
         <Script
           src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
           strategy="afterInteractive"

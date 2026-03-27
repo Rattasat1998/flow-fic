@@ -1,11 +1,31 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/support";
+import { buildFaqPageJsonLd, serializeJsonLd } from "@/lib/server/seo";
 
 export const metadata: Metadata = {
     title: "ศูนย์ช่วยเหลือ | FlowFic",
     description: "ศูนย์ช่วยเหลือและคำถามที่พบบ่อยสำหรับผู้ใช้งาน FlowFic",
 };
+
+const faqJsonLd = buildFaqPageJsonLd([
+    {
+        question: "วิธีสมัครสมาชิกบน FlowFic ทำอย่างไร?",
+        answer: "คุณสามารถสมัครและเข้าสู่ระบบได้ที่หน้าเข้าสู่ระบบ FlowFic ด้วยอีเมลและรหัสผ่าน",
+    },
+    {
+        question: "วิธีเขียนนิยายบน FlowFic ทำอย่างไร?",
+        answer: "หลังจากล็อกอิน ให้ไปที่เมนูสร้าง แล้วเลือกรูปแบบการเขียนที่ต้องการ เช่น นิยายข้อความหรือคอมิกส์",
+    },
+    {
+        question: "ระบบ Branching Story คืออะไร?",
+        answer: "Branching Story เป็นระบบที่ผู้เขียนสร้างเรื่องหลายทางเลือก และผู้อ่านสามารถตัดสินใจเส้นทางของเรื่องได้",
+    },
+    {
+        question: "เหรียญและ VIP ใช้งานอย่างไร?",
+        answer: "เหรียญใช้ปลดล็อกตอนพิเศษหรือสนับสนุนนักเขียน ส่วน VIP ใช้อ่านตอนพรีเมียมได้ตามสิทธิ์สมาชิก",
+    },
+]);
 
 export default function HelpPage() {
     return (
@@ -17,6 +37,10 @@ export default function HelpPage() {
                 lineHeight: 1.7,
             }}
         >
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqJsonLd) }}
+            />
             <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>ศูนย์ช่วยเหลือ FlowFic</h1>
             <p style={{ color: "#666", marginBottom: "2rem" }}>คำแนะนำและคำตอบสำหรับคำถามที่พบบ่อย</p>
 
