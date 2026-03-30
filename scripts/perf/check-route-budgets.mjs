@@ -13,6 +13,8 @@ const ROUTE_BUDGETS = [
   {
     label: '/',
     manifestPath: '.next/server/app/page_client-reference-manifest.js',
+    jsEntryKeys: ['[project]/src/components/home/HomePageClient.tsx'],
+    cssEntryKeys: ['[project]/src/app/page'],
     entryKeys: [
       '[project]/src/components/home/HomePageClient.tsx',
       '[project]/src/app/page',
@@ -23,6 +25,8 @@ const ROUTE_BUDGETS = [
   {
     label: '/story/[id]',
     manifestPath: '.next/server/app/story/[id]/page_client-reference-manifest.js',
+    jsEntryKeys: ['[project]/src/app/story/[id]/StoryDetailsClient.tsx'],
+    cssEntryKeys: ['[project]/src/app/story/[id]/page'],
     entryKeys: ['[project]/src/app/story/[id]/page'],
     jsBudgetBytes: 310 * 1024,
     cssBudgetBytes: 154 * 1024,
@@ -30,6 +34,8 @@ const ROUTE_BUDGETS = [
   {
     label: '/story/[id]/read',
     manifestPath: '.next/server/app/story/[id]/read/page_client-reference-manifest.js',
+    jsEntryKeys: ['[project]/src/app/story/[id]/read/page.tsx'],
+    cssEntryKeys: ['[project]/src/app/story/[id]/read/page'],
     entryKeys: ['[project]/src/app/story/[id]/read/page'],
     jsBudgetBytes: 460 * 1024,
     cssBudgetBytes: 156 * 1024,
@@ -59,7 +65,10 @@ function readRouteManifest(manifestPath) {
     throw new Error(`No route key found in manifest: ${manifestPath}`);
   }
 
-  return manifestByPath[routeKey];
+  return {
+    manifest: manifestByPath[routeKey],
+    routeKey,
+  };
 }
 
 function asArray(value) {
@@ -69,6 +78,130 @@ function asArray(value) {
 
 function normalizeCssEntries(entries) {
   return entries.map((entry) => (typeof entry === 'string' ? entry : entry?.path)).filter(Boolean);
+}
+
+function normalizeJsEntries(entries) {
+  return entries.filter((entry) => typeof entry === 'string' && entry.includes('.js'));
+}
+
+function toPosix(value) {
+  return String(value).replace(/\\/g, '/');
+}
+
+function resolveProjectAlias(value) {
+  const normalized = toPosix(value).trim();
+  if (normalized === '[project]') return toPosix(PROJECT_ROOT);
+  if (normalized.startsWith('[project]/')) {
+    return `${toPosix(PROJECT_ROOT)}/${normalized.slice('[project]/'.length)}`;
+  }
+
+  return normalized;
+}
+
+function stripQuery(value) {
+  const index = value.indexOf('?');
+  return index === -1 ? value : value.slice(0, index);
+}
+
+function stripKnownExtension(value) {
+  return value.replace(/\.(?:tsx?|jsx?|mjs|cjs)$/, '');
+}
+
+function keyMatches(candidateKey, availableKey) {
+  const candidateResolved = resolveProjectAlias(candidateKey);
+  const availableResolved = resolveProjectAlias(availableKey);
+  if (candidateResolved === availableResolved) return true;
+  if (availableResolved.startsWith(`${candidateResolved}?`) || candidateResolved.startsWith(`${availableResolved}?`)) {
+    return true;
+  }
+
+  const candidateBase = stripKnownExtension(stripQuery(candidateResolved));
+  const availableBase = stripKnownExtension(stripQuery(availableResolved));
+  return candidateBase === availableBase;
+}
+
+function findManifestKey(availableKeys, candidateKeys) {
+  for (const candidate of candidateKeys) {
+    const match = availableKeys.find((available) => keyMatches(candidate, available));
+    if (match) return match;
+  }
+
+  return null;
+}
+
+function buildRouteEntryCandidates(routeKey) {
+  const normalizedRouteKey = toPosix(routeKey || '');
+  const routeBase = `[project]/src/app${normalizedRouteKey}`;
+  return [
+    routeBase,
+    `${routeBase}.tsx`,
+    `${routeBase}.ts`,
+    `${routeBase}.jsx`,
+    `${routeBase}.js`,
+  ];
+}
+
+function getRouteDirectoryAbs(routeKey) {
+  const normalizedRouteKey = toPosix(routeKey || '');
+  if (!normalizedRouteKey || normalizedRouteKey === '/page') return null;
+
+  const routeWithoutPage = normalizedRouteKey.replace(/\/page$/, '');
+  if (!routeWithoutPage) return null;
+
+  return `${toPosix(PROJECT_ROOT)}/src/app${routeWithoutPage}`;
+}
+
+function pickRouteScopedClientModule(manifest, routeKey) {
+  const routeDirectory = getRouteDirectoryAbs(routeKey);
+  if (!routeDirectory) return null;
+
+  const modules = manifest.clientModules || {};
+  const scopedCandidates = Object.keys(modules)
+    .filter((moduleKey) => resolveProjectAlias(moduleKey).startsWith(`${routeDirectory}/`))
+    .map((moduleKey) => ({
+      moduleKey,
+      chunkCount: normalizeJsEntries(asArray(modules[moduleKey]?.chunks)).length,
+    }))
+    .filter((entry) => entry.chunkCount > 0)
+    .sort((a, b) => b.chunkCount - a.chunkCount);
+
+  return scopedCandidates[0]?.moduleKey || null;
+}
+
+function resolveJsAssets(manifest, routeKey, candidateKeys) {
+  const entryJSFiles = manifest.entryJSFiles;
+  if (entryJSFiles && typeof entryJSFiles === 'object') {
+    const matchedEntryKey = findManifestKey(Object.keys(entryJSFiles), candidateKeys);
+    if (matchedEntryKey) {
+      return {
+        source: 'entryJSFiles',
+        matchedKey: matchedEntryKey,
+        assets: normalizeJsEntries(asArray(entryJSFiles[matchedEntryKey])),
+      };
+    }
+  }
+
+  const clientModules = manifest.clientModules || {};
+  const clientModuleKeys = Object.keys(clientModules);
+  let matchedClientModuleKey = findManifestKey(clientModuleKeys, candidateKeys);
+
+  if (!matchedClientModuleKey) {
+    matchedClientModuleKey = pickRouteScopedClientModule(manifest, routeKey);
+  }
+
+  if (!matchedClientModuleKey) {
+    return {
+      source: 'clientModules',
+      matchedKey: null,
+      assets: [],
+    };
+  }
+
+  return {
+    source: 'clientModules',
+    matchedKey: matchedClientModuleKey,
+    assets: normalizeJsEntries(asArray(clientModules[matchedClientModuleKey]?.chunks)),
+  };
 }
 
 function sumAssetBytes(assetPaths) {
@@ -86,21 +219,38 @@ function sumAssetBytes(assetPaths) {
 }
 
 function evaluateRouteBudget(config) {
-  const manifest = readRouteManifest(path.join(PROJECT_ROOT, config.manifestPath));
-  const selectedEntryKey = config.entryKeys.find((key) => {
-    return (manifest.entryJSFiles && key in manifest.entryJSFiles)
-      || (manifest.entryCSSFiles && key in manifest.entryCSSFiles);
-  });
+  const { manifest, routeKey } = readRouteManifest(path.join(PROJECT_ROOT, config.manifestPath));
+  const routeEntryCandidates = buildRouteEntryCandidates(routeKey);
+  const jsCandidateKeys = [
+    ...(config.jsEntryKeys || []),
+    ...(config.entryKeys || []),
+    ...routeEntryCandidates,
+  ];
+  const cssCandidateKeys = [
+    ...(config.cssEntryKeys || []),
+    ...(config.entryKeys || []),
+    ...routeEntryCandidates,
+  ];
 
-  if (!selectedEntryKey) {
+  const entryCssFilesByKey = manifest.entryCSSFiles || {};
+  const selectedCssEntryKey = findManifestKey(Object.keys(entryCssFilesByKey), cssCandidateKeys);
+  if (!selectedCssEntryKey) {
     throw new Error(
-      `Entry key not found for ${config.label} in ${config.manifestPath}.` +
-      ` Checked keys: ${config.entryKeys.join(', ')}`
+      `CSS entry key not found for ${config.label} in ${config.manifestPath}.` +
+      ` Checked keys: ${cssCandidateKeys.join(', ')}`
     );
   }
 
-  const entryJsFiles = asArray(manifest.entryJSFiles?.[selectedEntryKey]);
-  const entryCssFiles = normalizeCssEntries(asArray(manifest.entryCSSFiles?.[selectedEntryKey]));
+  const jsResolution = resolveJsAssets(manifest, routeKey, jsCandidateKeys);
+  if (!jsResolution.matchedKey) {
+    throw new Error(
+      `JS entry key not found for ${config.label} in ${config.manifestPath}.` +
+      ` Checked keys: ${jsCandidateKeys.join(', ')}`
+    );
+  }
+
+  const entryJsFiles = jsResolution.assets;
+  const entryCssFiles = normalizeCssEntries(asArray(entryCssFilesByKey[selectedCssEntryKey]));
 
   const jsBytes = sumAssetBytes(entryJsFiles);
   const cssBytes = sumAssetBytes(entryCssFiles);
