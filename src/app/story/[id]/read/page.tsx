@@ -13,6 +13,7 @@ import {
 
 import { ChatBubble } from '@/components/chat/ChatBubble';
 import { ChatTypingIndicator } from '@/components/chat/ChatTypingIndicator';
+import { ChatReaderLayout } from '@/components/reader/chat/ChatReaderLayout';
 import { ChatMessage } from '@/types/chat';
 import { VisualNovelStage } from '@/components/story/VisualNovelStage';
 import Link from 'next/link';
@@ -3426,40 +3427,14 @@ export default function StoryPage({ params }: StoryPageProps) {
     <div className={themeWrapperClass}>
       <div className={isChatStyle ? styles.main : isVisualNovelStyle ? styles.visualNovelShell : styles.readerLayout}>
         {isChatStyle ? (
-          <>
-            <header
-              className={[
-                styles.chatTopbar,
-                shouldHideChatTopbar ? styles.chatTopbarHidden : '',
-              ].filter(Boolean).join(' ')}
-            >
-              <div className={styles.chatTopbarCopy}>
-                <span className={styles.chatTopbarEyebrow}>Chat Reader</span>
-                <h1 className={styles.chatTopbarTitle}>{activeStory.title}</h1>
-                <p className={styles.chatTopbarMeta}>
-                  {chatChapterMetaLabel}
-                  {isCurrentChapterLocked ? ` · 🔒 ${currentChapter?.coinPrice || 0} เหรียญ` : ''}
-                </p>
-              </div>
-              <button
-                type="button"
-                className={styles.chatTopbarMenuBtn}
-                onClick={() => setIsChatOverflowOpen(true)}
-                aria-label="เปิดเมนูการอ่าน"
-                aria-expanded={isChatOverflowOpen}
-              >
-                <MoreVertical size={18} />
-              </button>
-            </header>
-            <div
-              className={[
-                styles.chatContainer,
-                messages.length === 0 ? styles.chatContainerEmpty : '',
-              ].filter(Boolean).join(' ')}
-              onPointerDown={handleChatContainerPointerDown}
-              onPointerUp={handleChatContainerPointerUp}
-              onPointerCancel={handleChatContainerPointerCancel}
-            >
+          <ChatReaderLayout
+             story={dbStory}
+             chapter={currentChapter}
+             coinBalance={coinBalance}
+             onPointerDown={handleChatContainerPointerDown}
+             onPointerUp={handleChatContainerPointerUp}
+             onPointerCancel={handleChatContainerPointerCancel}
+          >
               <div className={styles.chatConversation}>
                 {messages.length === 0 ? (
                   <div className={styles.chatStarterHint}>
@@ -3528,80 +3503,7 @@ export default function StoryPage({ params }: StoryPageProps) {
                   </>
                 )}
               </div>
-            </div>
-
-            {isChatOverflowOpen && (
-              <div
-                className={styles.chatOverflowBackdrop}
-                onClick={closeChatOverflowMenu}
-                role="dialog"
-                aria-modal="true"
-                aria-label="เมนูการอ่าน"
-              >
-                <div
-                  className={styles.chatOverflowSheet}
-                  onClick={(event) => event.stopPropagation()}
-                  onTouchStart={handleChatOverflowTouchStart}
-                  onTouchEnd={handleChatOverflowTouchEnd}
-                >
-                  <button
-                    type="button"
-                    className={styles.chatOverflowHandle}
-                    onClick={closeChatOverflowMenu}
-                    aria-label="ปิดเมนูการอ่าน"
-                  />
-                  <div className={styles.chatOverflowHeader}>
-                    <p>เมนูการอ่าน</p>
-                    <button
-                      type="button"
-                      className={styles.chatOverflowCloseBtn}
-                      onClick={closeChatOverflowMenu}
-                      aria-label="ปิดเมนู"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                  <div className={styles.chatOverflowActions}>
-                    {allowTocInReader && (
-                      <button
-                        type="button"
-                        className={styles.chatOverflowActionBtn}
-                        onClick={() => {
-                          closeChatOverflowMenu();
-                          setIsTocOpen(true);
-                        }}
-                      >
-                        <List size={18} />
-                        <span>สารบัญ</span>
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className={`${styles.chatOverflowActionBtn} ${isCurrentChapterLiked ? styles.chatOverflowActionBtnActive : ''}`}
-                      onClick={() => {
-                        closeChatOverflowMenu();
-                        void handleToggleLike();
-                      }}
-                    >
-                      <Heart size={18} fill={isCurrentChapterLiked ? 'currentColor' : 'none'} />
-                      <span>{chatMenuLikeLabel}</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.chatOverflowActionBtn} ${isCurrentChapterFavorited ? styles.chatOverflowActionBtnActive : ''}`}
-                      onClick={() => {
-                        closeChatOverflowMenu();
-                        void handleToggleFavorite();
-                      }}
-                    >
-                      {isCurrentChapterFavorited ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}
-                      <span>{isCurrentChapterFavorited ? 'นำออกจากชั้น' : 'เก็บเข้าชั้น'}</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
+          </ChatReaderLayout>
         ) : isVisualNovelStyle ? (
           <>
             <div className={styles.visualNovelViewport}>
