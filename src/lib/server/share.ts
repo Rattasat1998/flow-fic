@@ -226,24 +226,12 @@ async function fetchWriterShareMeta(writerId: string): Promise<WriterShareMeta |
   };
 }
 
-const getCachedStoryShareMeta = unstable_cache(
-  async (storyId: string) => fetchStoryShareMeta(storyId),
-  ['story-share-meta-v1'],
-  { revalidate: 300 }
-);
-
-const getCachedWriterShareMeta = unstable_cache(
-  async (writerId: string) => fetchWriterShareMeta(writerId),
-  ['writer-share-meta-v1'],
-  { revalidate: 300 }
-);
-
 export async function getStoryShareMeta(storyId: string): Promise<StoryShareMeta | null> {
-  return getCachedStoryShareMeta(storyId);
+  return fetchStoryShareMeta(storyId);
 }
 
 export async function getWriterShareMeta(writerId: string): Promise<WriterShareMeta | null> {
-  return getCachedWriterShareMeta(writerId);
+  return fetchWriterShareMeta(writerId);
 }
 
 export async function buildStoryMetadata(storyId: string): Promise<Metadata> {

@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { DEFAULT_SITE_DESCRIPTION, DEFAULT_SITE_TITLE } from '@/lib/server/share';
 
-export const runtime = 'nodejs';
+export const runtime = 'edge';
 export const alt = DEFAULT_SITE_TITLE;
 export const size = {
   width: 1200,
