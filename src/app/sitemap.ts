@@ -24,6 +24,12 @@ type StorySitemapRow = {
   updated_at: string | null;
 };
 
+function hasSitemapSupabaseAdminEnv(): boolean {
+  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return Boolean(supabaseUrl && serviceRoleKey);
+}
+
 const toLastModifiedDate = (value: string | null | undefined, fallback: Date): Date => {
   if (!value) return fallback;
   const parsed = new Date(value);
@@ -32,6 +38,11 @@ const toLastModifiedDate = (value: string | null | undefined, fallback: Date): D
 };
 
 async function fetchPublishedStoriesForSitemap(): Promise<StorySitemapRow[]> {
+  if (!hasSitemapSupabaseAdminEnv()) {
+    console.warn('[sitemap] Missing Supabase admin env. Generating sitemap without story/writer URLs.');
+    return [];
+  }
+
   const admin = getSupabaseAdmin();
   const rows: StorySitemapRow[] = [];
   let offset = 0;
