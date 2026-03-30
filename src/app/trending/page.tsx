@@ -15,7 +15,7 @@ import {
 import type { DiscoveryFilters } from '@/types/discovery';
 
 type TrendingPageProps = {
-  searchParams?: Promise<{ page?: string }> | { page?: string };
+  searchParams?: Promise<{ page?: string }>;
 };
 
 const TRENDING_TITLE = `เรื่องมาแรง | ${DEFAULT_SITE_TITLE}`;
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
 };
 
 export default async function TrendingPage({ searchParams }: TrendingPageProps) {
-  const params = await Promise.resolve(searchParams ?? {});
+  const params = (await searchParams) ?? {};
   const page = Math.max(1, Number(params.page || '1'));
   const limit = 20;
   const offset = (page - 1) * limit;

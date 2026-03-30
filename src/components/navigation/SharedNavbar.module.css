@@ -319,10 +319,6 @@
     }
 }
 
-:global(body.ffMobileDrawerOpen) {
-    overflow: hidden;
-}
-
 .mobileDrawerOverlay {
     position: fixed;
     inset: 0;

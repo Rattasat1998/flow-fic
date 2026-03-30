@@ -17,12 +17,12 @@ import type { DiscoveryFilters } from '@/types/discovery';
 import { notFound } from 'next/navigation';
 
 type CategoryPageProps = {
-  params?: Promise<{ id: string }> | { id: string };
-  searchParams?: Promise<{ page?: string }> | { page?: string };
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ page?: string }>;
 };
 
 export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
-  const resolvedParams = await Promise.resolve(params ?? { id: '' });
+  const resolvedParams = await params;
   const category = MAIN_CATEGORIES.find((entry) => entry.id === resolvedParams.id);
 
   if (!category) {
@@ -62,8 +62,8 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
 }
 
 export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
-  const resolvedParams = await Promise.resolve(params ?? { id: '' });
-  const resolvedSearchParams = await Promise.resolve(searchParams ?? {});
+  const resolvedParams = await params;
+  const resolvedSearchParams = (await searchParams) ?? {};
 
   const categoryId = resolvedParams.id;
   const category = MAIN_CATEGORIES.find((c) => c.id === categoryId);

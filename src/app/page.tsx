@@ -41,11 +41,11 @@ export const metadata: Metadata = {
 };
 
 type HomePageProps = {
-  searchParams?: Promise<DiscoverySearchParams> | DiscoverySearchParams;
+  searchParams?: Promise<DiscoverySearchParams>;
 };
 
 export default async function HomePage({ searchParams }: HomePageProps) {
-  await Promise.resolve(searchParams ?? {});
+  await searchParams;
   const initialFilters: DiscoveryFilters = {
     q: '',
     category: 'all',
