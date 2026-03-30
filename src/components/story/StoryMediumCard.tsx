@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { Trash2 } from 'lucide-react';
+import { Fingerprint, Trash2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { CoverTiltFrame } from './CoverTiltFrame';
@@ -27,6 +27,8 @@ type StoryMediumCardProps = {
     imageSizes?: string;
     className?: string;
     dataCard?: string;
+    variant?: 'default' | 'case';
+    badgeLabel?: string | null;
 };
 
 export function StoryMediumCard({
@@ -46,8 +48,11 @@ export function StoryMediumCard({
     imageSizes = '(max-width: 767px) 46vw, (max-width: 1180px) 24vw, 180px',
     className,
     dataCard,
+    variant = 'default',
+    badgeLabel = null,
 }: StoryMediumCardProps) {
     const visibleTags = tags.filter(Boolean).slice(0, 2);
+    const isCaseVariant = variant === 'case';
     const accentClassName =
         accent === 'bookshelf'
             ? styles.accentBookshelf
@@ -55,7 +60,7 @@ export function StoryMediumCard({
                 ? styles.accentLoves
                 : '';
 
-    const cardClassName = [styles.card, accentClassName, className].filter(Boolean).join(' ');
+    const cardClassName = [styles.card, isCaseVariant ? styles.caseCard : '', accentClassName, className].filter(Boolean).join(' ');
     const coverContent = (
         <>
             {coverUrl ? (
@@ -70,7 +75,9 @@ export function StoryMediumCard({
                 <div className={styles.coverFallback}>{title.slice(0, 2)}</div>
             )}
 
-            {isCompleted && <span className={styles.completedBadge}>{completedLabel}</span>}
+            {isCaseVariant && <div className={styles.caseCoverOverlay} aria-hidden="true" />}
+            {badgeLabel ? <span className={styles.caseBadge}>{badgeLabel}</span> : null}
+            {!badgeLabel && isCompleted && <span className={styles.completedBadge}>{completedLabel}</span>}
         </>
     );
 
@@ -85,9 +92,16 @@ export function StoryMediumCard({
 
                 <div className={styles.body}>
                     <h3 className={styles.title}>{title}</h3>
-                    <p className={styles.author}>{author}</p>
+                    {isCaseVariant ? (
+                        <p className={`${styles.author} ${styles.caseAuthor}`}>
+                            <Fingerprint size={11} className={styles.caseAuthorIcon} />
+                            <span>{author}</span>
+                        </p>
+                    ) : (
+                        <p className={styles.author}>{author}</p>
+                    )}
                     {(footer || visibleTags.length > 0) && (
-                        <div className={styles.footer}>
+                        <div className={`${styles.footer} ${isCaseVariant ? styles.caseFooter : ''}`}>
                             {footer || (
                                 <div className={styles.tagList}>
                                     {visibleTags.map((tag) => (

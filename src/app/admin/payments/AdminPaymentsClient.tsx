@@ -2,15 +2,15 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useCookieConsent } from '@/contexts/CookieConsentContext';
 import {
   ShieldCheck,
   Search,
   RefreshCcw,
   Coins,
-  CreditCard,
+  Wallet,
   History,
   BarChart3,
-  Undo2,
   Lock,
   Activity,
   Terminal,
@@ -62,6 +62,34 @@ interface AdminLog {
   response: unknown;
 }
 
+interface CreatorPayoutRequest {
+  id: string;
+  writerUserId: string;
+  status: 'requested' | 'approved' | 'paid' | 'rejected' | 'canceled';
+  grossSatang: number;
+  withholdingBps: number;
+  withholdingSatang: number;
+  netSatang: number;
+  promptpayTarget: string | null;
+  transferReference: string | null;
+  transferProofUrl: string | null;
+  requestNote: string | null;
+  requestedAt: string;
+  approvedAt: string | null;
+  approvedBy: string | null;
+  paidAt: string | null;
+  paidBy: string | null;
+  rejectedAt: string | null;
+  rejectedBy: string | null;
+  rejectReason: string | null;
+  itemCount: number;
+  profile: {
+    legalName: string | null;
+    kycStatus: string;
+    promptpayTarget: string | null;
+  } | null;
+}
+
 const CASE_STATUS_LABELS: Record<PaymentCaseStatus, string> = {
   open: 'รอดำเนินการ',
   resolved: 'ปิดเคสแล้ว',
@@ -91,6 +119,9 @@ const ADMIN_ACTION_LABELS: Record<string, string> = {
   hold: 'ระงับยอด',
   release: 'ปลดระงับยอด',
   reconcile: 'กระทบยอด',
+  payoutApprove: 'อนุมัติถอนเงิน',
+  payoutReject: 'ปฏิเสธถอนเงิน',
+  payoutPaid: 'ยืนยันโอนสำเร็จ',
 };
 
 const TRANSACTION_TYPE_LABELS: Record<string, string> = {
@@ -99,6 +130,25 @@ const TRANSACTION_TYPE_LABELS: Record<string, string> = {
   stripe_topup: 'เติมเหรียญผ่าน Stripe',
   chapter_unlock: 'ปลดล็อกตอน',
   admin_adjust: 'ปรับยอดโดยผู้ดูแล',
+};
+
+type AdminStats = {
+  todayTransactionCount: number;
+  todayCoinNet: number;
+  pendingCases: number;
+};
+
+const BANGKOK_TIME_ZONE = 'Asia/Bangkok';
+const BANGKOK_DATE_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+  timeZone: BANGKOK_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+const EMPTY_STATS: AdminStats = {
+  todayTransactionCount: 0,
+  todayCoinNet: 0,
+  pendingCases: 0,
 };
 
 function getCaseStatusLabel(status: PaymentCaseStatus) {
@@ -121,8 +171,34 @@ function getTransactionTypeLabel(txnType: string) {
   return TRANSACTION_TYPE_LABELS[txnType] || txnType.replace(/_/g, ' ');
 }
 
+function mapPayoutStatusToCaseStatus(status: CreatorPayoutRequest['status']): PaymentCaseStatus {
+  if (status === 'requested') return 'open';
+  if (status === 'rejected' || status === 'canceled') return 'rejected';
+  if (status === 'paid') return 'resolved';
+  return 'on_hold';
+}
+
+function toBangkokDateKey(value: string | Date) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return BANGKOK_DATE_FORMATTER.format(date);
+}
+
+function calculateStats(paymentCases: PaymentCase[], coinTransactions: CoinTransaction[]): AdminStats {
+  const todayKey = toBangkokDateKey(new Date());
+  if (!todayKey) return { ...EMPTY_STATS };
+
+  const todayTransactions = coinTransactions.filter((txn) => toBangkokDateKey(txn.created_at) === todayKey);
+  return {
+    todayTransactionCount: todayTransactions.length,
+    todayCoinNet: todayTransactions.reduce((sum, txn) => sum + txn.amount, 0),
+    pendingCases: paymentCases.filter((item) => item.status === 'open').length,
+  };
+}
+
 export default function AdminPaymentsClient() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'cases' | 'transactions' | 'management'>('overview');
+  const { canTrackAnalytics } = useCookieConsent();
+  const [activeTab, setActiveTab] = useState<'overview' | 'cases' | 'transactions' | 'management' | 'creatorPayouts'>('overview');
   const [loading, setLoading] = useState(true);
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -131,14 +207,9 @@ export default function AdminPaymentsClient() {
   // Data State
   const [cases, setCases] = useState<PaymentCase[]>([]);
   const [transactions, setTransactions] = useState<CoinTransaction[]>([]);
+  const [creatorPayouts, setCreatorPayouts] = useState<CreatorPayoutRequest[]>([]);
   const [logs, setLogs] = useState<AdminLog[]>([]);
-  const [stats, setStats] = useState({
-    todayRevenue: 12450,
-    activeVips: 432,
-    pendingRefunds: 0,
-    revenueChange: 12.5,
-    isDemo: true
-  });
+  const [stats, setStats] = useState<AdminStats>(EMPTY_STATS);
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -147,6 +218,12 @@ export default function AdminPaymentsClient() {
   // Form States (Management)
   const [refundData, setRefundData] = useState({ userId: '', sourceTxnId: '', reason: '' });
   const [holdData, setHoldData] = useState({ userId: '', amount: '', reason: '', extRef: '' });
+  const [payoutData, setPayoutData] = useState({
+    requestId: '',
+    rejectReason: '',
+    transferReference: '',
+    transferProofUrl: '',
+  });
 
   // --- Auth & Access ---
   const checkAccess = useCallback(async () => {
@@ -171,32 +248,33 @@ export default function AdminPaymentsClient() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const res = await fetch('/api/admin/payments/history', {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
+      const [historyRes, payoutRes] = await Promise.all([
+        fetch('/api/admin/payments/history', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        }),
+        fetch('/api/admin/payouts/requests?limit=50', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        }),
+      ]);
+
+      if (historyRes.ok) {
+        const data = await historyRes.json();
         const paymentCases = (data.paymentCases || []) as PaymentCase[];
         const coinTransactions = (data.coinTransactions || []) as CoinTransaction[];
-        const hasRealData = paymentCases.length > 0 || coinTransactions.length > 0;
+        setCases(paymentCases);
+        setTransactions(coinTransactions);
+        setStats(calculateStats(paymentCases, coinTransactions));
+      } else {
+        setCases([]);
+        setTransactions([]);
+        setStats({ ...EMPTY_STATS });
+      }
 
-        if (hasRealData) {
-          setCases(paymentCases);
-          setTransactions(coinTransactions);
-          const pending = paymentCases.filter((item) => item.status === 'open').length;
-          setStats(prev => ({ ...prev, pendingRefunds: pending, isDemo: false }));
-        } else {
-          // แสดงข้อมูลตัวอย่างเมื่อไม่มีข้อมูลจริง
-          setCases([
-            { id: 'demo-001', case_type: 'refund_request', status: 'open', user_id: 'abc123', amount: 500, currency: 'THB', reason: 'ทดสอบการคืนเงิน', external_reference: null, source_txn_id: 'txn_demo_1', hold_txn_id: null, resolution_txn_id: null, opened_by: null, resolved_by: null, resolved_at: null, created_at: new Date().toISOString() },
-            { id: 'demo-002', case_type: 'chargeback', status: 'resolved', user_id: 'xyz789', amount: 1500, currency: 'THB', reason: 'คำขอคืนเงิน', external_reference: null, source_txn_id: 'txn_demo_2', hold_txn_id: null, resolution_txn_id: null, opened_by: null, resolved_by: null, resolved_at: null, created_at: new Date(Date.now() - 86400000).toISOString() }
-          ]);
-          setTransactions([
-            { id: 'txn-001', user_id: 'abc123', amount: 100, txn_type: 'purchase', description: 'ซื้อเหรียญ 100 เหรียญ', created_at: new Date().toISOString(), reference_type: null, reference_id: null, policy_version: null, reversal_of_txn_id: null },
-            { id: 'txn-002', user_id: 'xyz789', amount: -50, txn_type: 'refund', description: 'คืนเงิน 50 เหรียญ', created_at: new Date(Date.now() - 3600000).toISOString(), reference_type: null, reference_id: null, policy_version: null, reversal_of_txn_id: null }
-          ]);
-          setStats(prev => ({ ...prev, pendingRefunds: 1, isDemo: true }));
-        }
+      if (payoutRes.ok) {
+        const payoutDataRes = await payoutRes.json();
+        setCreatorPayouts((payoutDataRes.requests || []) as CreatorPayoutRequest[]);
+      } else {
+        setCreatorPayouts([]);
       }
     } catch (err) {
       console.error(err);
@@ -240,6 +318,20 @@ export default function AdminPaymentsClient() {
         response: data
       }, ...prev].slice(0, 10));
 
+      if (canTrackAnalytics && action.startsWith('payout')) {
+        void supabase.from('page_events').insert({
+          user_id: session.user.id,
+          session_id: `admin-${Date.now()}`,
+          event_type: 'admin_payout_action',
+          page_path: '/admin/payments',
+          metadata: {
+            action,
+            ok: res.ok,
+            status: res.status,
+          },
+        });
+      }
+
       if (res.ok) fetchData();
       else alert(`ทำรายการไม่สำเร็จ: ${data.error || 'ไม่สามารถส่งคำขอได้'}`);
     } catch {
@@ -257,6 +349,10 @@ export default function AdminPaymentsClient() {
       return matchSearch && matchStatus;
     });
   }, [cases, searchQuery, statusFilter]);
+  const recentCases = useMemo(() => cases.slice(0, 5), [cases]);
+  const recentTransactions = useMemo(() => transactions.slice(0, 50), [transactions]);
+  const todayCoinNetDisplay = `${stats.todayCoinNet >= 0 ? '+' : ''}${stats.todayCoinNet.toLocaleString('th-TH')}`;
+  const todayCoinNetColor = stats.todayCoinNet >= 0 ? '#6ee7b7' : '#fda4af';
 
   // --- Render Helpers ---
   if (loading) return <div className={styles.loadingContainer}><RefreshCcw className={styles.spinner} /><p style={{ color: '#94a3b8' }}>กำลังโหลดข้อมูลการเงิน...</p></div>;
@@ -274,7 +370,7 @@ export default function AdminPaymentsClient() {
       {/* Test Tag */}
       <div className={styles.statusBanner}>
         <Zap size={16} className={styles.statusBannerIcon} />
-        FLOWFIC ศูนย์จัดการการเงิน v2.1 พร้อมใช้งาน {stats.isDemo && <span className={styles.statusBannerMeta}>(ข้อมูลตัวอย่าง)</span>}
+        FLOWFIC ศูนย์จัดการการเงิน v2.1 พร้อมใช้งาน
       </div>
 
       <header className={styles.header}>
@@ -293,6 +389,7 @@ export default function AdminPaymentsClient() {
         <button className={`${styles.tab} ${activeTab === 'management' ? styles.activeTab : ''}`} onClick={() => setActiveTab('management')}><ShieldCheck size={18} /> เครื่องมือ</button>
         <button className={`${styles.tab} ${activeTab === 'cases' ? styles.activeTab : ''}`} onClick={() => setActiveTab('cases')}><Activity size={18} /> เคส</button>
         <button className={`${styles.tab} ${activeTab === 'transactions' ? styles.activeTab : ''}`} onClick={() => setActiveTab('transactions')}><History size={18} /> ธุรกรรม</button>
+        <button className={`${styles.tab} ${activeTab === 'creatorPayouts' ? styles.activeTab : ''}`} onClick={() => setActiveTab('creatorPayouts')}><Wallet size={18} /> Creator Payouts</button>
       </div>
 
       <main>
@@ -300,12 +397,16 @@ export default function AdminPaymentsClient() {
           <>
             <div className={styles.statsGrid}>
               <div className={styles.statCard}>
-                <div className={styles.statHeader}><div className={`${styles.statIcon} ${styles.revenueIcon}`}><Coins size={24} /></div><span className={styles.trendUp}>+{stats.revenueChange}%</span></div>
-                <div className={styles.statValue}>฿{(stats.todayRevenue / 100).toLocaleString()}</div>
-                <div className={styles.statLabel}>รายได้วันนี้</div>
+                <div className={styles.statHeader}><div className={`${styles.statIcon} ${styles.txnIcon}`}><History size={24} /></div></div>
+                <div className={styles.statValue}>{stats.todayTransactionCount.toLocaleString('th-TH')}</div>
+                <div className={styles.statLabel}>ธุรกรรมเหรียญวันนี้</div>
               </div>
-              <div className={styles.statCard}><div className={styles.statHeader}><div className={`${styles.statIcon} ${styles.vipIcon}`}><CreditCard size={24} /></div></div><div className={styles.statValue}>{stats.activeVips}</div><div className={styles.statLabel}>สมาชิก VIP ที่ใช้งานอยู่</div></div>
-              <div className={styles.statCard}><div className={styles.statHeader}><div className={`${styles.statIcon} ${styles.refundIcon}`}><Undo2 size={24} /></div></div><div className={styles.statValue}>{stats.pendingRefunds}</div><div className={styles.statLabel}>เคสที่รอดำเนินการ</div></div>
+              <div className={styles.statCard}>
+                <div className={styles.statHeader}><div className={`${styles.statIcon} ${styles.revenueIcon}`}><Coins size={24} /></div></div>
+                <div className={styles.statValue} style={{ color: todayCoinNetColor }}>{todayCoinNetDisplay} coin</div>
+                <div className={styles.statLabel}>สุทธิเหรียญวันนี้</div>
+              </div>
+              <div className={styles.statCard}><div className={styles.statHeader}><div className={`${styles.statIcon} ${styles.refundIcon}`}><Activity size={24} /></div></div><div className={styles.statValue}>{stats.pendingCases}</div><div className={styles.statLabel}>เคสรอดำเนินการ</div></div>
             </div>
 
             <div className={styles.contentCard}>
@@ -313,15 +414,21 @@ export default function AdminPaymentsClient() {
               <table className={styles.table}>
                 <thead><tr><th>รหัสเคส</th><th>ประเภทเคส</th><th>จำนวนเงิน</th><th>สถานะ</th><th>เวลา</th></tr></thead>
                 <tbody>
-                  {cases.slice(0, 5).map(c => (
-                    <tr key={c.id}>
-                      <td style={{ fontFamily: 'monospace', color: '#94a3b8' }}>#{c.id.slice(0, 8)}</td>
-                      <td>{getCaseTypeLabel(c.case_type)}</td>
-                      <td style={{ fontWeight: 'bold' }}>฿{(c.amount / 100).toLocaleString()}</td>
-                      <td><span className={`${styles.statusBadge} ${styles[getCaseStatusClassName(c.status)]}`}>{getCaseStatusLabel(c.status)}</span></td>
-                      <td>{new Date(c.created_at).toLocaleTimeString('th-TH')}</td>
+                  {recentCases.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className={styles.emptyTableCell}>ยังไม่มีกิจกรรมเคสการเงิน</td>
                     </tr>
-                  ))}
+                  ) : (
+                    recentCases.map(c => (
+                      <tr key={c.id}>
+                        <td style={{ fontFamily: 'monospace', color: '#94a3b8' }}>#{c.id.slice(0, 8)}</td>
+                        <td>{getCaseTypeLabel(c.case_type)}</td>
+                        <td style={{ fontWeight: 'bold' }}>฿{(c.amount / 100).toLocaleString()}</td>
+                        <td><span className={`${styles.statusBadge} ${styles[getCaseStatusClassName(c.status)]}`}>{getCaseStatusLabel(c.status)}</span></td>
+                        <td>{new Date(c.created_at).toLocaleTimeString('th-TH')}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -405,16 +512,22 @@ export default function AdminPaymentsClient() {
             <table className={styles.table}>
               <thead><tr><th>รหัสเคส</th><th>ประเภทเคส</th><th>ผู้ใช้</th><th>จำนวนเงิน</th><th>สถานะ</th><th>วันที่สร้าง</th></tr></thead>
               <tbody>
-                {filteredCases.map(c => (
-                  <tr key={c.id}>
-                    <td style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#94a3b8' }}>#{c.id.slice(0, 8)}</td>
-                    <td>{getCaseTypeLabel(c.case_type)}</td>
-                    <td style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{c.user_id.slice(0, 8)}...</td>
-                    <td style={{ fontWeight: 'bold' }}>฿{(c.amount / 100).toLocaleString()}</td>
-                    <td><span className={`${styles.statusBadge} ${styles[getCaseStatusClassName(c.status)]}`}>{getCaseStatusLabel(c.status)}</span></td>
-                    <td>{new Date(c.created_at).toLocaleDateString('th-TH')}</td>
+                {filteredCases.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className={styles.emptyTableCell}>ไม่พบข้อมูลเคสตามเงื่อนไขที่เลือก</td>
                   </tr>
-                ))}
+                ) : (
+                  filteredCases.map(c => (
+                    <tr key={c.id}>
+                      <td style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#94a3b8' }}>#{c.id.slice(0, 8)}</td>
+                      <td>{getCaseTypeLabel(c.case_type)}</td>
+                      <td style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{c.user_id.slice(0, 8)}...</td>
+                      <td style={{ fontWeight: 'bold' }}>฿{(c.amount / 100).toLocaleString()}</td>
+                      <td><span className={`${styles.statusBadge} ${styles[getCaseStatusClassName(c.status)]}`}>{getCaseStatusLabel(c.status)}</span></td>
+                      <td>{new Date(c.created_at).toLocaleDateString('th-TH')}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -426,18 +539,170 @@ export default function AdminPaymentsClient() {
             <table className={styles.table}>
               <thead><tr><th>รหัสธุรกรรม</th><th>ผู้ใช้</th><th>จำนวนเหรียญ</th><th>ประเภทธุรกรรม</th><th>รายละเอียด</th><th>วันที่</th></tr></thead>
               <tbody>
-                {transactions.slice(0, 50).map(t => (
-                  <tr key={t.id}>
-                    <td style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#94a3b8' }}>#{t.id.slice(0, 8)}</td>
-                    <td style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{t.user_id.slice(0, 8)}...</td>
-                    <td style={{ fontWeight: 'bold', color: t.amount >= 0 ? '#34d399' : '#fb7185' }}>{t.amount >= 0 ? '+' : ''}{t.amount}</td>
-                    <td><span style={{ fontSize: '0.7rem', background: '#1e293b', padding: '2px 6px', borderRadius: '4px' }}>{getTransactionTypeLabel(t.txn_type)}</span></td>
-                    <td style={{ color: '#94a3b8', fontSize: '0.875rem' }}>{t.description}</td>
-                    <td>{new Date(t.created_at).toLocaleDateString('th-TH')}</td>
+                {recentTransactions.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className={styles.emptyTableCell}>ยังไม่มีธุรกรรมเหรียญ</td>
                   </tr>
-                ))}
+                ) : (
+                  recentTransactions.map(t => (
+                    <tr key={t.id}>
+                      <td style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#94a3b8' }}>#{t.id.slice(0, 8)}</td>
+                      <td style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{t.user_id.slice(0, 8)}...</td>
+                      <td style={{ fontWeight: 'bold', color: t.amount >= 0 ? '#34d399' : '#fb7185' }}>{t.amount >= 0 ? '+' : ''}{t.amount}</td>
+                      <td><span style={{ fontSize: '0.7rem', background: '#1e293b', padding: '2px 6px', borderRadius: '4px' }}>{getTransactionTypeLabel(t.txn_type)}</span></td>
+                      <td style={{ color: '#94a3b8', fontSize: '0.875rem' }}>{t.description}</td>
+                      <td>{new Date(t.created_at).toLocaleDateString('th-TH')}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {activeTab === 'creatorPayouts' && (
+          <div className={styles.managementGrid}>
+            <div className={`${styles.contentCard} ${styles.fullWidthCard}`}>
+              <div className={styles.cardHeader}>
+                <h2>Creator Payout Requests</h2>
+                <button
+                  className={styles.refreshButton}
+                  onClick={fetchData}
+                  disabled={isRefreshing}
+                >
+                  <RefreshCcw size={16} className={isRefreshing ? styles.spin : ''} /> รีเฟรช
+                </button>
+              </div>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>คำขอ</th>
+                    <th>ผู้เขียน</th>
+                    <th>สถานะ</th>
+                    <th>Gross / Net</th>
+                    <th>PromptPay</th>
+                    <th>จำนวนรายการ</th>
+                    <th>เวลา</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {creatorPayouts.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className={styles.emptyTableCell}>ยังไม่มีคำขอถอนเงินของนักเขียน</td>
+                    </tr>
+                  ) : (
+                    creatorPayouts.map((item) => (
+                      <tr key={item.id}>
+                        <td style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#94a3b8' }}>#{item.id.slice(0, 8)}</td>
+                        <td style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{item.writerUserId.slice(0, 8)}...</td>
+                        <td>
+                          <span className={`${styles.statusBadge} ${styles[getCaseStatusClassName(mapPayoutStatusToCaseStatus(item.status))]}`}>
+                            {item.status}
+                          </span>
+                        </td>
+                        <td>
+                          ฿{(item.grossSatang / 100).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /{' '}
+                          ฿{(item.netSatang / 100).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td>{item.promptpayTarget || item.profile?.promptpayTarget || '-'}</td>
+                        <td>{item.itemCount}</td>
+                        <td>{new Date(item.requestedAt).toLocaleDateString('th-TH')}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className={styles.contentCard}>
+              <h3>อนุมัติคำขอถอน</h3>
+              <div style={{ marginTop: '1.5rem' }}>
+                <input
+                  placeholder="payoutRequestId"
+                  className={styles.searchInput}
+                  style={{ marginBottom: '1rem' }}
+                  value={payoutData.requestId}
+                  onChange={e => setPayoutData({ ...payoutData, requestId: e.target.value })}
+                />
+                <button
+                  className={`${styles.backButton} ${styles.backButtonPrimary}`}
+                  style={{ width: '100%' }}
+                  onClick={() => callApi('payoutApprove', '/api/admin/payouts/approve', { payoutRequestId: payoutData.requestId })}
+                  disabled={isSubmitting === 'payoutApprove'}
+                >
+                  {isSubmitting === 'payoutApprove' ? 'กำลังอนุมัติ...' : 'อนุมัติ'}
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.contentCard}>
+              <h3>ปฏิเสธคำขอถอน</h3>
+              <div style={{ marginTop: '1.5rem' }}>
+                <input
+                  placeholder="payoutRequestId"
+                  className={styles.searchInput}
+                  style={{ marginBottom: '1rem' }}
+                  value={payoutData.requestId}
+                  onChange={e => setPayoutData({ ...payoutData, requestId: e.target.value })}
+                />
+                <textarea
+                  placeholder="เหตุผลการปฏิเสธ (ขั้นต่ำ 8 ตัวอักษร)"
+                  className={styles.searchInput}
+                  style={{ height: '80px', paddingTop: '10px', marginBottom: '1rem' }}
+                  value={payoutData.rejectReason}
+                  onChange={e => setPayoutData({ ...payoutData, rejectReason: e.target.value })}
+                />
+                <button
+                  className={`${styles.backButton} ${styles.backButtonDanger}`}
+                  style={{ width: '100%' }}
+                  onClick={() => callApi('payoutReject', '/api/admin/payouts/reject', { payoutRequestId: payoutData.requestId, reason: payoutData.rejectReason })}
+                  disabled={isSubmitting === 'payoutReject'}
+                >
+                  {isSubmitting === 'payoutReject' ? 'กำลังส่ง...' : 'ปฏิเสธคำขอ'}
+                </button>
+              </div>
+            </div>
+
+            <div className={`${styles.contentCard} ${styles.fullWidthCard}`}>
+              <h3>ยืนยันโอนเงินสำเร็จ</h3>
+              <div style={{ marginTop: '1.5rem' }}>
+                <input
+                  placeholder="payoutRequestId"
+                  className={styles.searchInput}
+                  style={{ marginBottom: '1rem' }}
+                  value={payoutData.requestId}
+                  onChange={e => setPayoutData({ ...payoutData, requestId: e.target.value })}
+                />
+                <input
+                  placeholder="transfer reference"
+                  className={styles.searchInput}
+                  style={{ marginBottom: '1rem' }}
+                  value={payoutData.transferReference}
+                  onChange={e => setPayoutData({ ...payoutData, transferReference: e.target.value })}
+                />
+                <input
+                  placeholder="transfer proof URL (optional)"
+                  className={styles.searchInput}
+                  style={{ marginBottom: '1rem' }}
+                  value={payoutData.transferProofUrl}
+                  onChange={e => setPayoutData({ ...payoutData, transferProofUrl: e.target.value })}
+                />
+                <button
+                  className={`${styles.backButton} ${styles.backButtonPrimary}`}
+                  style={{ width: '100%' }}
+                  onClick={() =>
+                    callApi('payoutPaid', '/api/admin/payouts/mark-paid', {
+                      payoutRequestId: payoutData.requestId,
+                      transferReference: payoutData.transferReference,
+                      transferProofUrl: payoutData.transferProofUrl || null,
+                    })
+                  }
+                  disabled={isSubmitting === 'payoutPaid'}
+                >
+                  {isSubmitting === 'payoutPaid' ? 'กำลังบันทึก...' : 'บันทึกว่าโอนแล้ว'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </main>

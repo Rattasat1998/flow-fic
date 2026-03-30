@@ -96,20 +96,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
     }, []);
 
-    const getOAuthRedirectUrl = useCallback((nextPath = '/') => {
+    const normalizeNextPath = useCallback((nextPath = '/') => {
+        if (!nextPath.startsWith('/') || nextPath.startsWith('//')) return '/';
+        return nextPath;
+    }, []);
+
+    const getOAuthRedirectUrl = useCallback(() => {
         if (typeof window === 'undefined') return undefined;
-        const normalizedNextPath = nextPath.startsWith('/') && !nextPath.startsWith('//') ? nextPath : '/';
-        const redirectUrl = new URL('/auth/callback', window.location.origin);
-        redirectUrl.searchParams.set('next', normalizedNextPath);
-        return redirectUrl.toString();
+        return `${window.location.origin}/auth/callback`;
     }, []);
 
     const signInWithFacebook = useCallback(async (nextPath = '/') => {
         try {
+            if (typeof window !== 'undefined') {
+                window.sessionStorage.setItem('oauth_next_path', normalizeNextPath(nextPath));
+            }
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'facebook',
                 options: {
-                    redirectTo: getOAuthRedirectUrl(nextPath),
+                    redirectTo: getOAuthRedirectUrl(),
                     scopes: 'email,public_profile',
                 },
             });
@@ -118,14 +123,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error('Error signing in with Facebook:', error);
             throw error;
         }
-    }, [getOAuthRedirectUrl]);
+    }, [getOAuthRedirectUrl, normalizeNextPath]);
 
     const signInWithGoogle = useCallback(async (nextPath = '/') => {
         try {
+            if (typeof window !== 'undefined') {
+                window.sessionStorage.setItem('oauth_next_path', normalizeNextPath(nextPath));
+            }
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: getOAuthRedirectUrl(nextPath),
+                    redirectTo: getOAuthRedirectUrl(),
                 },
             });
             if (error) throw error;
@@ -133,7 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error('Error signing in with Google:', error);
             throw error;
         }
-    }, [getOAuthRedirectUrl]);
+    }, [getOAuthRedirectUrl, normalizeNextPath]);
 
     const signOut = useCallback(async () => {
         try {

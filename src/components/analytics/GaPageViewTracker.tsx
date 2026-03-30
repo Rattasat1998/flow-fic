@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { useCookieConsent } from '@/contexts/CookieConsentContext';
 
 declare global {
   interface Window {
@@ -14,6 +15,7 @@ type GaPageViewTrackerProps = {
 };
 
 export function GaPageViewTracker({ measurementId }: GaPageViewTrackerProps) {
+  const { canTrackAnalytics } = useCookieConsent();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const search = searchParams.toString();
@@ -21,7 +23,7 @@ export function GaPageViewTracker({ measurementId }: GaPageViewTrackerProps) {
   const isFirstRenderRef = useRef(true);
 
   useEffect(() => {
-    if (!measurementId || !pagePath) return;
+    if (!canTrackAnalytics || !measurementId || !pagePath) return;
 
     if (isFirstRenderRef.current) {
       isFirstRenderRef.current = false;
@@ -36,7 +38,7 @@ export function GaPageViewTracker({ measurementId }: GaPageViewTrackerProps) {
       page_location: window.location.href,
       page_title: document.title,
     });
-  }, [measurementId, pagePath]);
+  }, [canTrackAnalytics, measurementId, pagePath]);
 
   return null;
 }

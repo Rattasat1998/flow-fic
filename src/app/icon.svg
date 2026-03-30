@@ -1,24 +1,47 @@
 <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect x="4" y="4" width="56" height="56" rx="18" fill="#FFF7ED"/>
-  <path
-    d="M32 13L45.5 19.1V31.4C45.5 42.2 39.3 49 32 51.8C24.7 49 18.5 42.2 18.5 31.4V19.1L32 13Z"
-    fill="#0F172A"
-  />
-  <path
-    d="M32 20.3L39.1 23.7V30.2C39.1 36.6 35.4 40.8 32 42.6C28.6 40.8 24.9 36.6 24.9 30.2V23.7L32 20.3Z"
-    fill="url(#flowfic_icon_gradient)"
-  />
-  <path d="M32 22.1V40.7" stroke="#0F172A" stroke-width="2.6" stroke-linecap="round"/>
-  <path
-    d="M28.4 30.8C30.1 29.4 31.3 28.7 32 28.7C32.7 28.7 33.9 29.4 35.6 30.8"
-    stroke="#0F172A"
-    stroke-width="2.6"
-    stroke-linecap="round"
-  />
   <defs>
-    <linearGradient id="flowfic_icon_gradient" x1="20" y1="16" x2="41" y2="44" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#F97316"/>
-      <stop offset="1" stop-color="#FB7185"/>
+    <linearGradient id="bg" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1220" />
+      <stop offset="1" stop-color="#05070C" />
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(32 16) rotate(90) scale(28)">
+      <stop stop-color="#F59E0B" stop-opacity="0.26" />
+      <stop offset="1" stop-color="#F59E0B" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="frame" x1="10" y1="10" x2="54" y2="54" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FCD68A" />
+      <stop offset="0.5" stop-color="#F59E0B" />
+      <stop offset="1" stop-color="#B45309" />
+    </linearGradient>
+    <linearGradient id="badge" x1="20" y1="18" x2="44" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#141D2E" />
+      <stop offset="1" stop-color="#0A0F1A" />
+    </linearGradient>
+    <linearGradient id="glyph" x1="24" y1="23" x2="42" y2="41" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF7E3" />
+      <stop offset="1" stop-color="#F6C15A" />
     </linearGradient>
   </defs>
+
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#bg)" />
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#glow)" />
+  <rect x="5.25" y="5.25" width="53.5" height="53.5" rx="14.75" stroke="url(#frame)" stroke-opacity="0.6" stroke-width="1.5" />
+
+  <path
+    d="M32 14L46 20V31.5C46 40.6 40.1 46.6 32 50C23.9 46.6 18 40.6 18 31.5V20L32 14Z"
+    fill="url(#badge)"
+    stroke="url(#frame)"
+    stroke-width="1.5"
+  />
+
+  <rect x="23.4" y="23.8" width="3.8" height="15.6" rx="1" fill="url(#glyph)" />
+  <rect x="23.4" y="23.8" width="11" height="3.8" rx="1" fill="url(#glyph)" />
+  <rect x="23.4" y="30.8" width="8.6" height="3.4" rx="1" fill="url(#glyph)" />
+
+  <rect x="35.2" y="23.8" width="3.8" height="15.6" rx="1" fill="url(#glyph)" />
+  <rect x="35.2" y="23.8" width="8.9" height="3.8" rx="1" fill="url(#glyph)" />
+  <rect x="35.2" y="30.8" width="7.2" height="3.4" rx="1" fill="url(#glyph)" />
+
+  <circle cx="13" cy="13" r="1.2" fill="#F59E0B" fill-opacity="0.7" />
+  <circle cx="51" cy="51" r="1.2" fill="#F59E0B" fill-opacity="0.5" />
 </svg>

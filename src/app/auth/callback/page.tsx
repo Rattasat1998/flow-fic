@@ -15,7 +15,6 @@ function AuthCallbackContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    const nextPath = normalizeNextPath(searchParams.get('next'));
 
     useEffect(() => {
         const handleAuthCallback = async () => {
@@ -24,6 +23,12 @@ function AuthCallbackContent() {
                 setErrorMessage(decodeURIComponent(providerError));
                 return;
             }
+
+            const nextFromQuery = normalizeNextPath(searchParams.get('next'));
+            const nextFromSession = typeof window !== 'undefined'
+                ? normalizeNextPath(window.sessionStorage.getItem('oauth_next_path'))
+                : '/';
+            const redirectPath = nextFromQuery !== '/' ? nextFromQuery : nextFromSession;
 
             const code = searchParams.get('code');
             if (code) {
@@ -34,11 +39,15 @@ function AuthCallbackContent() {
                 }
             }
 
-            router.replace(nextPath);
+            if (typeof window !== 'undefined') {
+                window.sessionStorage.removeItem('oauth_next_path');
+            }
+
+            router.replace(redirectPath);
         };
 
         handleAuthCallback();
-    }, [nextPath, router, searchParams]);
+    }, [router, searchParams]);
 
     if (errorMessage) {
         return (

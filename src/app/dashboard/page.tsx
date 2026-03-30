@@ -18,6 +18,7 @@ import {
     Trash2,
     ChevronDown,
     Search,
+    Landmark,
 } from 'lucide-react';
 import styles from './dashboard.module.css';
 import { supabase } from '@/lib/supabase';
@@ -1045,6 +1046,9 @@ export default function DashboardPage() {
                                 <Link href="/story/create" className={styles.createBtn}>
                                     <Plus size={14} /> แต่งเรื่องใหม่
                                 </Link>
+                                <Link href="/dashboard/earnings" className={styles.earningsBtn}>
+                                    <Landmark size={14} /> รายได้นักเขียน
+                                </Link>
                                 <button onClick={handleOpenProfileModal} className={styles.profileSettingsBtn}>
                                     <Settings size={14} /> ตั้งค่าโปรไฟล์นักเขียน
                                 </button>
@@ -1096,6 +1100,7 @@ export default function DashboardPage() {
                                 </div>
                             </div>
                         </div>
+
                     </section>
 
                     <div className={styles.mainGrid}>

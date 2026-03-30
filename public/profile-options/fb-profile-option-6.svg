@@ -1,0 +1,48 @@
+<svg width="1080" height="1080" viewBox="0 0 1080 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="540" y1="0" x2="540" y2="1080" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#090C12" />
+      <stop offset="0.46" stop-color="#0A0C10" />
+      <stop offset="1" stop-color="#07090E" />
+    </linearGradient>
+    <radialGradient id="warmGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(540 88) rotate(90) scale(340 620)">
+      <stop stop-color="#F59E0B" stop-opacity="0.2" />
+      <stop offset="0.6" stop-color="#F59E0B" stop-opacity="0.06" />
+      <stop offset="1" stop-color="#F59E0B" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="coolGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(888 848) rotate(90) scale(260 260)">
+      <stop stop-color="#304D80" stop-opacity="0.18" />
+      <stop offset="0.7" stop-color="#304D80" stop-opacity="0.05" />
+      <stop offset="1" stop-color="#304D80" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="centerGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(540 540) rotate(90) scale(250)">
+      <stop stop-color="#F59E0B" stop-opacity="0.12" />
+      <stop offset="0.72" stop-color="#F59E0B" stop-opacity="0.03" />
+      <stop offset="1" stop-color="#F59E0B" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="markFill" x1="8" y1="8" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111827" />
+      <stop offset="1" stop-color="#0D1119" />
+    </linearGradient>
+    <linearGradient id="markStroke" x1="10" y1="8" x2="54" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FDE3A0" />
+      <stop offset="0.52" stop-color="#F6B84D" />
+      <stop offset="1" stop-color="#D97706" />
+    </linearGradient>
+    <linearGradient id="glyph" x1="18" y1="16" x2="50" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF4D1" />
+      <stop offset="0.55" stop-color="#F9D688" />
+      <stop offset="1" stop-color="#F59E0B" />
+    </linearGradient>
+  </defs>
+
+  <rect width="1080" height="1080" fill="url(#bg)" />
+  <rect width="1080" height="1080" fill="url(#warmGlow)" />
+  <rect width="1080" height="1080" fill="url(#coolGlow)" />
+  <circle cx="540" cy="540" r="250" fill="url(#centerGlow)" />
+
+  <g transform="translate(300 300) scale(7.5)">
+    <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#markFill)" stroke="url(#markStroke)" stroke-opacity="0.9" stroke-width="1.5" />
+    <path d="M18 16h6v32h-6zM18 16h18v6H18zM18 29h14v6H18zM38 16h6v32h-6zM38 16h12v6H38zM38 29h10v6H38z" fill="url(#glyph)" />
+  </g>
+</svg>

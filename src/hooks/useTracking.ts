@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCookieConsent } from '@/contexts/CookieConsentContext';
 import { supabase } from '@/lib/supabase';
 import { getOrCreateTrackingSessionId } from '@/lib/trackingSession';
 
@@ -57,7 +58,10 @@ export type EventType =
     | 'auth_login_failed'
     | 'auth_oauth_start'
     | 'dashboard_access_blocked'
-    | 'web_vitals';
+    | 'web_vitals'
+    | 'writer_earnings_view'
+    | 'writer_payout_request'
+    | 'admin_payout_action';
 
 // ─── Device metadata helper ────────────────────────────
 function getDeviceMeta(): Pick<TrackingMetadata, 'device' | 'viewport_width' | 'referrer'> {
@@ -89,9 +93,10 @@ interface UseTrackingOptions {
 }
 
 export function useTracking(options: UseTrackingOptions = {}) {
-    const { user } = useAuth();
-    const userId = user?.id ?? null;
-    const sessionIdRef = useRef<string>('ssr');
+  const { user } = useAuth();
+  const { canTrackAnalytics } = useCookieConsent();
+  const userId = user?.id ?? null;
+  const sessionIdRef = useRef<string>('ssr');
     const mountTimeRef = useRef<number>(0);
     const hasFiredPageView = useRef(false);
     const hasTrackedPageLeaveRef = useRef(false);
@@ -117,6 +122,7 @@ export function useTracking(options: UseTrackingOptions = {}) {
             const sessionId = getOrCreateTrackingSessionId();
             sessionIdRef.current = sessionId;
             if (sessionId === 'ssr') return; // skip SSR
+            if (!canTrackAnalytics) return;
 
             const deviceMeta = getDeviceMeta();
             const mergedMeta = { ...deviceMeta, ...(extra?.metadata || {}) };
@@ -138,11 +144,13 @@ export function useTracking(options: UseTrackingOptions = {}) {
                     }
                 });
         },
-        [userId]
+        [canTrackAnalytics, userId]
     );
 
     // Auto page_view on mount
     useEffect(() => {
+        if (!canTrackAnalytics) return;
+
         if (options.autoPageView && options.pagePath && !hasFiredPageView.current) {
             hasFiredPageView.current = true;
             trackEvent(
@@ -155,11 +163,12 @@ export function useTracking(options: UseTrackingOptions = {}) {
                 }
             );
         }
-    }, [options.autoPageView, options.pagePath, options.storyId, options.chapterId, options.autoMeta, trackEvent]);
+    }, [canTrackAnalytics, options.autoPageView, options.pagePath, options.storyId, options.chapterId, options.autoMeta, trackEvent]);
 
     // Track time spent when leaving page without blocking BFCache.
     useEffect(() => {
         if (!options.pagePath) return;
+        if (!canTrackAnalytics) return;
 
         const trackPageLeave = () => {
             if (hasTrackedPageLeaveRef.current) return;
@@ -232,7 +241,7 @@ export function useTracking(options: UseTrackingOptions = {}) {
             window.removeEventListener('pageshow', handlePageShow);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [options.pagePath, options.storyId, options.chapterId, userId]);
+    }, [canTrackAnalytics, options.pagePath, options.storyId, options.chapterId, userId]);
 
     return {
         trackEvent,

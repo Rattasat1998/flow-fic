@@ -9,7 +9,9 @@ export async function GET(request: NextRequest) {
     }
 
     if (!isFinanceAdmin(actor.id)) {
-      return NextResponse.json({ error: 'Forbidden', allowed: false }, { status: 403 });
+      // Access-check endpoint intentionally returns 200 for non-admin users.
+      // This avoids noisy browser "Failed to load resource" logs for expected denials.
+      return NextResponse.json({ error: 'Forbidden', allowed: false });
     }
 
     return NextResponse.json({ allowed: true, userId: actor.id });

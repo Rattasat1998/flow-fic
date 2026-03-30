@@ -25,12 +25,21 @@ const faqJsonLd = buildFaqPageJsonLd([
         question: "เหรียญและ VIP ใช้งานอย่างไร?",
         answer: "เหรียญใช้ปลดล็อกตอนพิเศษหรือสนับสนุนนักเขียน ส่วน VIP ใช้อ่านตอนพรีเมียมได้ตามสิทธิ์สมาชิก",
     },
+    {
+        question: "ยอดรายได้นักเขียนจาก Pending จะกลายเป็น Available เมื่อไร?",
+        answer: "ยอดรายได้จากการปลดล็อกตอนด้วยเหรียญจะถือยอด 14 วันก่อนย้ายเป็น Available โดยระบบอัตโนมัติ",
+    },
+    {
+        question: "ตั้งค่าคุกกี้ Analytics ได้จากที่ไหน?",
+        answer: "สามารถกดปุ่ม \"ตั้งค่าคุกกี้\" ที่ส่วนท้ายเว็บไซต์ทุกหน้า เพื่อเปิดหรือปิด Analytics ได้ตลอดเวลา",
+    },
 ]);
 
 export default function HelpPage() {
     return (
         <main
-            style={{
+      className="ffLegalPage"
+      style={{
                 maxWidth: "760px",
                 margin: "0 auto",
                 padding: "48px 20px 72px",
@@ -42,7 +51,7 @@ export default function HelpPage() {
                 dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqJsonLd) }}
             />
             <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>ศูนย์ช่วยเหลือ FlowFic</h1>
-            <p style={{ color: "#666", marginBottom: "2rem" }}>คำแนะนำและคำตอบสำหรับคำถามที่พบบ่อย</p>
+            <p style={{ color: "var(--text-muted)", marginBottom: "2rem" }}>คำแนะนำและคำตอบสำหรับคำถามที่พบบ่อย</p>
 
             <section style={{ marginBottom: "1.5rem" }}>
                 <h2>เริ่มต้นใช้งาน</h2>
@@ -99,15 +108,48 @@ export default function HelpPage() {
                     <h3 style={{ fontSize: "1.1rem", marginBottom: "0.3rem" }}>วิธีดูสถิติการอ่าน</h3>
                     <p>ไปที่ Dashboard ในเมนูนักเขียนเพื่อดูจำนวนผู้อ่าน ยอดไลค์ และรายได้จากการเขียน</p>
                 </div>
+
+                <div style={{ marginBottom: "1rem" }}>
+                    <h3 style={{ fontSize: "1.1rem", marginBottom: "0.3rem" }}>วิธีตั้งค่าถอนเงินนักเขียน</h3>
+                    <p>
+                        ไปที่ Dashboard เพื่อกรอกข้อมูล PromptPay และส่ง KYC ขั้นพื้นฐาน
+                        จากนั้นเมื่อยอด Available ถึงขั้นต่ำ ระบบจะเปิดให้ยื่นคำขอถอนเงินได้
+                    </p>
+                </div>
+
+                <div style={{ marginBottom: "1rem" }}>
+                    <h3 style={{ fontSize: "1.1rem", marginBottom: "0.3rem" }}>ทำไมยอดยังเป็น Pending อยู่?</h3>
+                    <p>
+                        รายได้จากการปลดล็อกตอนด้วยเหรียญจะอยู่สถานะ Pending เป็นเวลา 14 วันก่อนย้ายเป็น Available
+                        เพื่อบริหารความเสี่ยงด้านการชำระเงินและข้อพิพาท
+                    </p>
+                </div>
+
+                <div style={{ marginBottom: "1rem" }}>
+                    <h3 style={{ fontSize: "1.1rem", marginBottom: "0.3rem" }}>เรื่องภาษีหรือทะเบียนพาณิชย์ต้องทำอย่างไร?</h3>
+                    <p>
+                        ระบบถอนเงินไม่ได้ใช้ทะเบียนพาณิชย์เป็นเงื่อนไขบล็อกในเวอร์ชันปัจจุบัน
+                        แต่ภาระภาษีและเอกสารตามกฎหมายของผู้เขียนยังเป็นความรับผิดชอบของผู้เขียน
+                        กรุณาดูนโยบายที่ <Link href="/creator-payout-policy">หน้านโยบายรายได้นักเขียนและการถอนเงิน</Link>
+                    </p>
+                </div>
             </section>
 
             <section style={{ marginBottom: "1.5rem" }}>
                 <h2>นโยบายและข้อกำหนด</h2>
+                <div style={{ marginBottom: "1rem" }}>
+                    <h3 style={{ fontSize: "1.1rem", marginBottom: "0.3rem" }}>จัดการคุกกี้ Analytics ยังไง?</h3>
+                    <p>
+                        ระบบใช้รูปแบบ strict opt-in โดย Analytics จะปิดไว้ก่อนจนกว่าคุณจะยินยอม
+                        และคุณสามารถเปลี่ยนการตั้งค่าได้ตลอดเวลาจากปุ่ม &quot;ตั้งค่าคุกกี้&quot; ที่ footer
+                    </p>
+                </div>
                 <ul style={{ paddingLeft: "1.2rem", marginTop: "0.5rem" }}>
                     <li><Link href="/terms">ข้อกำหนดการใช้งาน</Link></li>
                     <li><Link href="/privacy">นโยบายความเป็นส่วนตัว</Link></li>
                     <li><Link href="/billing-policies">ศูนย์นโยบาย</Link></li>
                     <li><Link href="/copyright-takedown-policy">นโยบายลิขสิทธิ์</Link></li>
+                    <li><Link href="/cookie-tracking-notice">ประกาศคุกกี้และการติดตามการใช้งาน</Link></li>
                 </ul>
             </section>
 

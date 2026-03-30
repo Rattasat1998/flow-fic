@@ -3,9 +3,9 @@
     --home-shell-padding: var(--ff-page-gutter, clamp(0.95rem, 3vw, 1.8rem));
     min-height: 100vh;
     background:
-        radial-gradient(circle at 50% -18%, rgba(77, 130, 112, 0.22) 0%, rgba(77, 130, 112, 0) 56%),
-        radial-gradient(circle at 20% 12%, rgba(255, 143, 112, 0.1) 0%, rgba(255, 143, 112, 0) 42%),
-        #05070b;
+        radial-gradient(circle at 50% -22%, rgba(245, 158, 11, 0.22) 0%, rgba(245, 158, 11, 0) 56%),
+        radial-gradient(circle at 86% 8%, rgba(72, 98, 154, 0.16) 0%, rgba(72, 98, 154, 0) 44%),
+        #0a0c10;
     color: #f4f6fb;
 }
 
@@ -38,12 +38,12 @@
 
 .heroFrame {
     position: relative;
-    min-height: clamp(470px, 76vh, 860px);
-    border-radius: 0;
+    min-height: clamp(420px, 70vh, 760px);
+    border-radius: clamp(18px, 3vw, 28px);
     overflow: hidden;
-    border: none;
+    border: 1px solid rgba(255, 255, 255, 0.08);
     background: #0d1119;
-    box-shadow: 0 22px 48px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 24px 56px rgba(0, 0, 0, 0.52);
 }
 
 .heroBackdrop {
@@ -81,8 +81,8 @@
     position: absolute;
     inset: 0;
     background:
-        linear-gradient(180deg, rgba(4, 5, 9, 0.12) 0%, rgba(4, 5, 9, 0.72) 56%, rgba(4, 5, 9, 0.98) 100%),
-        linear-gradient(90deg, rgba(4, 5, 9, 0.9) 0%, rgba(4, 5, 9, 0.4) 52%, rgba(4, 5, 9, 0.82) 100%);
+        linear-gradient(180deg, rgba(7, 10, 16, 0.2) 0%, rgba(7, 10, 16, 0.74) 54%, rgba(7, 10, 16, 0.98) 100%),
+        linear-gradient(90deg, rgba(7, 10, 16, 0.92) 0%, rgba(7, 10, 16, 0.36) 52%, rgba(7, 10, 16, 0.84) 100%);
     z-index: 1;
 }
 
@@ -100,27 +100,27 @@
 
 .heroBadge {
     width: fit-content;
-    padding: 0.22rem 0.56rem;
+    padding: 0.26rem 0.68rem;
     border-radius: 999px;
-    border: 1px solid rgba(255, 143, 112, 0.32);
-    background: rgba(255, 143, 112, 0.14);
-    color: #ffd1bf;
+    border: 1px solid rgba(245, 158, 11, 0.34);
+    background: rgba(245, 158, 11, 0.14);
+    color: #ffd995;
     font-size: 0.61rem;
     font-weight: 800;
-    letter-spacing: 0.11em;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
 }
 
 .heroStoryTitle {
     margin: 0;
-    font-family: ui-serif, Georgia, "Times New Roman", serif;
+    font-family: var(--font-sans);
     font-size: clamp(1.75rem, 6.2vw, 3.8rem);
-    font-weight: 800;
-    letter-spacing: -0.035em;
-    line-height: 0.9;
+    font-weight: 900;
+    letter-spacing: -0.04em;
+    line-height: 0.94;
     color: #ffffff;
     text-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
-    max-width: 12ch;
+    max-width: 14ch;
     text-wrap: balance;
 }
 
@@ -173,9 +173,9 @@
     gap: 0.45rem;
     text-decoration: none;
     border-radius: 11px;
-    border: 1px solid rgba(255, 143, 112, 0.52);
-    background: linear-gradient(95deg, rgba(255, 143, 112, 0.95) 0%, rgba(214, 77, 43, 0.95) 100%);
-    color: #ffffff;
+    border: 1px solid rgba(245, 158, 11, 0.58);
+    background: linear-gradient(95deg, rgba(245, 158, 11, 0.95) 0%, rgba(217, 119, 6, 0.95) 100%);
+    color: #1a1307;
     font-size: 0.8rem;
     font-weight: 800;
     min-height: 38px;
@@ -231,14 +231,14 @@
 
 .heroDot:hover,
 .activeHeroDot {
-    background: #f8d4c7;
+    background: #f7c76d;
     transform: scaleX(1.08);
 }
 
 .heroEmpty {
     min-height: 420px;
     border: 1px dashed rgba(255, 255, 255, 0.22);
-    border-radius: 0;
+    border-radius: clamp(18px, 3vw, 28px);
     background: rgba(255, 255, 255, 0.04);
     color: rgba(255, 255, 255, 0.62);
     display: flex;
@@ -271,8 +271,8 @@
 }
 
 .filterToggleBtn:hover {
-    border-color: rgba(255, 143, 112, 0.5);
-    background: rgba(255, 143, 112, 0.1);
+    border-color: rgba(245, 158, 11, 0.5);
+    background: rgba(245, 158, 11, 0.1);
 }
 
 .activeFiltersWrap {
@@ -292,9 +292,9 @@
 
 .activeFilterPill {
     border-radius: 999px;
-    border: 1px solid rgba(255, 191, 164, 0.4);
-    background: rgba(255, 143, 112, 0.16);
-    color: #ffcfbf;
+    border: 1px solid rgba(245, 201, 122, 0.4);
+    background: rgba(245, 158, 11, 0.16);
+    color: #f9d799;
     font-size: 0.66rem;
     font-weight: 700;
     padding: 0.3rem 0.6rem;
@@ -406,9 +406,9 @@
 }
 
 .activeFilter {
-    border-color: rgba(255, 143, 112, 0.78);
-    background: rgba(255, 143, 112, 0.28);
-    color: #fff3ed;
+    border-color: rgba(245, 158, 11, 0.78);
+    background: rgba(245, 158, 11, 0.28);
+    color: #fff9ec;
 }
 
 .trendingSection,
@@ -442,11 +442,32 @@
     gap: 0.22rem;
 }
 
+.sectionHeadlineRow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.58rem;
+}
+
+.sectionHeadlineIconWrap {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    background: rgba(245, 158, 11, 0.12);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sectionHeadlineIcon {
+    color: #f3ba4d;
+}
+
 .sectionHeadline {
     margin: 0;
-    font-family: ui-serif, Georgia, "Times New Roman", serif;
+    font-family: var(--font-sans);
     font-size: clamp(1.42rem, 2.5vw, 2rem);
-    font-weight: 700;
+    font-weight: 900;
     letter-spacing: -0.03em;
     color: #ffffff;
 }
@@ -463,20 +484,24 @@
     align-items: center;
     gap: 0.35rem;
     text-decoration: none;
-    color: #ffbca8;
+    color: #f4bf58;
     font-size: 0.72rem;
     font-weight: 700;
     white-space: nowrap;
 }
 
 .sectionActionLink:hover {
-    color: #ffd2c3;
+    color: #f9d886;
 }
 
 .trendingGrid {
     display: grid;
     grid-template-columns: repeat(1, minmax(0, 1fr));
     gap: 1rem;
+}
+
+.trendingCaseCard {
+    min-width: 0;
 }
 
 @media (min-width: 720px) {
@@ -590,8 +615,8 @@
     z-index: 1;
     background:
         linear-gradient(135deg,
-            rgba(255, 143, 112, 0.16) 0%,
-            rgba(255, 143, 112, 0.04) 36%,
+            rgba(245, 158, 11, 0.16) 0%,
+            rgba(245, 158, 11, 0.04) 36%,
             rgba(99, 213, 217, 0.12) 100%);
     opacity: calc(var(--story-card-aura-opacity) * 0.75);
 }
@@ -610,7 +635,7 @@
 
 .trendingCard:hover {
     transform: translateY(-4px);
-    border-color: rgba(255, 143, 112, 0.62);
+    border-color: rgba(245, 158, 11, 0.62);
 }
 
 .trendingCoverWrap {
@@ -657,9 +682,9 @@
     font-size: 0.66rem;
     font-weight: 900;
     line-height: 1;
-    color: #ffcaac;
+    color: #f9ce7e;
     background: rgba(9, 11, 16, 0.86);
-    border: 1px solid rgba(255, 143, 112, 0.55);
+    border: 1px solid rgba(245, 158, 11, 0.55);
     border-radius: 8px;
     box-shadow: 0 8px 14px rgba(0, 0, 0, 0.34);
 }
@@ -703,7 +728,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.2rem;
-    color: #ffbe79;
+    color: #f6c15a;
     font-size: 0.66rem;
     font-weight: 800;
 }
@@ -751,9 +776,9 @@
     min-height: 1.24rem;
     border-radius: 999px;
     padding: 0.12rem 0.5rem;
-    border: 1px solid rgba(255, 196, 145, 0.4);
-    background: rgba(255, 182, 117, 0.16);
-    color: #ffd3ab;
+    border: 1px solid rgba(245, 200, 120, 0.4);
+    background: rgba(245, 158, 11, 0.18);
+    color: #ffe0ae;
     font-size: 0.58rem;
     font-weight: 800;
     letter-spacing: 0.04em;
@@ -781,11 +806,11 @@
 .editorSectionTitle {
     margin: 0 0 1.35rem;
     text-align: center;
-    font-family: ui-serif, Georgia, "Times New Roman", serif;
+    font-family: var(--font-sans);
     font-size: clamp(1.55rem, 2.5vw, 2.2rem);
-    font-weight: 700;
+    font-weight: 900;
     letter-spacing: -0.02em;
-    font-style: italic;
+    font-style: normal;
     color: #ffffff;
 }
 
@@ -842,9 +867,9 @@
 .editorFeaturedBadge {
     width: fit-content;
     border-radius: 999px;
-    border: 1px solid rgba(255, 143, 112, 0.42);
-    background: rgba(255, 143, 112, 0.18);
-    color: #ffc9b5;
+    border: 1px solid rgba(245, 158, 11, 0.42);
+    background: rgba(245, 158, 11, 0.18);
+    color: #f9d493;
     font-size: 0.6rem;
     font-weight: 800;
     letter-spacing: 0.08em;
@@ -855,9 +880,9 @@
 .editorFeaturedTitle {
     margin: 0;
     color: #ffffff;
-    font-family: ui-serif, Georgia, "Times New Roman", serif;
+    font-family: var(--font-sans);
     font-size: clamp(1.18rem, 2.1vw, 1.72rem);
-    font-weight: 700;
+    font-weight: 900;
     letter-spacing: -0.03em;
 }
 
@@ -893,7 +918,7 @@
 }
 
 .editorSideCard:hover {
-    border-color: rgba(255, 143, 112, 0.48);
+    border-color: rgba(245, 158, 11, 0.48);
     transform: translateY(-2px);
 }
 
@@ -950,7 +975,7 @@
 }
 
 .editorSideLink {
-    color: #ffb79e;
+    color: #f6c66f;
     font-size: 0.6rem;
     font-weight: 800;
     letter-spacing: 0.08em;
@@ -972,9 +997,9 @@
 .mainCategoryGroupTitle {
     margin: 0;
     color: #f8fbff;
-    font-family: ui-serif, Georgia, "Times New Roman", serif;
+    font-family: var(--font-sans);
     font-size: clamp(1.3rem, 2.4vw, 1.9rem);
-    font-weight: 700;
+    font-weight: 900;
     letter-spacing: -0.03em;
     line-height: 1.1;
 }
@@ -1002,9 +1027,9 @@
 .mainCategoryShelfRowTitle {
     margin: 0;
     color: #ffffff;
-    font-family: ui-serif, Georgia, "Times New Roman", serif;
+    font-family: var(--font-sans);
     font-size: clamp(1.22rem, 2.2vw, 1.66rem);
-    font-weight: 700;
+    font-weight: 900;
     letter-spacing: -0.03em;
     line-height: 1.08;
 }
@@ -1012,7 +1037,7 @@
 .mainCategoryShelfViewAll {
     border: none;
     background: transparent;
-    color: #63d5d9;
+    color: #f4bf58;
     font-size: 0.84rem;
     font-weight: 700;
     letter-spacing: 0.01em;
@@ -1022,7 +1047,7 @@
 }
 
 .mainCategoryShelfViewAll:hover {
-    color: #95ebef;
+    color: #f8d888;
 }
 
 .mainCategoryShelfRailWrap {
@@ -1131,8 +1156,24 @@
 .mainCategoryShelfMetaRow {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     flex-wrap: wrap;
     gap: 0.3rem 0.44rem;
+}
+
+.mainCategoryShelfMetaStats {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+
+.mainCategoryShelfHeartIcon {
+    color: rgba(244, 63, 94, 0.74);
+    transition: color 0.16s ease;
+}
+
+.mainCategoryShelfHeartIcon:hover {
+    color: rgba(244, 63, 94, 1);
 }
 
 .mainCategoryShelfArrowButton {
@@ -1154,7 +1195,7 @@
 }
 
 .mainCategoryShelfArrowButton:hover {
-    background: rgba(71, 78, 95, 0.9);
+    background: rgba(245, 158, 11, 0.28);
 }
 
 @media (min-width: 768px) {
@@ -1190,9 +1231,9 @@
 .shelfGridModeTitle {
     margin: 0;
     color: #ffffff;
-    font-family: ui-serif, Georgia, "Times New Roman", serif;
+    font-family: var(--font-sans);
     font-size: clamp(1.32rem, 2.5vw, 1.84rem);
-    font-weight: 700;
+    font-weight: 900;
     letter-spacing: -0.03em;
 }
 
@@ -1235,7 +1276,7 @@
     border: 1px solid rgba(255, 255, 255, 0.12);
     overflow: hidden;
     background:
-        radial-gradient(circle at 10% 14%, rgba(255, 143, 112, 0.26) 0%, rgba(255, 143, 112, 0) 38%),
+        radial-gradient(circle at 10% 14%, rgba(245, 158, 11, 0.26) 0%, rgba(245, 158, 11, 0) 38%),
         radial-gradient(circle at 92% 90%, rgba(87, 112, 164, 0.24) 0%, rgba(87, 112, 164, 0) 44%),
         linear-gradient(140deg, rgba(17, 21, 31, 0.96) 0%, rgba(11, 13, 20, 0.96) 100%);
     display: flex;
@@ -1248,9 +1289,9 @@
 .writerCtaTitle {
     margin: 0;
     color: #ffffff;
-    font-family: ui-serif, Georgia, "Times New Roman", serif;
+    font-family: var(--font-sans);
     font-size: clamp(1.58rem, 3.6vw, 2.5rem);
-    font-weight: 700;
+    font-weight: 900;
     letter-spacing: -0.025em;
     line-height: 1.14;
     display: inline-flex;
@@ -1261,8 +1302,8 @@
 
 .writerCtaAccent {
     display: block;
-    color: #ff9d82;
-    font-style: italic;
+    color: #f7c76d;
+    font-style: normal;
     line-height: 1.05;
 }
 
@@ -1276,9 +1317,9 @@
 
 .writerCtaButton {
     margin-top: 0.3rem;
-    border: 1px solid rgba(255, 143, 112, 0.56);
-    background: linear-gradient(95deg, rgba(255, 143, 112, 0.95) 0%, rgba(214, 77, 43, 0.95) 100%);
-    color: #ffffff;
+    border: 1px solid rgba(245, 158, 11, 0.56);
+    background: linear-gradient(95deg, rgba(245, 158, 11, 0.95) 0%, rgba(217, 119, 6, 0.95) 100%);
+    color: #1a1307;
     border-radius: 999px;
     min-height: 44px;
     padding: 0 1.05rem;
@@ -1294,6 +1335,39 @@
 
 .writerCtaButton:hover {
     transform: translateY(-1px);
+}
+
+.quickTags {
+    padding: 0.6rem 0 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.46rem;
+}
+
+.quickTagButton {
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 999px;
+    min-height: 30px;
+    padding: 0 0.78rem;
+    color: rgba(244, 246, 251, 0.82);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    cursor: pointer;
+    transition: border-color 0.16s ease, color 0.16s ease, background-color 0.16s ease;
+}
+
+.quickTagButton:hover {
+    border-color: rgba(245, 158, 11, 0.52);
+    color: #f7c76d;
+    background: rgba(245, 158, 11, 0.12);
 }
 
 .modalOverlay {
@@ -1451,7 +1525,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(180deg, #ff8f70 0%, #d64d2b 100%);
+    background: linear-gradient(180deg, #f59e0b 0%, #b45309 100%);
     color: #ffffff;
     font-size: 1.8rem;
     font-weight: 800;
@@ -1502,8 +1576,8 @@
 .inputField:focus,
 .textareaField:focus {
     outline: none;
-    border-color: rgba(255, 143, 112, 0.66);
-    box-shadow: 0 0 0 3px rgba(255, 143, 112, 0.14);
+    border-color: rgba(245, 158, 11, 0.66);
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.14);
 }
 
 .modalFooter {
@@ -1531,9 +1605,9 @@
 }
 
 .saveBtn {
-    border: 1px solid rgba(255, 143, 112, 0.5);
-    background: linear-gradient(95deg, rgba(255, 143, 112, 0.95) 0%, rgba(214, 77, 43, 0.95) 100%);
-    color: #ffffff;
+    border: 1px solid rgba(245, 158, 11, 0.5);
+    background: linear-gradient(95deg, rgba(245, 158, 11, 0.95) 0%, rgba(217, 119, 6, 0.95) 100%);
+    color: #1a1307;
 }
 
 .saveBtn:disabled,

@@ -10,6 +10,7 @@ export const metadata: Metadata = {
 export default function DisputeAndChargebackPolicyPage() {
   return (
     <main
+      className="ffLegalPage"
       style={{
         maxWidth: "760px",
         margin: "0 auto",
@@ -18,7 +19,7 @@ export default function DisputeAndChargebackPolicyPage() {
       }}
     >
       <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>นโยบายข้อพิพาทและ Chargeback</h1>
-      <p style={{ color: "#666", marginBottom: "2rem" }}>มีผลบังคับใช้: March 5, 2026 (Policy v1)</p>
+      <p style={{ color: "var(--text-muted)", marginBottom: "2rem" }}>มีผลบังคับใช้: March 5, 2026 (Policy v1)</p>
 
       <section style={{ marginBottom: "1.5rem" }}>
         <h2>1. การเปิดข้อพิพาทการชำระเงิน</h2>

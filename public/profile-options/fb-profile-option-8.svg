@@ -1,0 +1,114 @@
+<svg width="1080" height="1080" viewBox="0 0 1080 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="540" y1="0" x2="540" y2="1080" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" />
+      <stop offset="1" stop-color="#F4F7FC" />
+    </linearGradient>
+    <radialGradient id="bgGlowTop" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(538 148) rotate(90) scale(288 544)">
+      <stop stop-color="#FFFFFF" />
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="bgGlowBottom" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(852 842) rotate(90) scale(236 236)">
+      <stop stop-color="#DCE8FA" stop-opacity="0.72" />
+      <stop offset="1" stop-color="#DCE8FA" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="coat" x1="360" y1="610" x2="720" y2="860" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#172235" />
+      <stop offset="1" stop-color="#0F172A" />
+    </linearGradient>
+    <linearGradient id="hat" x1="392" y1="248" x2="678" y2="414" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1B2940" />
+      <stop offset="1" stop-color="#101827" />
+    </linearGradient>
+    <linearGradient id="skin" x1="462" y1="362" x2="622" y2="566" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F5D6C8" />
+      <stop offset="1" stop-color="#EFC4B1" />
+    </linearGradient>
+    <linearGradient id="lens" x1="564" y1="382" x2="682" y2="522" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.74" />
+      <stop offset="1" stop-color="#BFDBFE" stop-opacity="0.42" />
+    </linearGradient>
+    <linearGradient id="lensRing" x1="560" y1="378" x2="678" y2="520" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#60A5FA" />
+      <stop offset="1" stop-color="#1D4ED8" />
+    </linearGradient>
+  </defs>
+
+  <rect width="1080" height="1080" fill="url(#bg)" />
+  <rect width="1080" height="1080" fill="url(#bgGlowTop)" />
+  <rect width="1080" height="1080" fill="url(#bgGlowBottom)" />
+
+  <ellipse cx="540" cy="826" rx="246" ry="94" fill="#0F172A" fill-opacity="0.08" />
+  <circle cx="540" cy="532" r="320" fill="#F5F8FD" />
+
+  <path
+    d="M366 806C392 686 466 622 540 622C614 622 688 686 714 806H366Z"
+    fill="url(#coat)"
+  />
+  <path
+    d="M452 802L500 646H580L628 802H452Z"
+    fill="#F8FAFC"
+  />
+  <path
+    d="M520 646H560L584 802H496L520 646Z"
+    fill="#93C5FD"
+  />
+  <path
+    d="M438 652C470 626 502 614 540 614C578 614 610 626 642 652L602 700C586 686 566 678 540 678C514 678 494 686 478 700L438 652Z"
+    fill="#0F172A"
+  />
+
+  <circle cx="540" cy="468" r="136" fill="url(#skin)" />
+  <path
+    d="M430 486C438 568 476 618 540 642C604 618 642 568 650 486C622 454 582 436 540 436C498 436 458 454 430 486Z"
+    fill="#F1CFBE"
+    fill-opacity="0.58"
+  />
+  <path
+    d="M474 544C492 558 514 566 540 566C566 566 588 558 606 544"
+    stroke="#A1624A"
+    stroke-width="10"
+    stroke-linecap="round"
+  />
+  <path
+    d="M486 500C492 474 514 456 540 456C566 456 588 474 594 500"
+    stroke="#D2A996"
+    stroke-width="8"
+    stroke-linecap="round"
+  />
+  <circle cx="494" cy="494" r="12" fill="#0F172A" />
+  <circle cx="604" cy="492" r="16" fill="#0F172A" />
+  <circle cx="600" cy="488" r="6" fill="#FFFFFF" fill-opacity="0.86" />
+
+  <path
+    d="M398 378C426 302 476 254 546 236C610 220 676 240 726 288L688 324C656 298 614 286 572 294C522 304 484 334 458 394L398 378Z"
+    fill="url(#hat)"
+  />
+  <path
+    d="M368 382C414 334 480 310 550 310C622 310 690 336 730 382C684 398 614 408 540 408C472 408 408 400 368 382Z"
+    fill="#0F172A"
+  />
+  <path
+    d="M448 336C466 302 494 278 528 266C572 250 622 260 664 294L646 326C612 300 576 292 546 300C522 306 500 322 484 348L448 336Z"
+    fill="#334155"
+    fill-opacity="0.4"
+  />
+
+  <circle cx="618" cy="492" r="88" fill="url(#lens)" />
+  <circle cx="618" cy="492" r="88" stroke="url(#lensRing)" stroke-width="18" />
+  <path
+    d="M676 554L748 632"
+    stroke="#1D4ED8"
+    stroke-width="24"
+    stroke-linecap="round"
+  />
+  <path
+    d="M612 482C630 458 654 446 686 446"
+    stroke="#FFFFFF"
+    stroke-opacity="0.8"
+    stroke-width="8"
+    stroke-linecap="round"
+  />
+  <circle cx="610" cy="494" r="18" fill="#0F172A" />
+  <circle cx="604" cy="488" r="7" fill="#FFFFFF" fill-opacity="0.9" />
+</svg>

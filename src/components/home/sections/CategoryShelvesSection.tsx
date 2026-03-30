@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ChevronRight, Inbox } from 'lucide-react';
+import { ChevronRight, Inbox, Search } from 'lucide-react';
 import type { ReactNode, RefObject } from 'react';
 import type { DiscoveryStory } from '@/types/discovery';
 import styles from '@/app/home.module.css';
@@ -42,6 +42,7 @@ export function CategoryShelvesSection({
 }: CategoryShelvesSectionProps) {
   return (
     <section className={styles.mainCategoryMapSection} ref={sectionRef} data-gsap-section="main-category-map">
+
       {isGridMode ? (
         selectedCategory ? (
           <div className={styles.shelfGridModeSection} data-gsap-grid-mode>

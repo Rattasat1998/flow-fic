@@ -10,7 +10,8 @@ export const metadata: Metadata = {
 export default function AboutPage() {
     return (
         <main
-            style={{
+      className="ffLegalPage"
+      style={{
                 maxWidth: "760px",
                 margin: "0 auto",
                 padding: "48px 20px 72px",
@@ -18,7 +19,7 @@ export default function AboutPage() {
             }}
         >
             <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>เกี่ยวกับ FlowFic</h1>
-            <p style={{ color: "#666", marginBottom: "2rem" }}>อัปเดตล่าสุด: March 2026</p>
+            <p style={{ color: "var(--text-muted)", marginBottom: "2rem" }}>อัปเดตล่าสุด: March 2026</p>
 
             <section style={{ marginBottom: "1.5rem" }}>
                 <h2>FlowFic คืออะไร?</h2>

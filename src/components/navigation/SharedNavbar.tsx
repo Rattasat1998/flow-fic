@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 
 import styles from '@/components/navigation/SharedNavbar.module.css';
+import { BrandLogo } from '@/components/brand/BrandLogo';
 
 type SharedNavbarProps = {
   navRef?: RefObject<HTMLElement | null>;
@@ -43,6 +44,7 @@ type SharedNavbarProps = {
   onSignOut: () => void | Promise<void>;
   lovesLabel?: string;
   profileExtraAction?: ReactNode;
+  variant?: 'default' | 'case';
 };
 
 export function SharedNavbar({
@@ -69,8 +71,10 @@ export function SharedNavbar({
   onSignOut,
   lovesLabel = 'เรื่องที่ชอบ',
   profileExtraAction,
+  variant = 'default',
 }: SharedNavbarProps) {
   const pathname = usePathname();
+  const isCaseVariant = variant === 'case';
   const hasSearch = Boolean(onSearchSubmit && onSearchChange);
   const hasSearchPanel = hasSearch && Boolean(searchPanel);
   const [mobileDrawerRoute, setMobileDrawerRoute] = useState<string | null>(null);
@@ -157,7 +161,7 @@ export function SharedNavbar({
       >
         <div className={styles.mobileDrawerHeader}>
           <Link href="/" className={styles.mobileDrawerBrand} onClick={closeMobileDrawer}>
-            FlowFic
+            <BrandLogo variant="lockup" tone="dark" size="sm" />
           </Link>
           <button
             type="button"
@@ -231,16 +235,18 @@ export function SharedNavbar({
     </div>
   ) : null;
 
+  const agentDisplayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Guest';
+
   return (
     <nav
-      className={`${styles.navbar} ${!hasSearch ? styles.navbarNoSearch : ''}`}
+      className={`${styles.navbar} ${isCaseVariant ? styles.navbarCase : ''} ${!hasSearch ? styles.navbarNoSearch : ''}`}
       ref={navRef}
       data-gsap={navDataGsap}
     >
       <div className={styles.navLeft}>
-        <Link href="/" className={styles.logo}>
-          FlowFic
-        </Link>
+        <div className={isCaseVariant ? styles.caseBrandWrap : undefined}>
+          <BrandLogo href="/" variant="lockup" tone="dark" size={26} className={styles.logo} />
+        </div>
       </div>
 
       {hasSearch && onSearchSubmit && onSearchChange && (
@@ -273,39 +279,73 @@ export function SharedNavbar({
       )}
 
       <div className={styles.navRight}>
-        {user ? (
-          <Link href="/pricing" prefetch={false} className={styles.coinBalancePill}>
-            <Coins size={15} />
-            <span>{coinBalance === null ? '...' : `${coinBalance.toLocaleString('th-TH')} เหรียญ`}</span>
-          </Link>
-        ) : (
-          <Link href="/pricing" prefetch={false} className={styles.pricingLink}>
-            แพ็กเกจ
-          </Link>
+        {!isCaseVariant && (
+          user ? (
+            <Link href="/pricing" prefetch={false} className={styles.coinBalancePill}>
+              <Coins size={15} />
+              <span>{coinBalance === null ? '...' : `${coinBalance.toLocaleString('th-TH')} เหรียญ`}</span>
+            </Link>
+          ) : (
+            <Link href="/pricing" prefetch={false} className={styles.pricingLink}>
+              แพ็กเกจ
+            </Link>
+          )
         )}
 
-        {user && (
+        {!isCaseVariant && user && (
           <Link href="/dashboard" className={styles.dashboardLink} onClick={onDashboardAccess}>
             แดชบอร์ดนักเขียน
           </Link>
         )}
 
-        {user && (
+        {isCaseVariant && hasSearch && (
+          <button
+            type="button"
+            className={styles.caseMobileSearchBtn}
+            aria-label="ค้นหา"
+            onClick={() => {
+              searchInputRef?.current?.focus();
+              if (hasSearchPanel) {
+                setIsSearchPanelOpen(true);
+                setSearchPanelPathname(pathname);
+              }
+            }}
+          >
+            <Search size={18} />
+          </button>
+        )}
+
+        {user ? (
           <Link href="/notifications" className={styles.notifBellBtn} aria-label="การแจ้งเตือน">
             <Bell size={18} />
             {unreadNotifCount > 0 && (
               <span className={styles.notifBadge}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</span>
             )}
           </Link>
-        )}
+        ) : isCaseVariant ? (
+          <button
+            type="button"
+            className={styles.notifBellBtn}
+            aria-label="เข้าสู่ระบบเพื่อดูการแจ้งเตือน"
+            onClick={onOpenLogin}
+          >
+            <Bell size={18} />
+          </button>
+        ) : null}
 
         {isLoadingAuth ? (
           <div className={styles.authLoading}>...</div>
         ) : user ? (
-          <div className={styles.profileMenuWrapper} ref={profileMenuRef}>
+          <div className={`${styles.profileMenuWrapper} ${isCaseVariant ? styles.caseProfileMenuWrapper : ''}`} ref={profileMenuRef}>
+            {isCaseVariant && (
+              <div className={styles.caseAgentInfo}>
+                <span>Agent</span>
+                <strong>{agentDisplayName}</strong>
+              </div>
+            )}
             <button
               type="button"
-              className={styles.profileAvatarBtn}
+              className={`${styles.profileAvatarBtn} ${isCaseVariant ? styles.caseProfileAvatarBtn : ''}`}
               aria-label="เมนูผู้ใช้"
               aria-haspopup="menu"
               aria-expanded={isProfileMenuOpen}
@@ -390,9 +430,17 @@ export function SharedNavbar({
             )}
           </div>
         ) : (
-          <button type="button" className={styles.navLoginBtn} onClick={onOpenLogin}>
-            เข้าสู่ระบบ
-          </button>
+          <>
+            {isCaseVariant && (
+              <div className={styles.caseAgentInfo}>
+                <span>Agent</span>
+                <strong>Guest</strong>
+              </div>
+            )}
+            <button type="button" className={`${styles.navLoginBtn} ${isCaseVariant ? styles.caseNavLoginBtn : ''}`} onClick={onOpenLogin}>
+              เข้าสู่ระบบ
+            </button>
+          </>
         )}
 
         <button

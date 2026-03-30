@@ -1208,7 +1208,8 @@
     justify-content: flex-end;
 }
 
-.profileSettingsBtn {
+.profileSettingsBtn,
+.earningsBtn {
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
@@ -1222,9 +1223,11 @@
     font-weight: 700;
     cursor: pointer;
     transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+    text-decoration: none;
 }
 
-.profileSettingsBtn:hover {
+.profileSettingsBtn:hover,
+.earningsBtn:hover {
     transform: translateY(-1px);
     border-color: rgba(249, 115, 22, 0.22);
     background: rgba(255, 255, 255, 0.92);
@@ -1685,13 +1688,15 @@
     filter: brightness(1.05);
 }
 
-.profileSettingsBtn {
+.profileSettingsBtn,
+.earningsBtn {
     border: 1px solid rgba(148, 163, 184, 0.3);
     background: rgba(15, 23, 42, 0.56);
     color: rgba(241, 245, 249, 0.95);
 }
 
-.profileSettingsBtn:hover {
+.profileSettingsBtn:hover,
+.earningsBtn:hover {
     border-color: rgba(255, 143, 112, 0.44);
     background: rgba(30, 41, 59, 0.78);
 }
@@ -2181,6 +2186,7 @@
     }
 
     .createBtn,
+    .earningsBtn,
     .profileSettingsBtn {
         width: 100%;
         justify-content: center;
@@ -2258,6 +2264,7 @@
     }
 
     .createBtn,
+    .earningsBtn,
     .profileSettingsBtn {
         width: 100%;
         justify-content: center;

@@ -4,8 +4,8 @@ import { unstable_cache } from 'next/cache';
 import type { Metadata } from 'next';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
-export const DEFAULT_SITE_TITLE = 'FlowFic';
-export const DEFAULT_SITE_DESCRIPTION = 'แพลตฟอร์มอ่านเขียนนิยายสยองขวัญและสืบสวนที่ให้ผู้อ่านเลือกเส้นทางเรื่องได้';
+export const DEFAULT_SITE_TITLE = 'นิยายสืบสวนสอบสวน FlowFic Anthology';
+export const DEFAULT_SITE_DESCRIPTION = 'พื้นที่สร้างสรรค์สำหรับงานเขียนสาย Flowfic รวมเรื่องราวที่ถ่ายทอดผ่านจังหวะตัวอักษรอันลื่นไหล ปล่อยใจไปกับจินตนาการและอารมณ์ที่ไร้ขีดจำกัดได้ที่นี่';
 export const ROOT_SHARE_IMAGE_PATH = '/opengraph-image';
 
 const DEFAULT_APP_ORIGIN = 'http://localhost:3000';

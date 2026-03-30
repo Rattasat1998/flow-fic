@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   BarChart3,
   CreditCard,
+  Coins,
   Users,
   ShieldCheck,
   ChevronLeft,
@@ -22,6 +23,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const menuItems = [
     { icon: BarChart3, label: 'KPI ผู้บริหาร', href: '/admin/kpi' },
     { icon: CreditCard, label: 'การเงิน', href: '/admin/payments' },
+    { icon: Coins, label: 'เติม Coin', href: '/admin/coin-topup' },
     { icon: Users, label: 'ผู้ใช้', href: '/admin/users' },
   ];
 

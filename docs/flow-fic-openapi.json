@@ -39,6 +39,12 @@
     },
     {
       "name": "Edge Functions"
+    },
+    {
+      "name": "Writer Payouts"
+    },
+    {
+      "name": "Admin Payouts"
     }
   ],
   "paths": {
@@ -505,6 +511,70 @@
         }
       }
     },
+    "/api/admin/users": {
+      "get": {
+        "tags": [
+          "Admin Users"
+        ],
+        "operationId": "getAdminUsers",
+        "summary": "List users for finance admin tools",
+        "security": [
+          {
+            "SupabaseBearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Users list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUsersListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
     "/api/admin/payments/access": {
       "get": {
         "tags": [
@@ -519,27 +589,24 @@
         ],
         "responses": {
           "200": {
-            "description": "Access allowed",
+            "description": "Access status",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AdminAccessResponse"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/AdminAccessResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AdminAccessDeniedResponse"
+                    }
+                  ]
                 }
               }
             }
           },
           "401": {
             "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AdminAccessDeniedResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {
@@ -628,6 +695,66 @@
           },
           "403": {
             "$ref": "#/components/responses/Error403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
+    "/api/admin/payments/topup-coins": {
+      "post": {
+        "tags": [
+          "Admin Payments"
+        ],
+        "operationId": "adminTopupCoins",
+        "summary": "Top up coins to a selected user",
+        "security": [
+          {
+            "SupabaseBearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminTopupCoinsRequest"
+              },
+              "example": {
+                "userId": "1abcc2d6-92b4-4b34-b21c-33fb8eda92ec",
+                "amount": 100,
+                "reason": "Compensate outage incident",
+                "correlationId": "topup-20260328-001"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Top-up applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTopupCoinsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
           },
           "500": {
             "$ref": "#/components/responses/Error500"
@@ -978,6 +1105,118 @@
         }
       }
     },
+    "/api/internal/creator-revenue/settle": {
+      "get": {
+        "tags": [
+          "Internal"
+        ],
+        "operationId": "runCreatorRevenueSettleGet",
+        "summary": "Run creator revenue settlement via GET",
+        "security": [
+          {
+            "CronBearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "at",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "required": false,
+            "description": "Optional settlement timestamp override (ISO-8601)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Creator revenue settlement result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatorRevenueSettleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Internal"
+        ],
+        "operationId": "runCreatorRevenueSettlePost",
+        "summary": "Run creator revenue settlement via POST",
+        "security": [
+          {
+            "CronBearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "at",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "required": false,
+            "description": "Optional settlement timestamp override (ISO-8601)."
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "at": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "example": {
+                "at": "2026-03-28T00:00:00.000Z"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Creator revenue settlement result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatorRevenueSettleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error500"
+          }
+        }
+      }
+    },
     "/stripe-checkout": {
       "post": {
         "tags": [
@@ -1128,6 +1367,388 @@
           }
         }
       }
+    },
+    "/api/writer/earnings/summary": {
+      "get": {
+        "tags": [
+          "Writer Payouts"
+        ],
+        "summary": "Fetch creator earnings summary for current writer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/writer/earnings/statement": {
+      "get": {
+        "tags": [
+          "Writer Payouts"
+        ],
+        "summary": "Fetch creator earnings statement",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "storyId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/writer/payout-profile": {
+      "get": {
+        "tags": [
+          "Writer Payouts"
+        ],
+        "summary": "Get writer payout profile",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Writer Payouts"
+        ],
+        "summary": "Create or update writer payout profile",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "legalName": {
+                    "type": "string"
+                  },
+                  "promptpayTarget": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "legalName",
+                  "promptpayTarget"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/writer/payouts/request": {
+      "post": {
+        "tags": [
+          "Writer Payouts"
+        ],
+        "summary": "Submit payout request for current writer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "amountSatang": {
+                    "type": "integer"
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "409": {
+            "description": "Business rule error"
+          }
+        }
+      }
+    },
+    "/api/writer/payouts/history": {
+      "get": {
+        "tags": [
+          "Writer Payouts"
+        ],
+        "summary": "Fetch payout request history for current writer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/admin/payouts/requests": {
+      "get": {
+        "tags": [
+          "Admin Payouts"
+        ],
+        "summary": "List creator payout requests",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "writerId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/admin/payouts/approve": {
+      "post": {
+        "tags": [
+          "Admin Payouts"
+        ],
+        "summary": "Approve creator payout request",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/admin/payouts/reject": {
+      "post": {
+        "tags": [
+          "Admin Payouts"
+        ],
+        "summary": "Reject creator payout request",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/admin/payouts/mark-paid": {
+      "post": {
+        "tags": [
+          "Admin Payouts"
+        ],
+        "summary": "Mark creator payout request as paid",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1142,7 +1763,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "Token",
-        "description": "CRON_SECRET in the Authorization header for internal reconciliation."
+        "description": "CRON_SECRET in the Authorization header for internal cron-protected finance endpoints."
       },
       "StripeSignature": {
         "type": "apiKey",
@@ -2013,6 +2634,191 @@
         ],
         "additionalProperties": false
       },
+      "AdminUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "penName": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "coinBalance": {
+            "type": "number"
+          },
+          "vipStatus": {
+            "type": "string"
+          },
+          "vipPlanCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "vipCurrentPeriodEnd": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastSignInAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "emailConfirmedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "penName",
+          "avatarUrl",
+          "coinBalance",
+          "vipStatus",
+          "vipPlanCode",
+          "vipCurrentPeriodEnd",
+          "createdAt",
+          "updatedAt",
+          "lastSignInAt",
+          "emailConfirmedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminUsersListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer"
+              },
+              "limit": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              },
+              "nextPage": {
+                "type": "integer",
+                "nullable": true
+              },
+              "lastPage": {
+                "type": "integer",
+                "nullable": true
+              }
+            },
+            "required": [
+              "page",
+              "limit",
+              "total",
+              "nextPage",
+              "lastPage"
+            ]
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminUser"
+            }
+          }
+        },
+        "required": [
+          "success",
+          "pagination",
+          "users"
+        ],
+        "additionalProperties": false
+      },
+      "AdminTopupCoinsRequest": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 8
+          },
+          "correlationId": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "userId",
+          "amount",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "AdminTopupCoinsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "integer"
+          },
+          "transactionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "newBalance": {
+            "type": "number"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "policyVersion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "userId",
+          "amount",
+          "transactionId",
+          "newBalance",
+          "correlationId",
+          "policyVersion"
+        ],
+        "additionalProperties": false
+      },
       "PaymentCase": {
         "type": "object",
         "properties": {
@@ -2424,6 +3230,33 @@
           "success",
           "alert",
           "run"
+        ],
+        "additionalProperties": false
+      },
+      "CreatorRevenueSettleResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "settledCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "movedSatang": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "executedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "success",
+          "settledCount",
+          "movedSatang",
+          "executedAt"
         ],
         "additionalProperties": false
       }

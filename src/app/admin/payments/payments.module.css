@@ -343,6 +343,13 @@
   background: rgba(255, 255, 255, 0.03);
 }
 
+.emptyTableCell {
+  text-align: center;
+  color: var(--admin-text-subtle, #6d7787);
+  font-style: italic;
+  padding: 1.5rem 1rem;
+}
+
 /* Status Badges */
 .statusBadge {
   display: inline-flex;

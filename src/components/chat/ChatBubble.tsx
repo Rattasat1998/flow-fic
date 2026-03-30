@@ -17,7 +17,7 @@ export function ChatBubble({ message, character }: ChatBubbleProps) {
         return (
             <div className={styles.systemMessage}>
                 {message.type === 'image' && message.imageUrl ? (
-                    <img src={message.imageUrl} alt="System Image" style={{ maxWidth: '240px', borderRadius: '8px', marginTop: '4px' }} />
+                    <img src={message.imageUrl} alt="System Image" className={styles.systemImage} />
                 ) : (
                     <span>{message.text}</span>
                 )}
@@ -44,9 +44,12 @@ export function ChatBubble({ message, character }: ChatBubbleProps) {
                 {character && (
                     <div className={styles.characterName} style={isPlayer ? { textAlign: 'right' } : undefined}>{character.name}</div>
                 )}
-                <div className={`${styles.bubble} ${isPlayer ? styles.playerBubble : styles.characterBubble}`} style={{ padding: message.type === 'image' ? '4px' : undefined, backgroundColor: message.type === 'image' ? (isPlayer ? '#3b82f6' : 'white') : undefined }}>
+                <div
+                    className={`${styles.bubble} ${isPlayer ? styles.playerBubble : styles.characterBubble}`}
+                    style={{ padding: message.type === 'image' ? '4px' : undefined }}
+                >
                     {message.type === 'image' && message.imageUrl ? (
-                        <img src={message.imageUrl} alt="Chat Image" style={{ maxWidth: '240px', maxHeight: '300px', objectFit: 'contain', borderRadius: '12px', display: 'block' }} />
+                        <img src={message.imageUrl} alt="Chat Image" className={styles.chatImage} />
                     ) : (
                         <div className={styles.text}>{message.text}</div>
                     )}

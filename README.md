@@ -48,7 +48,7 @@ SPELLCHECK_TIMEOUT_MS=7000
 `SUPABASE_SERVICE_ROLE_KEY` must NOT be a publishable key (`sb_publishable_*`).
 `STRIPE_SECRET_KEY` must be a Stripe secret key (`sk_*`), not publishable (`pk_*`).
 `FINANCE_ADMIN_USER_IDS` controls access to admin payment operations APIs.
-`CRON_SECRET` is required to authorize Vercel Cron calls to internal reconciliation endpoints.
+`CRON_SECRET` is required to authorize Vercel Cron calls to internal finance endpoints.
 `RECONCILIATION_MISMATCH_THRESHOLD` sets the alert threshold for daily reconciliation (default `0`).
 
 ## Monetization Rollout (v1)
@@ -97,6 +97,30 @@ This endpoint requires header:
 `Authorization: Bearer <CRON_SECRET>`
 
 Vercel automatically sends this header for cron jobs when `CRON_SECRET` is configured in the project environment.
+
+Ops SOP reference: `docs/creator-payout-ops-runbook-v1.md`
+
+## Creator Revenue Settle Cron
+
+`vercel.json` schedules creator-revenue settlement every hour at minute `05` via:
+
+`/api/internal/creator-revenue/settle`
+
+This endpoint also requires:
+
+`Authorization: Bearer <CRON_SECRET>`
+
+Optional override time:
+
+- Query: `?at=2026-03-28T00:00:00.000Z`
+- POST body: `{ "at": "2026-03-28T00:00:00.000Z" }`
+
+Response shape:
+
+- `success: boolean`
+- `settledCount: number`
+- `movedSatang: number`
+- `executedAt: string`
 
 ## Thai Spellcheck Service (Railway)
 

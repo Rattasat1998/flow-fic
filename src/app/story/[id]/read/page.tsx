@@ -1,9 +1,18 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo, use, useCallback, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+  use,
+  useCallback,
+  type PointerEvent as ReactPointerEvent,
+  type TouchEvent as ReactTouchEvent,
+} from 'react';
 
 import { ChatBubble } from '@/components/chat/ChatBubble';
-import { ChatActionBar } from '@/components/chat/ChatActionBar';
+import { ChatTypingIndicator } from '@/components/chat/ChatTypingIndicator';
 import { ChatMessage } from '@/types/chat';
 import { VisualNovelStage } from '@/components/story/VisualNovelStage';
 import Link from 'next/link';
@@ -295,6 +304,7 @@ const MAX_BRANCH_TIMER_SECONDS = 300;
 const NARRATIVE_BOOKMARK_VIEWPORT_OFFSET = 128;
 const NARRATIVE_BOOKMARK_LONG_PRESS_MS = 400;
 const NARRATIVE_BOOKMARK_LONG_PRESS_MOVE_THRESHOLD = 12;
+const CHAT_ADVANCE_TAP_DISTANCE_PX = 8;
 const VISUAL_NOVEL_TYPEWRITER_CHAR_MS = 35;
 const VISUAL_NOVEL_AUTOPLAY_DELAY_MS = 900;
 const VISUAL_NOVEL_DEFAULT_BGM = '/sounds/vibehorn-lofi-background-music-479217.mp3';
@@ -359,6 +369,19 @@ const normalizeChoiceTimerSeconds = (value: unknown): number => {
   const numericValue = Number(value);
   if (!Number.isFinite(numericValue)) return 0;
   return Math.max(0, Math.min(MAX_BRANCH_TIMER_SECONDS, Math.floor(numericValue)));
+};
+
+const isInteractiveChatTarget = (target: EventTarget | null): boolean => {
+  if (!(target instanceof Element)) return false;
+  return !!target.closest('button, a, input, textarea, select, label, [role="button"], [contenteditable], [data-no-chat-advance="true"]');
+};
+
+const getChatTypingDelayMs = (message: ReaderChatMessage): number => {
+  if (message.type === 'image') return 620;
+
+  const textLength = typeof message.text === 'string' ? message.text.trim().length : 0;
+  const estimatedDelay = 300 + (textLength * 12);
+  return Math.max(260, Math.min(1100, estimatedDelay));
 };
 
 const normalizeBackgroundSound = (value: unknown): string | null => {
@@ -564,6 +587,8 @@ export default function StoryPage({ params }: StoryPageProps) {
 
   const [messages, setMessages] = useState<ReaderChatMessage[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isChatTyping, setIsChatTyping] = useState(false);
+  const [chatTypingPreview, setChatTypingPreview] = useState<ReaderChatMessage | null>(null);
   const [typedText, setTypedText] = useState('');
   const [isTypingComplete, setIsTypingComplete] = useState(true);
   const [typingSceneIndex, setTypingSceneIndex] = useState<number | null>(null);
@@ -595,6 +620,8 @@ export default function StoryPage({ params }: StoryPageProps) {
   const [choicesError, setChoicesError] = useState<string | null>(null);
   const [showChoiceOverlay, setShowChoiceOverlay] = useState(false);
   const [isTocOpen, setIsTocOpen] = useState(false);
+  const [isChatTopbarHidden, setIsChatTopbarHidden] = useState(false);
+  const [isChatOverflowOpen, setIsChatOverflowOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const narrativeChoicePanelRef = useRef<HTMLDivElement>(null);
   const narrativeCompletionSentinelRef = useRef<HTMLDivElement>(null);
@@ -621,6 +648,13 @@ export default function StoryPage({ params }: StoryPageProps) {
   const visualNovelTypewriterTimerRef = useRef<number | null>(null);
   const visualNovelAutoPlayTimerRef = useRef<number | null>(null);
   const visualNovelBgmAudioRef = useRef<HTMLAudioElement | null>(null);
+  const chatTypingTimerRef = useRef<number | null>(null);
+  const chatOverflowTouchStartYRef = useRef<number | null>(null);
+  const chatAdvancePointerRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+  } | null>(null);
 
   // Like / Favorite / Comment state
   const [likedChapterId, setLikedChapterId] = useState<string | null>(null);
@@ -685,6 +719,13 @@ export default function StoryPage({ params }: StoryPageProps) {
     });
 
     return nearestBlockId;
+  }, []);
+
+  const clearChatTypingTimer = useCallback(() => {
+    if (chatTypingTimerRef.current !== null) {
+      window.clearTimeout(chatTypingTimerRef.current);
+      chatTypingTimerRef.current = null;
+    }
   }, []);
 
   const flushPendingProgressToDatabase = useCallback(async () => {
@@ -1045,8 +1086,11 @@ export default function StoryPage({ params }: StoryPageProps) {
 
       setDbStory(normalizedStory);
       setDbChapters(parsedChapters);
+      clearChatTypingTimer();
       setMessages([]);
       setCurrentIndex(0);
+      setIsChatTyping(false);
+      setChatTypingPreview(null);
       setIsUnlockingChapterId(null);
       setUnlockError(null);
       setUnlockNotice(null);
@@ -1235,6 +1279,7 @@ export default function StoryPage({ params }: StoryPageProps) {
     initialChapterIdParam,
     fetchReaderChapters,
     mapReaderChapterRows,
+    clearChatTypingTimer,
   ]);
 
   const scrollToBottom = () => {
@@ -1243,7 +1288,13 @@ export default function StoryPage({ params }: StoryPageProps) {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, isChatTyping]);
+
+  useEffect(() => {
+    return () => {
+      clearChatTypingTimer();
+    };
+  }, [clearChatTypingTimer]);
 
   const isStoryOwner = !!user && dbStory?.user_id === user.id;
   const isVipActive = isVipAccessActive;
@@ -1524,12 +1575,63 @@ export default function StoryPage({ params }: StoryPageProps) {
     };
   }, [isVisualNovelStyle]);
 
-  const activeChatThemeClass = useMemo(() => {
-    const rawTheme = (dbChapters[selectedChapterIndex]?.chatTheme || 'white').toLowerCase();
-    if (rawTheme === 'pink' || rawTheme === 'mint' || rawTheme === 'midnight') return rawTheme;
-    if (rawTheme === 'dark') return 'midnight';
-    return 'light';
-  }, [dbChapters, selectedChapterIndex]);
+  useEffect(() => {
+    if (!isChatStyle) return;
+
+    let lastScrollY = window.scrollY;
+    let ticking = false;
+
+    const handleScroll = () => {
+      if (ticking) return;
+      ticking = true;
+
+      window.requestAnimationFrame(() => {
+        const currentScrollY = window.scrollY;
+        const deltaY = currentScrollY - lastScrollY;
+
+        if (currentScrollY <= 52) {
+          setIsChatTopbarHidden(false);
+        } else if (deltaY > 10) {
+          setIsChatTopbarHidden(true);
+        } else if (deltaY < -8) {
+          setIsChatTopbarHidden(false);
+        }
+
+        lastScrollY = currentScrollY;
+        ticking = false;
+      });
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isChatStyle, isTocOpen, isChatOverflowOpen]);
+
+  useEffect(() => {
+    if (!isChatStyle || !isChatOverflowOpen) return;
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, [isChatStyle, isChatOverflowOpen]);
+
+  useEffect(() => {
+    if (!isChatStyle || !isChatOverflowOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsChatOverflowOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isChatStyle, isChatOverflowOpen]);
 
   const activeChapter = dbChapters[selectedChapterIndex] || null;
   const activeChapterId = activeChapter?.id || null;
@@ -1646,25 +1748,25 @@ export default function StoryPage({ params }: StoryPageProps) {
     const contentMessages: ReaderChatMessage[] = activeChapter.blocks
       .filter((block): block is Block & { type: 'paragraph' | 'image' } => block.type !== 'scene')
       .map((block, blockIdx) => {
-      let sender: 'character' | 'player' | 'system' = 'character';
-      if (!block.characterId) {
-        sender = 'system';
-      } else if (block.characterId === activeChapter.povCharacterId) {
-        sender = 'player';
-      }
+        let sender: 'character' | 'player' | 'system' = 'character';
+        if (!block.characterId) {
+          sender = 'system';
+        } else if (block.characterId === activeChapter.povCharacterId) {
+          sender = 'player';
+        }
 
-      return {
-        id: `${activeChapter.id}_block_${block.id || blockIdx}`,
-        sender,
-        text: block.text,
-        timestamp: selectedChapterIndex * 1000 + blockIdx,
-        type: block.type,
-        imageUrl: block.imageUrl,
-        characterId: block.characterId,
-        chapterId: activeChapter.id,
-        chapterIndex: selectedChapterIndex,
-      };
-    });
+        return {
+          id: `${activeChapter.id}_block_${block.id || blockIdx}`,
+          sender,
+          text: block.text,
+          timestamp: selectedChapterIndex * 1000 + blockIdx,
+          type: block.type,
+          imageUrl: block.imageUrl,
+          characterId: block.characterId,
+          chapterId: activeChapter.id,
+          chapterIndex: selectedChapterIndex,
+        };
+      });
 
     return [chapterTitleMessage, ...contentMessages];
   }, [isChatStyle, activeChapter, selectedChapterIndex]);
@@ -1895,7 +1997,15 @@ export default function StoryPage({ params }: StoryPageProps) {
     setUnlockNotice(null);
     setShowChoiceOverlay(false);
     setHoveredBookmarkBlockId(null);
+    clearChatTypingTimer();
+    setIsChatTyping(false);
+    setChatTypingPreview(null);
     clearPendingLongPressBookmark();
+    if (isChatStyle) {
+      setIsChatTopbarHidden(false);
+      setIsChatOverflowOpen(false);
+      chatAdvancePointerRef.current = null;
+    }
 
     if (mode === 'top' && isSequentialReader) {
       if (isChatStyle) {
@@ -1946,6 +2056,7 @@ export default function StoryPage({ params }: StoryPageProps) {
     setVisibleNarrativeBookmarkForChapter,
     storyId,
     userId,
+    clearChatTypingTimer,
     clearPendingLongPressBookmark,
   ]);
 
@@ -2307,12 +2418,20 @@ export default function StoryPage({ params }: StoryPageProps) {
       return;
     }
 
-    if (!isChatStyle || currentIndex >= chatScript.length) return;
+    if (!isChatStyle || currentIndex >= chatScript.length || isChatTyping) return;
 
     const nextMessage = chatScript[currentIndex];
+    clearChatTypingTimer();
+    setChatTypingPreview(nextMessage);
+    setIsChatTyping(true);
 
-    setMessages((prev: ReaderChatMessage[]) => [...prev, nextMessage]);
-    setCurrentIndex((prev: number) => prev + 1);
+    chatTypingTimerRef.current = window.setTimeout(() => {
+      chatTypingTimerRef.current = null;
+      setMessages((prev: ReaderChatMessage[]) => [...prev, nextMessage]);
+      setCurrentIndex((prev: number) => prev + 1);
+      setIsChatTyping(false);
+      setChatTypingPreview(null);
+    }, getChatTypingDelayMs(nextMessage));
   }, [
     activeStory,
     dbChapters,
@@ -2324,11 +2443,49 @@ export default function StoryPage({ params }: StoryPageProps) {
     typingSceneIndex,
     typedText,
     isChatStyle,
+    isChatTyping,
     chatScript,
     showChoiceOverlay,
     clearVisualNovelTypewriterTimer,
     clearVisualNovelAutoPlayTimer,
+    clearChatTypingTimer,
   ]);
+
+  const handleChatContainerPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!isChatStyle || isChatOverflowOpen || isTocOpen || showChoiceOverlay) return;
+    if (!event.isPrimary || event.button !== 0) return;
+    if (isInteractiveChatTarget(event.target)) {
+      chatAdvancePointerRef.current = null;
+      return;
+    }
+
+    chatAdvancePointerRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+    };
+  }, [isChatStyle, isChatOverflowOpen, isTocOpen, showChoiceOverlay]);
+
+  const handleChatContainerPointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!isChatStyle) return;
+    if (!event.isPrimary || event.button !== 0) return;
+
+    const pendingTap = chatAdvancePointerRef.current;
+    chatAdvancePointerRef.current = null;
+    if (!pendingTap || pendingTap.pointerId !== event.pointerId) return;
+    if (isChatOverflowOpen || isTocOpen || showChoiceOverlay) return;
+    if (isInteractiveChatTarget(event.target)) return;
+
+    const movedX = Math.abs(event.clientX - pendingTap.startX);
+    const movedY = Math.abs(event.clientY - pendingTap.startY);
+    if (movedX > CHAT_ADVANCE_TAP_DISTANCE_PX || movedY > CHAT_ADVANCE_TAP_DISTANCE_PX) return;
+
+    handleNextLine();
+  }, [isChatStyle, isChatOverflowOpen, isTocOpen, showChoiceOverlay, handleNextLine]);
+
+  const handleChatContainerPointerCancel = useCallback(() => {
+    chatAdvancePointerRef.current = null;
+  }, []);
 
   useEffect(() => {
     if (!isVisualNovelStyle || isPreviewMode) return;
@@ -2722,7 +2879,7 @@ export default function StoryPage({ params }: StoryPageProps) {
     const countdownSeconds = options?.countdownSeconds ?? normalizeChoiceTimerSeconds(currentChapterRef.current?.choiceTimerSeconds);
 
     resetChoiceCountdown();
-    
+
     trackEvent('choice_select', `/story/${storyId}/read`, {
       storyId,
       chapterId: currentChapterId || 'unknown',
@@ -3083,6 +3240,43 @@ export default function StoryPage({ params }: StoryPageProps) {
     : currentChapter?.title?.trim()
       ? `ตอนที่ ${selectedChapterIndex + 1}: ${currentChapter.title}`
       : activeStory?.title || '';
+  const chatChapterMetaLabel = currentChapter
+    ? currentChapter.title.trim()
+      ? `ตอนที่ ${selectedChapterIndex + 1} · ${currentChapter.title}`
+      : `ตอนที่ ${selectedChapterIndex + 1}`
+    : 'ไม่พบตอน';
+  const chatMenuLikeLabel = storySettings.hideHeartCount
+    ? 'หัวใจ'
+    : `หัวใจ ${likeCount.toLocaleString('th-TH')}`;
+  const shouldHideChatTopbar = isChatTopbarHidden && !isTocOpen && !isChatOverflowOpen;
+  const resolveChatCharacter = (message: ReaderChatMessage) => {
+    const blockChar = characters.find((item) => item.id === message.characterId);
+    return blockChar
+      ? { id: blockChar.id, name: blockChar.name, avatarUrl: blockChar.image_url || fallbackAvatar }
+      : { id: 'reader-char', name: activeStory.characterName, avatarUrl: activeStory.avatarUrl || fallbackAvatar };
+  };
+  const chatTypingCharacter = chatTypingPreview ? resolveChatCharacter(chatTypingPreview) : null;
+
+  const closeChatOverflowMenu = () => {
+    setIsChatOverflowOpen(false);
+  };
+
+  const handleChatOverflowTouchStart = (event: ReactTouchEvent<HTMLDivElement>) => {
+    chatOverflowTouchStartYRef.current = event.touches[0]?.clientY ?? null;
+  };
+
+  const handleChatOverflowTouchEnd = (event: ReactTouchEvent<HTMLDivElement>) => {
+    const startY = chatOverflowTouchStartYRef.current;
+    chatOverflowTouchStartYRef.current = null;
+
+    const endY = event.changedTouches[0]?.clientY;
+    if (startY === null || typeof endY !== 'number') return;
+
+    if (endY - startY > 72) {
+      setIsChatOverflowOpen(false);
+    }
+  };
+
   const readerMobileActions = (
     <div className="ffMobileActionInner">
       {allowTocInReader && (
@@ -3226,114 +3420,187 @@ export default function StoryPage({ params }: StoryPageProps) {
     </div>
   );
 
-  const themeWrapperClass = isChatStyle ? `theme-${activeChatThemeClass}` : '';
+  const themeWrapperClass = isChatStyle ? 'theme-midnight' : '';
 
   return (
     <div className={themeWrapperClass}>
       <div className={isChatStyle ? styles.main : isVisualNovelStyle ? styles.visualNovelShell : styles.readerLayout}>
         {isChatStyle ? (
           <>
-            <header className={styles.header}>
-              <div className={styles.headerContent}>
-                <div>
-                  <h1>{activeStory.title}</h1>
-                  <p>
-                    ตอนที่ {selectedChapterIndex + 1}: {dbChapters[selectedChapterIndex]?.title}
-                    {isCurrentChapterLocked ? ` • 🔒 ${dbChapters[selectedChapterIndex]?.coinPrice || 0} เหรียญ` : ''}
-                  </p>
-                </div>
+            <header
+              className={[
+                styles.chatTopbar,
+                shouldHideChatTopbar ? styles.chatTopbarHidden : '',
+              ].filter(Boolean).join(' ')}
+            >
+              <div className={styles.chatTopbarCopy}>
+                <span className={styles.chatTopbarEyebrow}>Chat Reader</span>
+                <h1 className={styles.chatTopbarTitle}>{activeStory.title}</h1>
+                <p className={styles.chatTopbarMeta}>
+                  {chatChapterMetaLabel}
+                  {isCurrentChapterLocked ? ` · 🔒 ${currentChapter?.coinPrice || 0} เหรียญ` : ''}
+                </p>
               </div>
-              <div className={styles.chatHeaderActions}>
-                <button
-                  onClick={() => setIsTocOpen(true)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(148,163,184,0.8)' }}
-                  title="เลือกตอน"
-                >
-                  <List size={18} />
-                </button>
-                <button onClick={handleToggleLike} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', color: isCurrentChapterLiked ? '#ef4444' : 'rgba(148,163,184,0.7)', fontSize: '0.85rem', fontWeight: 600 }}>
-                  <Heart size={18} fill={isCurrentChapterLiked ? 'currentColor' : 'none'} />
-                  {!storySettings.hideHeartCount && <span>{likeCount}</span>}
-                </button>
-                <button onClick={handleToggleFavorite} style={{ background: 'none', border: 'none', cursor: 'pointer', color: isCurrentChapterFavorited ? 'var(--primary)' : 'rgba(148,163,184,0.7)' }}>
-                  {isCurrentChapterFavorited ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}
-                </button>
-              </div>
+              <button
+                type="button"
+                className={styles.chatTopbarMenuBtn}
+                onClick={() => setIsChatOverflowOpen(true)}
+                aria-label="เปิดเมนูการอ่าน"
+                aria-expanded={isChatOverflowOpen}
+              >
+                <MoreVertical size={18} />
+              </button>
             </header>
-            <div className={styles.chatContainer}>
-              {messages.length === 0 ? (
-                <div className={styles.emptyState}>
-                  แตะปุ่มด้านล่างเพื่อเริ่มอ่าน {activeStory.title}
-                </div>
-              ) : (
-                messages.map((msg) => {
-                  const blockChar = characters.find(c => c.id === msg.characterId);
-                  const chatChar = blockChar
-                    ? { id: blockChar.id, name: blockChar.name, avatarUrl: blockChar.image_url || fallbackAvatar }
-                    : { id: 'reader-char', name: activeStory.characterName, avatarUrl: activeStory.avatarUrl };
-                  return (
+            <div
+              className={[
+                styles.chatContainer,
+                messages.length === 0 ? styles.chatContainerEmpty : '',
+              ].filter(Boolean).join(' ')}
+              onPointerDown={handleChatContainerPointerDown}
+              onPointerUp={handleChatContainerPointerUp}
+              onPointerCancel={handleChatContainerPointerCancel}
+            >
+              <div className={styles.chatConversation}>
+                {messages.length === 0 ? (
+                  <div className={styles.chatStarterHint}>
+                    แตะที่หน้าจอเพื่อเริ่มอ่าน {activeStory.title}
+                  </div>
+                ) : (
+                  messages.map((msg) => (
                     <ChatBubble
                       key={msg.id}
                       message={msg}
-                      character={chatChar}
+                      character={resolveChatCharacter(msg)}
                     />
-                  );
-                })
-              )}
-              <div ref={messagesEndRef} className={styles.scrollAnchor} />
-              {premiumGateJSX}
-              {showChatBranchSection && (
-                <>
-                  {isLoadingChoicesForRead ? (
-                    <div className={styles.chatBranchPanel}>
-                      <p className={styles.branchChoiceInfo}>กำลังโหลดตัวเลือก...</p>
-                    </div>
-                  ) : showEndingNotice ? (
-                    <div className={`${styles.chatBranchPanel} ${styles.branchEndingPanel}`}>
-                      <div className={styles.branchChoiceHeader}>
-                        <h3>จบเส้นทางแล้ว</h3>
-                        <span className={styles.branchEndingTag}>Ending</span>
-                      </div>
-                      <p className={styles.branchChoiceInfo}>ตอนนี้เป็นตอนจบของเส้นทางนี้</p>
-                    </div>
-                  ) : chapterChoicesForRead.length === 0 ? (
-                    choicesErrorForRead ? (
+                  ))
+                )}
+                {isChatTyping && chatTypingPreview && (
+                  <ChatTypingIndicator
+                    sender={chatTypingPreview.sender}
+                    character={chatTypingCharacter}
+                  />
+                )}
+                <div ref={messagesEndRef} className={styles.scrollAnchor} />
+                {premiumGateJSX}
+                {showChatBranchSection && (
+                  <>
+                    {isLoadingChoicesForRead ? (
                       <div className={styles.chatBranchPanel}>
-                        <p className={styles.branchChoiceError}>{choicesErrorForRead}</p>
+                        <p className={styles.branchChoiceInfo}>กำลังโหลดตัวเลือก...</p>
                       </div>
-                    ) : null
-                  ) : !showChoiceOverlay ? (
-                    <div className={styles.chatBranchPanel}>
-                      {choicesErrorForRead && (
-                        <p className={styles.branchChoiceError}>{choicesErrorForRead}</p>
-                      )}
-                      <button
-                        type="button"
-                        className={styles.branchChoiceBtn}
-                        onClick={() => setShowChoiceOverlay(true)}
-                      >
-                        <span>⚡ เลือกเส้นทางถัดไป ({chapterChoicesForRead.length} ทางเลือก)</span>
-                      </button>
-                    </div>
-                  ) : null}
-                  {showChoiceOverlay && chapterChoicesForRead.length > 0 && (
-                    <BranchChoiceOverlay
-                      choices={chapterChoicesForRead}
-                      onSelect={handleSelectBranchChoice}
-                      timerSeconds={activeChapterChoiceTimerSeconds}
-                      remainingSeconds={choiceCountdownRemainingSeconds}
-                      progressPercent={choiceCountdownProgressPercent}
-                    />
-                  )}
-                </>
-              )}
+                    ) : showEndingNotice ? (
+                      <div className={`${styles.chatBranchPanel} ${styles.branchEndingPanel}`}>
+                        <div className={styles.branchChoiceHeader}>
+                          <h3>จบเส้นทางแล้ว</h3>
+                          <span className={styles.branchEndingTag}>Ending</span>
+                        </div>
+                        <p className={styles.branchChoiceInfo}>ตอนนี้เป็นตอนจบของเส้นทางนี้</p>
+                      </div>
+                    ) : chapterChoicesForRead.length === 0 ? (
+                      choicesErrorForRead ? (
+                        <div className={styles.chatBranchPanel}>
+                          <p className={styles.branchChoiceError}>{choicesErrorForRead}</p>
+                        </div>
+                      ) : null
+                    ) : !showChoiceOverlay ? (
+                      <div className={styles.chatBranchPanel}>
+                        {choicesErrorForRead && (
+                          <p className={styles.branchChoiceError}>{choicesErrorForRead}</p>
+                        )}
+                        <button
+                          type="button"
+                          className={styles.branchChoiceBtn}
+                          onClick={() => setShowChoiceOverlay(true)}
+                        >
+                          <span>⚡ เลือกเส้นทางถัดไป ({chapterChoicesForRead.length} ทางเลือก)</span>
+                        </button>
+                      </div>
+                    ) : null}
+                    {showChoiceOverlay && chapterChoicesForRead.length > 0 && (
+                      <BranchChoiceOverlay
+                        choices={chapterChoicesForRead}
+                        onSelect={handleSelectBranchChoice}
+                        timerSeconds={activeChapterChoiceTimerSeconds}
+                        remainingSeconds={choiceCountdownRemainingSeconds}
+                        progressPercent={choiceCountdownProgressPercent}
+                      />
+                    )}
+                  </>
+                )}
+              </div>
             </div>
 
-            <ChatActionBar
-              onNextLine={handleNextLine}
-              hasMore={!isCurrentChapterLocked && currentIndex < chatScript.length}
-              secondaryActions={readerMobileActions}
-            />
+            {isChatOverflowOpen && (
+              <div
+                className={styles.chatOverflowBackdrop}
+                onClick={closeChatOverflowMenu}
+                role="dialog"
+                aria-modal="true"
+                aria-label="เมนูการอ่าน"
+              >
+                <div
+                  className={styles.chatOverflowSheet}
+                  onClick={(event) => event.stopPropagation()}
+                  onTouchStart={handleChatOverflowTouchStart}
+                  onTouchEnd={handleChatOverflowTouchEnd}
+                >
+                  <button
+                    type="button"
+                    className={styles.chatOverflowHandle}
+                    onClick={closeChatOverflowMenu}
+                    aria-label="ปิดเมนูการอ่าน"
+                  />
+                  <div className={styles.chatOverflowHeader}>
+                    <p>เมนูการอ่าน</p>
+                    <button
+                      type="button"
+                      className={styles.chatOverflowCloseBtn}
+                      onClick={closeChatOverflowMenu}
+                      aria-label="ปิดเมนู"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                  <div className={styles.chatOverflowActions}>
+                    {allowTocInReader && (
+                      <button
+                        type="button"
+                        className={styles.chatOverflowActionBtn}
+                        onClick={() => {
+                          closeChatOverflowMenu();
+                          setIsTocOpen(true);
+                        }}
+                      >
+                        <List size={18} />
+                        <span>สารบัญ</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className={`${styles.chatOverflowActionBtn} ${isCurrentChapterLiked ? styles.chatOverflowActionBtnActive : ''}`}
+                      onClick={() => {
+                        closeChatOverflowMenu();
+                        void handleToggleLike();
+                      }}
+                    >
+                      <Heart size={18} fill={isCurrentChapterLiked ? 'currentColor' : 'none'} />
+                      <span>{chatMenuLikeLabel}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.chatOverflowActionBtn} ${isCurrentChapterFavorited ? styles.chatOverflowActionBtnActive : ''}`}
+                      onClick={() => {
+                        closeChatOverflowMenu();
+                        void handleToggleFavorite();
+                      }}
+                    >
+                      {isCurrentChapterFavorited ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}
+                      <span>{isCurrentChapterFavorited ? 'นำออกจากชั้น' : 'เก็บเข้าชั้น'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         ) : isVisualNovelStyle ? (
           <>
@@ -3712,76 +3979,76 @@ export default function StoryPage({ params }: StoryPageProps) {
                         aria-hidden="true"
                       />
                     </>
-                )}
+                  )}
 
-                {isBranchingPath ? (
-                  showNarrativeChoiceSection ? (
-                    <div ref={narrativeChoicePanelRef} className={styles.branchChoicePanel}>
-                      <div className={styles.branchChoiceHeader}>
-                        <h3>ทางเลือกเส้นทางถัดไป</h3>
-                      </div>
-                      {activeChapterChoiceTimerSeconds > 0 && chapterChoicesForRead.length > 0 && (
-                        <div className={`${styles.branchChoiceTimer} ${isChoiceCountdownDanger ? styles.branchChoiceTimerDanger : ''}`}>
-                          <div className={styles.branchChoiceTimerMeta}>
-                            <span>{isChoiceCountdownDanger ? 'เวลาใกล้หมด!' : 'เวลาจำกัด'}</span>
-                            <strong>เหลือ {choiceCountdownRemainingSeconds} วิ</strong>
-                          </div>
-                          <div className={styles.branchChoiceTimerTrack}>
-                            <div
-                              className={styles.branchChoiceTimerFill}
-                              style={{ width: `${choiceCountdownProgressPercent}%` }}
-                            />
-                          </div>
+                  {isBranchingPath ? (
+                    showNarrativeChoiceSection ? (
+                      <div ref={narrativeChoicePanelRef} className={styles.branchChoicePanel}>
+                        <div className={styles.branchChoiceHeader}>
+                          <h3>ทางเลือกเส้นทางถัดไป</h3>
                         </div>
-                      )}
-                      {isLoadingChoicesForRead ? (
-                        <p className={styles.branchChoiceInfo}>กำลังโหลดตัวเลือก...</p>
-                      ) : chapterChoicesForRead.length === 0 ? (
-                        choicesErrorForRead ? (
-                          <p className={styles.branchChoiceError}>{choicesErrorForRead}</p>
-                        ) : null
-                      ) : (
-                        <>
-                          {choicesErrorForRead && <p className={styles.branchChoiceError}>{choicesErrorForRead}</p>}
-                          <div className={styles.branchChoiceList}>
-                            {chapterChoicesForRead.map((choice, index) => {
-                              const isLockedChoice = !choice.canRead;
-                              return (
-                                <button
-                                  key={choice.id}
-                                  type="button"
-                                  className={[
-                                    styles.branchChoiceBtn,
-                                    isLockedChoice ? styles.branchChoiceBtnLocked : '',
-                                  ].filter(Boolean).join(' ')}
-                                  onClick={() => handleSelectBranchChoice(choice)}
-                                >
-                                  <span>{index + 1}. {choice.choiceText}</span>
-                                  {isLockedChoice && (
-                                    <small className={styles.branchChoiceMeta}>
-                                      {`🔒 ล็อก ${choice.coinPrice.toLocaleString('th-TH')} เหรียญ`}
-                                    </small>
-                                  )}
-                                  {choice.outcomeText && (
-                                    <p className={styles.branchChoiceOutcome}>{choice.outcomeText}</p>
-                                  )}
-                                </button>
-                              );
-                            })}
+                        {activeChapterChoiceTimerSeconds > 0 && chapterChoicesForRead.length > 0 && (
+                          <div className={`${styles.branchChoiceTimer} ${isChoiceCountdownDanger ? styles.branchChoiceTimerDanger : ''}`}>
+                            <div className={styles.branchChoiceTimerMeta}>
+                              <span>{isChoiceCountdownDanger ? 'เวลาใกล้หมด!' : 'เวลาจำกัด'}</span>
+                              <strong>เหลือ {choiceCountdownRemainingSeconds} วิ</strong>
+                            </div>
+                            <div className={styles.branchChoiceTimerTrack}>
+                              <div
+                                className={styles.branchChoiceTimerFill}
+                                style={{ width: `${choiceCountdownProgressPercent}%` }}
+                              />
+                            </div>
                           </div>
-                        </>
-                      )}
-                    </div>
-                  ) : showEndingNotice ? (
-                    <div className={`${styles.branchChoicePanel} ${styles.branchEndingPanel}`}>
-                      <div className={styles.branchChoiceHeader}>
-                        <h3>จบเส้นทางแล้ว</h3>
-                        <span className={styles.branchEndingTag}>Ending</span>
+                        )}
+                        {isLoadingChoicesForRead ? (
+                          <p className={styles.branchChoiceInfo}>กำลังโหลดตัวเลือก...</p>
+                        ) : chapterChoicesForRead.length === 0 ? (
+                          choicesErrorForRead ? (
+                            <p className={styles.branchChoiceError}>{choicesErrorForRead}</p>
+                          ) : null
+                        ) : (
+                          <>
+                            {choicesErrorForRead && <p className={styles.branchChoiceError}>{choicesErrorForRead}</p>}
+                            <div className={styles.branchChoiceList}>
+                              {chapterChoicesForRead.map((choice, index) => {
+                                const isLockedChoice = !choice.canRead;
+                                return (
+                                  <button
+                                    key={choice.id}
+                                    type="button"
+                                    className={[
+                                      styles.branchChoiceBtn,
+                                      isLockedChoice ? styles.branchChoiceBtnLocked : '',
+                                    ].filter(Boolean).join(' ')}
+                                    onClick={() => handleSelectBranchChoice(choice)}
+                                  >
+                                    <span>{index + 1}. {choice.choiceText}</span>
+                                    {isLockedChoice && (
+                                      <small className={styles.branchChoiceMeta}>
+                                        {`🔒 ล็อก ${choice.coinPrice.toLocaleString('th-TH')} เหรียญ`}
+                                      </small>
+                                    )}
+                                    {choice.outcomeText && (
+                                      <p className={styles.branchChoiceOutcome}>{choice.outcomeText}</p>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </>
+                        )}
                       </div>
-                      <p className={styles.branchChoiceInfo}>ตอนนี้เป็นตอนจบของเส้นทางนี้</p>
-                    </div>
-                  ) : null
-                ) : (
+                    ) : showEndingNotice ? (
+                      <div className={`${styles.branchChoicePanel} ${styles.branchEndingPanel}`}>
+                        <div className={styles.branchChoiceHeader}>
+                          <h3>จบเส้นทางแล้ว</h3>
+                          <span className={styles.branchEndingTag}>Ending</span>
+                        </div>
+                        <p className={styles.branchChoiceInfo}>ตอนนี้เป็นตอนจบของเส้นทางนี้</p>
+                      </div>
+                    ) : null
+                  ) : (
                     <div className={styles.chapterNav} style={{ marginTop: '3rem', width: '100%', maxWidth: '400px' }}>
                       <button
                         type="button"

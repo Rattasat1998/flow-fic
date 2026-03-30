@@ -7,15 +7,16 @@ export const metadata: Metadata = {
 };
 
 const cardStyle = {
-  border: "1px solid #e2e8f0",
+  border: "1px solid rgba(255, 255, 255, 0.14)",
   borderRadius: 12,
   padding: "14px 16px",
-  background: "#ffffff",
+  background: "rgba(255, 255, 255, 0.03)",
 };
 
 export default function BillingPoliciesPage() {
   return (
     <main
+      className="ffLegalPage"
       style={{
         maxWidth: "820px",
         margin: "0 auto",
@@ -24,7 +25,7 @@ export default function BillingPoliciesPage() {
       }}
     >
       <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>ศูนย์นโยบาย (Policy Center)</h1>
-      <p style={{ color: "#666", marginBottom: "1.5rem" }}>อัปเดตล่าสุด: March 5, 2026</p>
+      <p style={{ color: "var(--text-muted)", marginBottom: "1.5rem" }}>อัปเดตล่าสุด: March 5, 2026</p>
       <p style={{ marginBottom: "1.2rem" }}>
         หน้านี้รวบรวมนโยบายสำคัญที่เกี่ยวข้องกับการใช้งานเว็บไซต์ FlowFic ทั้งด้านการเงิน ลิขสิทธิ์
         กฎชุมชน คุกกี้ และข้อมูลการติดต่อทางกฎหมาย
@@ -56,25 +57,31 @@ export default function BillingPoliciesPage() {
         </div>
 
         <div style={cardStyle}>
-          <h2 style={{ fontSize: "1.1rem", marginBottom: 6 }}>5. นโยบายลิขสิทธิ์และการแจ้งถอดเนื้อหา</h2>
+          <h2 style={{ fontSize: "1.1rem", marginBottom: 6 }}>5. นโยบายรายได้นักเขียนและการถอนเงิน</h2>
+          <p style={{ marginBottom: 8 }}>สูตรคำนวณรายได้จากเหรียญ รอบถือยอด และการถอนผ่าน PromptPay</p>
+          <Link href="/creator-payout-policy">ดูรายละเอียด</Link>
+        </div>
+
+        <div style={cardStyle}>
+          <h2 style={{ fontSize: "1.1rem", marginBottom: 6 }}>6. นโยบายลิขสิทธิ์และการแจ้งถอดเนื้อหา</h2>
           <p style={{ marginBottom: 8 }}>แนวทางแจ้งละเมิดลิขสิทธิ์และขั้นตอนพิจารณาของทีมงาน</p>
           <Link href="/copyright-takedown-policy">ดูรายละเอียด</Link>
         </div>
 
         <div style={cardStyle}>
-          <h2 style={{ fontSize: "1.1rem", marginBottom: 6 }}>6. นโยบายชุมชนและการบังคับใช้</h2>
+          <h2 style={{ fontSize: "1.1rem", marginBottom: 6 }}>7. นโยบายชุมชนและการบังคับใช้</h2>
           <p style={{ marginBottom: 8 }}>กฎชุมชน ตัวอย่างการฝ่าฝืน และระดับบทลงโทษ</p>
           <Link href="/community-enforcement-policy">ดูรายละเอียด</Link>
         </div>
 
         <div style={cardStyle}>
-          <h2 style={{ fontSize: "1.1rem", marginBottom: 6 }}>7. ประกาศคุกกี้และการติดตามการใช้งาน</h2>
+          <h2 style={{ fontSize: "1.1rem", marginBottom: 6 }}>8. ประกาศคุกกี้และการติดตามการใช้งาน</h2>
           <p style={{ marginBottom: 8 }}>คุกกี้ที่จำเป็น ข้อมูลการใช้งาน และการจัดการผ่านเบราว์เซอร์</p>
           <Link href="/cookie-tracking-notice">ดูรายละเอียด</Link>
         </div>
 
         <div style={cardStyle}>
-          <h2 style={{ fontSize: "1.1rem", marginBottom: 6 }}>8. ข้อมูลติดต่อทางกฎหมายและเวอร์ชันเอกสาร</h2>
+          <h2 style={{ fontSize: "1.1rem", marginBottom: 6 }}>9. ข้อมูลติดต่อทางกฎหมายและเวอร์ชันเอกสาร</h2>
           <p style={{ marginBottom: 8 }}>วันที่มีผลบังคับใช้ ช่องทางติดต่อ และเอกสารอ้างอิงหลัก</p>
           <Link href="/legal-contact-and-versioning">ดูรายละเอียด</Link>
         </div>

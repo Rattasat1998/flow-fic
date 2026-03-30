@@ -1,0 +1,84 @@
+<svg width="1080" height="1080" viewBox="0 0 1080 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="540" y1="0" x2="540" y2="1080" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#090C12" />
+      <stop offset="0.46" stop-color="#0A0C10" />
+      <stop offset="1" stop-color="#07090E" />
+    </linearGradient>
+    <radialGradient id="bgWarm" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(540 -160) rotate(90) scale(520 760)">
+      <stop stop-color="#F59E0B" stop-opacity="0.22" />
+      <stop offset="0.62" stop-color="#F59E0B" stop-opacity="0.06" />
+      <stop offset="1" stop-color="#F59E0B" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="bgCool" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(924 164) rotate(90) scale(360 420)">
+      <stop stop-color="#304D80" stop-opacity="0.24" />
+      <stop offset="0.68" stop-color="#304D80" stop-opacity="0.08" />
+      <stop offset="1" stop-color="#304D80" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="panelGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(486 402) rotate(90) scale(308 336)">
+      <stop stop-color="#F59E0B" stop-opacity="0.16" />
+      <stop offset="0.72" stop-color="#F59E0B" stop-opacity="0.04" />
+      <stop offset="1" stop-color="#F59E0B" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="panelFill" x1="246" y1="216" x2="854" y2="868" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#121827" />
+      <stop offset="0.55" stop-color="#0F1521" />
+      <stop offset="1" stop-color="#0D1119" />
+    </linearGradient>
+    <linearGradient id="panelRing" x1="286" y1="250" x2="792" y2="830" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8D58A" stop-opacity="0.58" />
+      <stop offset="0.5" stop-color="#F59E0B" stop-opacity="0.28" />
+      <stop offset="1" stop-color="#7BA6D6" stop-opacity="0.18" />
+    </linearGradient>
+    <linearGradient id="markFill" x1="8" y1="8" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111827" />
+      <stop offset="1" stop-color="#0D1119" />
+    </linearGradient>
+    <linearGradient id="markStroke" x1="10" y1="8" x2="54" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FDE3A0" />
+      <stop offset="0.5" stop-color="#F6B84D" />
+      <stop offset="1" stop-color="#D97706" />
+    </linearGradient>
+    <linearGradient id="glyph" x1="18" y1="16" x2="50" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF4D1" />
+      <stop offset="0.52" stop-color="#F9D688" />
+      <stop offset="1" stop-color="#F59E0B" />
+    </linearGradient>
+  </defs>
+
+  <rect width="1080" height="1080" fill="url(#bg)" />
+  <rect width="1080" height="1080" fill="url(#bgWarm)" />
+  <rect width="1080" height="1080" fill="url(#bgCool)" />
+
+  <circle cx="540" cy="540" r="430" stroke="#FFFFFF" stroke-opacity="0.04" stroke-width="2" />
+  <circle cx="540" cy="540" r="372" fill="url(#panelFill)" />
+  <circle cx="540" cy="540" r="372" fill="url(#panelGlow)" />
+  <circle cx="540" cy="540" r="372" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="2" />
+  <circle cx="540" cy="540" r="334" stroke="url(#panelRing)" stroke-opacity="0.3" stroke-width="2" />
+
+  <path
+    d="M232 462C258 356 334 272 436 230C496 204 564 196 626 208"
+    stroke="#F5C267"
+    stroke-opacity="0.26"
+    stroke-width="8"
+    stroke-linecap="round"
+  />
+  <path
+    d="M800 664C776 744 718 814 642 856C590 884 532 896 478 892"
+    stroke="#7BA6D6"
+    stroke-opacity="0.18"
+    stroke-width="8"
+    stroke-linecap="round"
+  />
+
+  <circle cx="304" cy="326" r="8" fill="#F8D58A" fill-opacity="0.72" />
+  <circle cx="796" cy="748" r="8" fill="#7BA6D6" fill-opacity="0.62" />
+  <circle cx="740" cy="246" r="5" fill="#FFFFFF" fill-opacity="0.12" />
+
+  <circle cx="540" cy="520" r="224" fill="#F59E0B" fill-opacity="0.06" />
+
+  <g transform="translate(348 348) scale(6)">
+    <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#markFill)" stroke="url(#markStroke)" stroke-opacity="0.88" stroke-width="1.5" />
+    <path d="M18 16h6v32h-6zM18 16h18v6H18zM18 29h14v6H18zM38 16h6v32h-6zM38 16h12v6H38zM38 29h10v6H38z" fill="url(#glyph)" />
+  </g>
+</svg>

@@ -209,6 +209,22 @@ async function fetchDiscoveryResponse(filters: DiscoveryFilters): Promise<Discov
   };
 }
 
+function hasAnyDiscoveryItems(payload: DiscoveryResponse): boolean {
+  return (
+    payload.rails.new.items.length > 0
+    || payload.rails.popular.items.length > 0
+    || payload.rails.trending.items.length > 0
+  );
+}
+
+function hasDiscoveryErrors(payload: DiscoveryResponse): boolean {
+  return Boolean(
+    payload.rails.new.error
+    || payload.rails.popular.error
+    || payload.rails.trending.error
+  );
+}
+
 const getCachedDiscoveryResponse = unstable_cache(
   async (filters: DiscoveryFilters) => fetchDiscoveryResponse(filters),
   ['discovery-rails-v2'],
@@ -219,5 +235,12 @@ const getCachedDiscoveryResponse = unstable_cache(
 );
 
 export async function getDiscoveryResponse(filters: DiscoveryFilters): Promise<DiscoveryResponse> {
-  return getCachedDiscoveryResponse(filters);
+  const cached = await getCachedDiscoveryResponse(filters);
+  if (hasAnyDiscoveryItems(cached) || hasDiscoveryErrors(cached)) {
+    return cached;
+  }
+
+  // Guard against stale empty cache after a fresh publish.
+  const fresh = await fetchDiscoveryResponse(filters);
+  return hasAnyDiscoveryItems(fresh) ? fresh : cached;
 }

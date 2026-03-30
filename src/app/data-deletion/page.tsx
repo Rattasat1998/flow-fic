@@ -10,6 +10,7 @@ export const metadata: Metadata = {
 export default function DataDeletionPage() {
   return (
     <main
+      className="ffLegalPage"
       style={{
         maxWidth: "760px",
         margin: "0 auto",
@@ -20,7 +21,7 @@ export default function DataDeletionPage() {
       <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>
         Data Deletion Instructions
       </h1>
-      <p style={{ color: "#666", marginBottom: "2rem" }}>Last updated: March 1, 2026</p>
+      <p style={{ color: "var(--text-muted)", marginBottom: "2rem" }}>Last updated: March 1, 2026</p>
 
       <section style={{ marginBottom: "1.5rem" }}>
         <h2>How to request deletion</h2>

@@ -1,0 +1,39 @@
+<svg width="1080" height="1080" viewBox="0 0 1080 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="540" y1="0" x2="540" y2="1080" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FEFFFE" />
+      <stop offset="1" stop-color="#F3F6FB" />
+    </linearGradient>
+    <radialGradient id="topGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(540 116) rotate(90) scale(300 560)">
+      <stop stop-color="#FFFFFF" />
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="coolGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(870 866) rotate(90) scale(220 220)">
+      <stop stop-color="#D8E4F6" stop-opacity="0.72" />
+      <stop offset="1" stop-color="#D8E4F6" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="centerShadow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(540 556) rotate(90) scale(190)">
+      <stop stop-color="#CBD5E1" stop-opacity="0.34" />
+      <stop offset="1" stop-color="#CBD5E1" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="markFill" x1="8" y1="8" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111827" />
+      <stop offset="1" stop-color="#0F172A" />
+    </linearGradient>
+    <linearGradient id="glyph" x1="18" y1="16" x2="50" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" />
+      <stop offset="1" stop-color="#E5EEF9" />
+    </linearGradient>
+  </defs>
+
+  <rect width="1080" height="1080" fill="url(#bg)" />
+  <rect width="1080" height="1080" fill="url(#topGlow)" />
+  <rect width="1080" height="1080" fill="url(#coolGlow)" />
+
+  <circle cx="540" cy="556" r="190" fill="url(#centerShadow)" />
+
+  <g transform="translate(300 300) scale(7.5)">
+    <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#markFill)" />
+    <path d="M18 16h6v32h-6zM18 16h18v6H18zM18 29h14v6H18zM38 16h6v32h-6zM38 16h12v6H38zM38 29h10v6H38z" fill="url(#glyph)" />
+  </g>
+</svg>

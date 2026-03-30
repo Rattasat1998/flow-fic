@@ -15,6 +15,13 @@ type ApplyCoinTransactionResult = {
   new_balance: number;
 };
 
+type ApplyCreatorChargebackResult = {
+  success: boolean;
+  message: string;
+  total_debited_satang: number;
+  affected_writers: number;
+};
+
 type ChargebackHoldPayload = {
   userId?: string;
   amount?: number;
@@ -134,11 +141,40 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    let creatorRevenueWarning: string | null = null;
+    const { data: creatorRows, error: creatorError } = await supabaseAdmin.rpc(
+      'apply_creator_chargeback_debit',
+      {
+        p_reader_id: targetUserId,
+        p_coins: holdAmount,
+        p_payment_case_id: paymentCase.id,
+      }
+    );
+
+    const creatorResult = Array.isArray(creatorRows) && creatorRows.length > 0
+      ? (creatorRows[0] as ApplyCreatorChargebackResult)
+      : null;
+
+    if (creatorError) {
+      creatorRevenueWarning = 'creator_chargeback_rpc_error';
+      console.error('apply_creator_chargeback_debit failed:', creatorError);
+    } else if (!creatorResult?.success) {
+      creatorRevenueWarning = creatorResult?.message || 'creator_chargeback_apply_failed';
+      console.warn('apply_creator_chargeback_debit returned failure:', creatorResult);
+    }
+
     await supabaseAdmin
       .from('payment_cases')
       .update({
         status: 'approved',
         hold_txn_id: applyResult.txn_id,
+        metadata: {
+          policy_version: MONETIZATION_POLICY_VERSION,
+          correlation_id: correlationId,
+          creator_revenue_warning: creatorRevenueWarning,
+          creator_debited_satang: creatorResult?.total_debited_satang || 0,
+          creator_affected_writers: creatorResult?.affected_writers || 0,
+        },
       })
       .eq('id', paymentCase.id);
 
@@ -149,6 +185,11 @@ export async function POST(request: NextRequest) {
       newBalance: applyResult.new_balance,
       financeStatus: 'restricted_finance',
       policyVersion: MONETIZATION_POLICY_VERSION,
+      creatorRevenue: {
+        warning: creatorRevenueWarning,
+        totalDebitedSatang: creatorResult?.total_debited_satang || 0,
+        affectedWriters: creatorResult?.affected_writers || 0,
+      },
     });
   } catch (error) {
     console.error('apply-chargeback-hold failed:', error);

@@ -9,6 +9,7 @@ export const metadata: Metadata = {
 export default function TermsPage() {
   return (
     <main
+      className="ffLegalPage"
       style={{
         maxWidth: "760px",
         margin: "0 auto",
@@ -17,7 +18,7 @@ export default function TermsPage() {
       }}
     >
       <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>ข้อกำหนดและเงื่อนไขการใช้บริการ</h1>
-      <p style={{ color: "#666", marginBottom: "2rem" }}>อัปเดตล่าสุด: March 5, 2026</p>
+      <p style={{ color: "var(--text-muted)", marginBottom: "2rem" }}>อัปเดตล่าสุด: March 5, 2026</p>
 
       <section style={{ marginBottom: "1.5rem" }}>
         <h2>1. เงื่อนไขทั่วไป</h2>
@@ -147,6 +148,14 @@ export default function TermsPage() {
         </p>
         <p>
           ทีมงานอาจเปลี่ยนแปลงราคา แพ็กเกจ หรือค่าธรรมเนียมได้ตามความเหมาะสม โดยประกาศผ่านเว็บไซต์
+        </p>
+        <p>
+          สำหรับนักเขียน รายได้จากการปลดล็อกตอนด้วยเหรียญ การถือยอดก่อนถอน และการถอนผ่าน PromptPay
+          ให้เป็นไปตามนโยบายรายได้นักเขียนที่ประกาศบนเว็บไซต์
+        </p>
+        <p>
+          ภาระด้านภาษีและเอกสารตามกฎหมายที่เกี่ยวข้องกับการรับรายได้ของนักเขียน
+          (รวมถึงกรณีที่อาจต้องจดทะเบียนพาณิชย์) เป็นความรับผิดชอบของนักเขียนตามกฎหมายที่ใช้บังคับ
         </p>
         <p style={{ marginTop: "0.75rem" }}>
           รายละเอียดเพิ่มเติมของเงื่อนไขด้านการเงินอยู่ที่

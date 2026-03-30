@@ -10,6 +10,7 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <main
+      className="ffLegalPage"
       style={{
         maxWidth: "760px",
         margin: "0 auto",
@@ -18,7 +19,7 @@ export default function PrivacyPage() {
       }}
     >
       <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>นโยบายความเป็นส่วนตัว (Privacy Policy)</h1>
-      <p style={{ color: "#666", marginBottom: "2rem" }}>อัปเดตล่าสุด: March 1, 2026</p>
+      <p style={{ color: "var(--text-muted)", marginBottom: "2rem" }}>อัปเดตล่าสุด: March 28, 2026</p>
 
       <section style={{ marginBottom: "1.5rem" }}>
         <h2>1. ข้อมูลที่เราเก็บ</h2>
@@ -68,8 +69,16 @@ export default function PrivacyPage() {
       <section style={{ marginBottom: "1.5rem" }}>
         <h2>6. คุกกี้และเซสชัน</h2>
         <p>
-          ระบบอาจใช้คุกกี้หรือข้อมูลเซสชันที่จำเป็นเพื่อคงสถานะการล็อกอินและการทำงานพื้นฐานของเว็บไซต์
-          การปิดใช้งานคุกกี้บางประเภทอาจทำให้บริการบางส่วนใช้งานไม่ได้
+          ระบบใช้คุกกี้ 2 หมวด: Necessary และ Analytics โดย Necessary จะเปิดเสมอเพื่อให้ระบบหลักทำงานได้
+          ส่วน Analytics จะปิดเป็นค่าเริ่มต้น และจะเปิดเฉพาะเมื่อผู้ใช้ให้ความยินยอมผ่านระบบ Cookie Consent
+          เท่านั้น
+        </p>
+        <p style={{ marginTop: "0.75rem" }}>
+          หากผู้ใช้ปฏิเสธ Analytics ระบบจะไม่ส่งเหตุการณ์ติดตามใหม่ และจะพยายามลบคุกกี้ analytics เดิม
+          แบบ best-effort ภายใต้ข้อจำกัดของเบราว์เซอร์
+        </p>
+        <p style={{ marginTop: "0.75rem" }}>
+          ผู้ใช้สามารถแก้ไขการตั้งค่าได้ตลอดเวลาจากปุ่ม <strong>ตั้งค่าคุกกี้</strong> ที่ส่วนท้ายเว็บไซต์ทุกหน้า
         </p>
         <p style={{ marginTop: "0.75rem" }}>
           อ่านรายละเอียดเพิ่มเติมได้ที่

@@ -2,6 +2,7 @@
 
 import type { NextWebVitalsMetric } from 'next/app';
 import { useReportWebVitals } from 'next/web-vitals';
+import { useCookieConsent } from '@/contexts/CookieConsentContext';
 
 const WEB_VITALS_SAMPLE_RATE = 0.5;
 
@@ -36,7 +37,10 @@ function postMetric(payload: VitalMetricPayload) {
 }
 
 export function WebVitalsReporter() {
+  const { canTrackAnalytics } = useCookieConsent();
+
   useReportWebVitals((metric: NextWebVitalsMetric) => {
+    if (!canTrackAnalytics) return;
     if (Math.random() > WEB_VITALS_SAMPLE_RATE) return;
 
     const metricWithRuntimeFields = metric as NextWebVitalsMetric & {

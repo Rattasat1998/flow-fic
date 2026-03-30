@@ -30,6 +30,17 @@ function timeAgo(iso: string): string {
     return new Date(iso).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
 }
 
+function getNotificationIcon(type: string): string {
+    switch (type) {
+        case 'new_chapter':
+            return '📖';
+        case 'chapter_unlock_coin':
+            return '🪙';
+        default:
+            return '🔔';
+    }
+}
+
 export default function NotificationsPage() {
     const { user, isLoading: isAuthLoading } = useAuth();
     const userId = user?.id ?? null;
@@ -188,7 +199,7 @@ export default function NotificationsPage() {
                             const inner = (
                                 <>
                                     <div className={styles.itemIcon}>
-                                        {notif.type === 'new_chapter' ? '📖' : '🔔'}
+                                        {getNotificationIcon(notif.type)}
                                     </div>
                                     <div className={styles.itemBody}>
                                         <div className={styles.itemTitle}>{notif.title}</div>

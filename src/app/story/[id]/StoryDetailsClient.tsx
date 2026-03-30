@@ -1,27 +1,28 @@
 'use client';
 
-import { useState, useEffect, useCallback, useLayoutEffect, useMemo, useRef, type FormEvent, type MouseEvent } from 'react';
+import { useState, useEffect, useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
 import {
-    PlaySquare,
-    UserPlus,
-    UserCheck,
+    BookOpen,
+    Clock,
     Coins,
-    Bookmark,
     ChevronRight,
+    Eye,
+    Heart,
     Lock,
-    X,
+    MessageCircle,
+    Star,
 } from 'lucide-react';
 import styles from './details.module.css';
 import { useTracking } from '@/hooks/useTracking';
 import { useFollow } from '@/hooks/useFollow';
 import { useAuth } from '@/contexts/AuthContext';
-import { StorySearchPanel } from '@/components/navigation/StorySearchPanel';
 import { ShareButton } from '@/components/share/ShareButton';
 import { SharedNavbar } from '@/components/navigation/SharedNavbar';
+import { getMainCategoryLabel, getSubCategoryLabel } from '@/lib/categories';
 import {
     deriveReaderCtaState,
     mergeStoredStoryProgress,
@@ -43,6 +44,12 @@ type DBStory = {
     title: string;
     pen_name: string;
     category: string;
+    main_category: string | null;
+    sub_category: string | null;
+    fandom: string | null;
+    tags: string[] | null;
+    rating: string | null;
+    writing_style: string | null;
     path_mode: 'linear' | 'branching';
     entry_chapter_id: string | null;
     synopsis: string;
@@ -109,11 +116,64 @@ type RelatedStory = {
     createdAt: string;
 };
 
+type AuthorProfileRow = {
+    id: string;
+    pen_name: string | null;
+    bio: string | null;
+    avatar_url: string | null;
+};
+
+type AuthorSummary = {
+    id: string;
+    penName: string;
+    bio: string;
+    avatarUrl: string | null;
+};
+
+type StoryCommentRow = {
+    id: string;
+    user_id: string;
+    content: string;
+    created_at: string;
+};
+
+type CommentProfileRow = {
+    id: string;
+    pen_name: string | null;
+    avatar_url: string | null;
+};
+
+type CommentPreviewItem = {
+    id: string;
+    userId: string;
+    content: string;
+    createdAt: string;
+    penName: string;
+    avatarUrl: string | null;
+};
+
+type RecommendedStory = {
+    id: string;
+    title: string;
+    penName: string;
+    categoryLabel: string;
+    completionLabel: string;
+    cover: string;
+    readCount: number;
+    createdAt: string;
+    source: 'author' | 'platform';
+};
+
+type StoryDetailTab = 'overview' | 'chapters' | 'comments';
+
 type StoryDetailCacheEntry = {
     story: DBStory;
     chapters: DBChapter[];
     storyCharacters: StoryCharacter[];
     relatedStories: RelatedStory[];
+    authorSummary: AuthorSummary | null;
+    commentPreview: CommentPreviewItem[];
+    recommendedStories: RecommendedStory[];
     likeCount: number;
     coinBalance: number;
     followerCount: number;
@@ -171,7 +231,50 @@ const resolveCompletionLabel = (completionStatus: string | null | undefined): st
     return completionStatus === 'completed' ? 'จบแล้ว' : 'กำลังอัปเดต';
 };
 
+const resolveWritingStyleLabel = (writingStyle: string | null | undefined): string => {
+    if (writingStyle === 'chat') return 'แชต';
+    if (writingStyle === 'thread') return 'เธรด';
+    if (writingStyle === 'visual_novel') return 'วิชวลโนเวล';
+    return 'บรรยาย';
+};
+
+const resolveRatingLabel = (rating: string | null | undefined): string => {
+    if (rating === '13+' || rating === '18+') return rating;
+    return 'ทั่วไป';
+};
+
+const formatThaiRelativeTime = (value: string): string => {
+    const timestamp = Date.parse(value);
+    if (!Number.isFinite(timestamp)) return formatThaiDate(value);
+
+    const diffMs = Date.now() - timestamp;
+    if (diffMs < 0) return formatThaiDate(value);
+
+    const minute = 60 * 1000;
+    const hour = 60 * minute;
+    const day = 24 * hour;
+
+    if (diffMs < hour) {
+        const minutes = Math.max(1, Math.floor(diffMs / minute));
+        return `${minutes.toLocaleString('th-TH')} นาทีที่แล้ว`;
+    }
+
+    if (diffMs < day) {
+        const hours = Math.max(1, Math.floor(diffMs / hour));
+        return `${hours.toLocaleString('th-TH')} ชม. ที่แล้ว`;
+    }
+
+    if (diffMs < 7 * day) {
+        const days = Math.max(1, Math.floor(diffMs / day));
+        return `${days.toLocaleString('th-TH')} วันที่แล้ว`;
+    }
+
+    return formatThaiDate(value);
+};
+
 const STORY_SEARCH_PANEL_LIMIT = 8;
+const STORY_COMMENT_PREVIEW_LIMIT = 3;
+const STORY_DISCOVERY_RECOMMEND_LIMIT = 12;
 
 const compareSearchStoriesByPriority = (a: DiscoveryStory, b: DiscoveryStory): number => {
     if (b.score_7d !== a.score_7d) return b.score_7d - a.score_7d;
@@ -184,14 +287,6 @@ const compareSearchStoriesByPriority = (a: DiscoveryStory, b: DiscoveryStory): n
     return safeCreatedAtB - safeCreatedAtA;
 };
 
-const buildStorySearchPanelQuery = (query: string): string => {
-    const params = new URLSearchParams();
-    if (query) params.set('q', query);
-    params.set('focusCore', 'false');
-    params.set('limit', String(STORY_SEARCH_PANEL_LIMIT));
-    return params.toString();
-};
-
 const collectStorySearchPanelStories = (payload: DiscoveryResponse, currentStoryId: string): DiscoveryStory[] => {
     const uniqueStories = new Map<string, DiscoveryStory>();
     [...payload.rails.trending.items, ...payload.rails.popular.items, ...payload.rails.new.items].forEach((story) => {
@@ -202,6 +297,35 @@ const collectStorySearchPanelStories = (payload: DiscoveryResponse, currentStory
     return Array.from(uniqueStories.values())
         .sort(compareSearchStoriesByPriority)
         .slice(0, STORY_SEARCH_PANEL_LIMIT);
+};
+
+const buildDiscoveryRecommendationQuery = (story: DBStory): string => {
+    const params = new URLSearchParams();
+    params.set('focusCore', 'false');
+    params.set('limit', String(STORY_DISCOVERY_RECOMMEND_LIMIT));
+    if (story.main_category) params.set('category', story.main_category);
+    if (story.sub_category) params.set('subCategory', story.sub_category);
+    return params.toString();
+};
+
+const resolveRecommendationCategoryLabel = (
+    category: string | null | undefined,
+    mainCategory: string | null | undefined,
+    subCategory: string | null | undefined
+): string => {
+    const subCategoryLabel = getSubCategoryLabel(subCategory);
+    if (subCategoryLabel) return subCategoryLabel;
+    const mainCategoryLabel = getMainCategoryLabel(mainCategory);
+    if (mainCategoryLabel) return mainCategoryLabel;
+    return resolveStoryTypeLabel(category);
+};
+
+const normalizeTagList = (tags: string[] | null | undefined): string[] => {
+    if (!Array.isArray(tags)) return [];
+    return tags
+        .map((tag) => (typeof tag === 'string' ? tag.trim() : ''))
+        .filter((tag) => tag.length > 0)
+        .slice(0, 4);
 };
 
 const formatThaiDate = (value: string): string => {
@@ -229,6 +353,15 @@ const parseStoryDetailCache = (raw: string | null): StoryDetailCacheEntry | null
                 : [],
             relatedStories: Array.isArray(parsed.relatedStories)
                 ? parsed.relatedStories as RelatedStory[]
+                : [],
+            authorSummary: parsed.authorSummary && typeof parsed.authorSummary === 'object'
+                ? parsed.authorSummary as AuthorSummary
+                : null,
+            commentPreview: Array.isArray(parsed.commentPreview)
+                ? parsed.commentPreview as CommentPreviewItem[]
+                : [],
+            recommendedStories: Array.isArray(parsed.recommendedStories)
+                ? parsed.recommendedStories as RecommendedStory[]
                 : [],
             likeCount: Number.isFinite(parsed.likeCount) ? Number(parsed.likeCount) : 0,
             coinBalance: Number.isFinite(parsed.coinBalance) ? Number(parsed.coinBalance) : 0,
@@ -316,13 +449,18 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
     const [dbChapters, setDbChapters] = useState<DBChapter[]>([]);
     const [storyCharacters, setStoryCharacters] = useState<StoryCharacter[]>([]);
     const [relatedStories, setRelatedStories] = useState<RelatedStory[]>([]);
+    const [authorSummary, setAuthorSummary] = useState<AuthorSummary | null>(null);
+    const [commentPreview, setCommentPreview] = useState<CommentPreviewItem[]>([]);
+    const [recommendedStories, setRecommendedStories] = useState<RecommendedStory[]>([]);
     const [likeCount, setLikeCount] = useState(0);
     const [loadError, setLoadError] = useState('');
     const [hydratedCache, setHydratedCache] = useState<StoryDetailCacheEntry | null>(null);
+    const [activeTab, setActiveTab] = useState<StoryDetailTab>('overview');
+    const [isLiked, setIsLiked] = useState(false);
+    const [isLikePending, setIsLikePending] = useState(false);
     const hasRestoredScrollRef = useRef(false);
     const hasConsumedReturnIntentRef = useRef(false);
     const isReturnNavigationRef = useRef(false);
-    const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
     // Coin dialog state
     const [coinBalance, setCoinBalance] = useState(0);
@@ -338,13 +476,11 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
     const [readerProgress, setReaderProgress] = useState<StoredStoryProgress | null>(null);
     const [storyProgressVersion, setStoryProgressVersion] = useState<string | null>(null);
     const [isChapterListExpanded, setIsChapterListExpanded] = useState(false);
-    const [topSearchInput, setTopSearchInput] = useState('');
-    const [topSearchStories, setTopSearchStories] = useState<DiscoveryStory[]>([]);
-    const [isTopSearchLoading, setIsTopSearchLoading] = useState(false);
+    const [isSynopsisExpanded, setIsSynopsisExpanded] = useState(false);
+    const [unreadNotifCountState, setUnreadNotifCountState] = useState(0);
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-    const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
-    const [authError, setAuthError] = useState<string | null>(null);
-    const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+    const profileMenuRef = useRef<HTMLDivElement>(null);
+    const unreadNotifCount = userId ? unreadNotifCountState : 0;
 
     const { isFollowing, followerCount, toggleFollow, isLoading: isFollowLoading } = useFollow({
         storyId,
@@ -394,6 +530,9 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
             setDbChapters(fallbackCached.chapters);
             setStoryCharacters(fallbackCached.storyCharacters);
             setRelatedStories(fallbackCached.relatedStories);
+            setAuthorSummary(fallbackCached.authorSummary);
+            setCommentPreview(fallbackCached.commentPreview);
+            setRecommendedStories(fallbackCached.recommendedStories);
             setLikeCount(fallbackCached.likeCount);
             setCoinBalance(fallbackCached.coinBalance);
             setIsLoading(false);
@@ -407,6 +546,9 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
             setDbChapters(cached.chapters);
             setStoryCharacters(cached.storyCharacters);
             setRelatedStories(cached.relatedStories);
+            setAuthorSummary(cached.authorSummary);
+            setCommentPreview(cached.commentPreview);
+            setRecommendedStories(cached.recommendedStories);
             setLikeCount(cached.likeCount);
             setCoinBalance(cached.coinBalance);
             setIsLoading(false);
@@ -423,6 +565,9 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
         setDbChapters([]);
         setStoryCharacters([]);
         setRelatedStories([]);
+        setAuthorSummary(null);
+        setCommentPreview([]);
+        setRecommendedStories([]);
         setLikeCount(0);
         setCoinBalance(0);
         setIsLoading(true);
@@ -436,6 +581,9 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
             chapters: dbChapters,
             storyCharacters,
             relatedStories,
+            authorSummary,
+            commentPreview,
+            recommendedStories,
             likeCount,
             coinBalance,
             followerCount: effectiveFollowerCount,
@@ -449,6 +597,9 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
         dbChapters,
         storyCharacters,
         relatedStories,
+        authorSummary,
+        commentPreview,
+        recommendedStories,
         likeCount,
         coinBalance,
         effectiveFollowerCount,
@@ -552,6 +703,9 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
                 setDbChapters([]);
                 setStoryCharacters([]);
                 setRelatedStories([]);
+                setAuthorSummary(null);
+                setCommentPreview([]);
+                setRecommendedStories([]);
                 setLikeCount(0);
                 setCoinBalance(0);
                 setLoadError(isStoryNotFoundError(storyError) || !storyData ? 'ไม่พบข้อมูลเรื่อง' : 'ไม่สามารถโหลดข้อมูลเรื่องนี้ได้');
@@ -594,6 +748,52 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
                 console.warn('[StoryDetail] Failed to fetch related stories:', relatedStoryError);
             }
 
+            const { data: authorProfileRow, error: authorProfileError } = await supabase
+                .from('profiles')
+                .select('id, pen_name, bio, avatar_url')
+                .eq('id', storyData.user_id)
+                .maybeSingle();
+            if (authorProfileError) {
+                console.warn('[StoryDetail] Failed to fetch author profile summary:', authorProfileError);
+            }
+
+            const { data: commentRows, error: commentRowsError } = await supabase
+                .from('comments')
+                .select('id, user_id, content, created_at')
+                .eq('story_id', storyId)
+                .order('created_at', { ascending: false })
+                .limit(STORY_COMMENT_PREVIEW_LIMIT);
+            if (commentRowsError) {
+                console.warn('[StoryDetail] Failed to fetch comment preview:', commentRowsError);
+            }
+
+            const commentUserIds = Array.from(
+                new Set(((commentRows as StoryCommentRow[] | null) || []).map((comment) => comment.user_id).filter(Boolean))
+            );
+            let commentProfiles: CommentProfileRow[] = [];
+            if (commentUserIds.length > 0) {
+                const { data: commentProfileRows, error: commentProfileError } = await supabase
+                    .from('profiles')
+                    .select('id, pen_name, avatar_url')
+                    .in('id', commentUserIds);
+                if (commentProfileError) {
+                    console.warn('[StoryDetail] Failed to fetch comment author profiles:', commentProfileError);
+                } else {
+                    commentProfiles = (commentProfileRows as CommentProfileRow[] | null) || [];
+                }
+            }
+
+            let discoveryStories: DiscoveryStory[] = [];
+            try {
+                const discoveryResponse = await fetch(`/api/discovery?${buildDiscoveryRecommendationQuery(storyData as DBStory)}`);
+                if (discoveryResponse.ok) {
+                    const discoveryPayload = await discoveryResponse.json() as DiscoveryResponse;
+                    discoveryStories = collectStorySearchPanelStories(discoveryPayload, storyId);
+                }
+            } catch (error) {
+                console.warn('[StoryDetail] Failed to fetch discovery recommendations:', error);
+            }
+
             const { data: storyProgressVersionData } = await supabase.rpc('get_story_progress_version', {
                 p_story_id: storyId,
             });
@@ -619,8 +819,9 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
             // Fetch wallet + unlock records
             let nextCoinBalance = 0;
             let remoteProgress: StoredStoryProgress | null = null;
+            let nextIsLiked = false;
             if (userId) {
-                const [{ data: walletData }, { data: unlockRows }, { data: progressRow }] = await Promise.all([
+                const [{ data: walletData }, { data: unlockRows }, { data: progressRow }, { data: likeRow }] = await Promise.all([
                     supabase
                         .from('wallets')
                         .select('coin_balance')
@@ -637,9 +838,16 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
                         .eq('user_id', userId)
                         .eq('story_id', storyId)
                         .maybeSingle(),
+                    supabase
+                        .from('likes')
+                        .select('chapter_id')
+                        .eq('story_id', storyId)
+                        .eq('user_id', userId)
+                        .maybeSingle(),
                 ]);
 
                 nextCoinBalance = walletData?.coin_balance || 0;
+                nextIsLiked = !!likeRow?.chapter_id;
                 if (progressRow) {
                     remoteProgress = normalizeStoredStoryProgress(progressRow as ReaderProgressRow);
                 }
@@ -656,6 +864,7 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
             }
             if (cancelled) return;
             setCoinBalance(nextCoinBalance);
+            setIsLiked(nextIsLiked);
 
             const mergedProgress = mergeStoredStoryProgress(localStoredProgress, remoteProgress);
             if (mergedProgress) {
@@ -667,6 +876,25 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
             const nextStory = storyData as DBStory;
             const nextChapters = chapterData as DBChapter[] || [];
             const nextCharacters = ((characterRows as StoryCharacter[] | null) || []).filter((character) => character.name.trim().length > 0);
+            const nextAuthorSummaryRow = authorProfileRow as AuthorProfileRow | null;
+            const nextAuthorSummary: AuthorSummary = {
+                id: storyData.user_id,
+                penName: (nextAuthorSummaryRow?.pen_name || nextStory.pen_name || 'นักเขียนนิรนาม').trim() || 'นักเขียนนิรนาม',
+                bio: (nextAuthorSummaryRow?.bio || '').trim(),
+                avatarUrl: nextAuthorSummaryRow?.avatar_url || null,
+            };
+            const commentProfileMap = new Map(commentProfiles.map((profile) => [profile.id, profile]));
+            const nextCommentPreview = ((commentRows as StoryCommentRow[] | null) || []).map((comment) => {
+                const profile = commentProfileMap.get(comment.user_id);
+                return {
+                    id: comment.id,
+                    userId: comment.user_id,
+                    content: comment.content || '',
+                    createdAt: comment.created_at || new Date(0).toISOString(),
+                    penName: (profile?.pen_name || 'ผู้อ่าน').trim() || 'ผู้อ่าน',
+                    avatarUrl: profile?.avatar_url || null,
+                };
+            });
             const nextRelatedStories = ((relatedStoryRows as RelatedStoryRow[] | null) || []).map((story) => ({
                 id: story.id,
                 title: story.title || 'ไม่มีชื่อเรื่อง',
@@ -677,12 +905,36 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
                 readCount: story.read_count || 0,
                 createdAt: story.created_at || new Date(0).toISOString(),
             }));
+            const authorSourceRecommendations: RecommendedStory[] = nextRelatedStories.map((story) => ({
+                ...story,
+                source: 'author',
+            }));
+            const platformRecommendations: RecommendedStory[] = discoveryStories.map((story) => ({
+                id: story.id,
+                title: story.title,
+                penName: story.pen_name,
+                categoryLabel: resolveRecommendationCategoryLabel(story.category, story.main_category, story.sub_category),
+                completionLabel: resolveCompletionLabel(story.completion_status),
+                cover: story.cover_url || story.cover_wide_url || fallbackCover,
+                readCount: story.total_view_count || 0,
+                createdAt: story.created_at || new Date(0).toISOString(),
+                source: 'platform',
+            }));
+            const recommendationMap = new Map<string, RecommendedStory>();
+            [...authorSourceRecommendations, ...platformRecommendations].forEach((story) => {
+                if (!story.id || story.id === storyId) return;
+                if (!recommendationMap.has(story.id)) recommendationMap.set(story.id, story);
+            });
+            const nextRecommendedStories = Array.from(recommendationMap.values()).slice(0, STORY_DISCOVERY_RECOMMEND_LIMIT);
             const nextLikeCount = likesCount || 0;
             const nextCache: StoryDetailCacheEntry = {
                 story: nextStory,
                 chapters: nextChapters,
                 storyCharacters: nextCharacters,
                 relatedStories: nextRelatedStories,
+                authorSummary: nextAuthorSummary,
+                commentPreview: nextCommentPreview,
+                recommendedStories: nextRecommendedStories,
                 likeCount: nextLikeCount,
                 coinBalance: nextCoinBalance,
                 followerCount: cachedFollowerCount,
@@ -696,6 +948,9 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
             setDbChapters(nextChapters);
             setStoryCharacters(nextCharacters);
             setRelatedStories(nextRelatedStories);
+            setAuthorSummary(nextAuthorSummary);
+            setCommentPreview(nextCommentPreview);
+            setRecommendedStories(nextRecommendedStories);
             setLikeCount(nextLikeCount);
             setIsLoading(false);
         };
@@ -731,8 +986,41 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
     }, [coinToast]);
 
     useEffect(() => {
+        if (!isProfileMenuOpen) return;
+
+        const handlePointerDown = (event: PointerEvent) => {
+            const target = event.target as Node | null;
+            if (!target) return;
+            if (profileMenuRef.current?.contains(target)) return;
+            setIsProfileMenuOpen(false);
+        };
+
+        document.addEventListener('pointerdown', handlePointerDown);
+        return () => document.removeEventListener('pointerdown', handlePointerDown);
+    }, [isProfileMenuOpen]);
+
+    useEffect(() => {
+        if (!userId) return;
+
+        const fetchUnread = async () => {
+            const { count } = await supabase
+                .from('notifications')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', userId)
+                .eq('is_read', false);
+
+            setUnreadNotifCountState(count || 0);
+        };
+
+        void fetchUnread();
+    }, [userId]);
+
+    useEffect(() => {
         const timer = window.setTimeout(() => {
             setIsChapterListExpanded(false);
+            setIsSynopsisExpanded(false);
+            setActiveTab('overview');
+            setIsLiked(false);
         }, 0);
 
         return () => {
@@ -747,142 +1035,58 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
         };
     }, []);
 
-    useEffect(() => {
-        if (!user) return;
-
-        const timer = window.setTimeout(() => {
-            setIsAuthDialogOpen(false);
-            setAuthError(null);
-        }, 0);
-
-        return () => {
-            window.clearTimeout(timer);
-        };
-    }, [user]);
-
-    useEffect(() => {
-        if (!userId) return;
-
-        const fetchUnreadNotifications = async () => {
-            const { count } = await supabase
-                .from('notifications')
-                .select('*', { count: 'exact', head: true })
-                .eq('user_id', userId)
-                .eq('is_read', false);
-            setUnreadNotifCount(count || 0);
-        };
-
-        void fetchUnreadNotifications();
-    }, [userId]);
-
-    const topSearchQuery = topSearchInput.trim();
-
-    useEffect(() => {
-        let isActive = true;
-        const controller = new AbortController();
-        const timer = window.setTimeout(() => {
-            setIsTopSearchLoading(true);
-            setTopSearchStories([]);
-
-            const loadSearchStories = async () => {
-                try {
-                    const response = await fetch(`/api/discovery?${buildStorySearchPanelQuery(topSearchQuery)}`, {
-                        signal: controller.signal,
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`DISCOVERY_HTTP_${response.status}`);
-                    }
-
-                    const payload = await response.json() as DiscoveryResponse;
-                    if (!isActive || controller.signal.aborted) return;
-
-                    setTopSearchStories(collectStorySearchPanelStories(payload, storyId));
-                } catch (error) {
-                    if (!isActive || controller.signal.aborted) return;
-                    console.error('[StoryDetailsClient] search panel discovery failed:', error);
-                    setTopSearchStories([]);
-                } finally {
-                    if (!isActive || controller.signal.aborted) return;
-                    setIsTopSearchLoading(false);
-                }
-            };
-
-            void loadSearchStories();
-        }, topSearchQuery ? 140 : 0);
-
-        return () => {
-            isActive = false;
-            window.clearTimeout(timer);
-            controller.abort();
-        };
-    }, [storyId, topSearchQuery]);
-
-    useEffect(() => {
-        if (!isProfileMenuOpen) return;
-
-        const handlePointerDown = (event: PointerEvent) => {
-            const target = event.target as Node | null;
-            if (!target) return;
-            if (profileMenuRef.current?.contains(target)) return;
-            setIsProfileMenuOpen(false);
-        };
-
-        document.addEventListener('pointerdown', handlePointerDown);
-        return () => document.removeEventListener('pointerdown', handlePointerDown);
-    }, [isProfileMenuOpen]);
-
-    const isStoryOwner = !!user && dbStory?.user_id === user.id;
-
-    const handleDashboardAccess = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
-        event.preventDefault();
-        setIsProfileMenuOpen(false);
-        setAuthError(null);
-
-        if (isLoadingAuth) return;
-
-        if (user) {
-            router.push('/dashboard');
+    const handleToggleLike = useCallback(async () => {
+        if (isLikePending) return;
+        if (!user) {
+            alert('กรุณาเข้าสู่ระบบก่อนกดหัวใจ');
             return;
         }
 
-        setIsAuthDialogOpen(true);
-    }, [isLoadingAuth, router, user]);
-
-    const searchPanelContent = useMemo(
-        () => (
-            <StorySearchPanel
-                stories={topSearchStories}
-                query={topSearchQuery}
-                isLoading={isTopSearchLoading}
-            />
-        ),
-        [isTopSearchLoading, topSearchQuery, topSearchStories]
-    );
-
-    const handleTopSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        const normalizedQuery = topSearchInput.trim();
-        if (!normalizedQuery) {
-            router.push('/');
+        const targetChapterId = dbStory?.entry_chapter_id || dbChapters[0]?.id;
+        if (!targetChapterId) {
+            alert('เรื่องนี้ยังไม่มีตอนสำหรับกดเลิฟ');
             return;
         }
-        router.push(`/?q=${encodeURIComponent(normalizedQuery)}`);
-    };
 
-    const openLoginPage = useCallback((nextPath: string) => {
-        router.push(`/login?next=${encodeURIComponent(nextPath)}`);
-    }, [router]);
+        setIsLikePending(true);
 
-    const handleSignOut = async () => {
-        try {
-            await signOut();
-            setIsProfileMenuOpen(false);
-            router.push('/');
-        } catch {
-            setAuthError('ไม่สามารถออกจากระบบได้ในขณะนี้');
+        if (isLiked) {
+            const { error } = await supabase
+                .from('likes')
+                .delete()
+                .eq('story_id', storyId)
+                .eq('user_id', user.id);
+
+            if (!error) {
+                setIsLiked(false);
+                setLikeCount((prev) => Math.max(0, prev - 1));
+            }
+            setIsLikePending(false);
+            return;
         }
-    };
+
+        const { error: clearError } = await supabase
+            .from('likes')
+            .delete()
+            .eq('story_id', storyId)
+            .eq('user_id', user.id);
+
+        if (clearError) {
+            setIsLikePending(false);
+            return;
+        }
+
+        const { error: insertError } = await supabase
+            .from('likes')
+            .insert({ story_id: storyId, user_id: user.id, chapter_id: targetChapterId });
+
+        if (!insertError) {
+            setIsLiked(true);
+            setLikeCount((prev) => prev + 1);
+        }
+
+        setIsLikePending(false);
+    }, [dbChapters, dbStory?.entry_chapter_id, isLikePending, isLiked, storyId, user]);
 
     const handleChapterClick = useCallback((chapter: DBChapter, index: number) => {
         const chapterHref = BRANCHING_FEATURE_ENABLED && dbStory?.path_mode === 'branching'
@@ -991,6 +1195,16 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
         }, result.message === 'UNLOCKED' ? 800 : 100);
     };
 
+    const handleSignOut = useCallback(async () => {
+        try {
+            setIsProfileMenuOpen(false);
+            await signOut();
+            router.push('/');
+        } catch (error) {
+            console.error('[StoryDetailsClient] Sign out failed:', error);
+        }
+    }, [router, signOut]);
+
     if (isLoading) {
         return (
             <main className={styles.main}>
@@ -1017,7 +1231,6 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
 
     const totalViews = dbChapters.reduce((sum, ch) => sum + ch.read_count, 0);
     const totalChapters = dbChapters.length;
-    const cover = dbStory.cover_url || dbStory.cover_wide_url || fallbackCover;
     const heroBackdrop = dbStory.cover_wide_url || dbStory.cover_url || fallbackPromoCover;
     const isBranchingStory = BRANCHING_FEATURE_ENABLED && dbStory.path_mode === 'branching';
     const entryChapterId = dbStory.entry_chapter_id || dbChapters[0]?.id || null;
@@ -1027,31 +1240,44 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
     const readHref = readerCtaState === 'completed'
         ? `/story/${storyId}/read?restart=1`
         : `/story/${storyId}/read`;
+    const isStoryOwner = !!user && dbStory.user_id === user.id;
     const storyTypeLabel = resolveStoryTypeLabel(dbStory.category);
     const completionLabel = resolveCompletionLabel(dbStory.completion_status);
+    const writingStyleLabel = resolveWritingStyleLabel(dbStory.writing_style);
+    const ratingLabel = resolveRatingLabel(dbStory.rating);
+    const mainCategoryLabel = getMainCategoryLabel(dbStory.main_category);
+    const subCategoryLabel = getSubCategoryLabel(dbStory.sub_category);
+    const displayCategoryLabel = subCategoryLabel || mainCategoryLabel || storyTypeLabel;
+    const authorProfileHref = `/writer/${dbStory.user_id}`;
+    const resolvedAuthorSummary: AuthorSummary = authorSummary || {
+        id: dbStory.user_id,
+        penName: dbStory.pen_name,
+        bio: '',
+        avatarUrl: null,
+    };
+    const authorInitial = resolvedAuthorSummary.penName.trim().charAt(0).toUpperCase() || 'W';
+    const tagList = normalizeTagList(dbStory.tags);
+    const metadataChips = [
+        completionLabel,
+        writingStyleLabel,
+        ratingLabel,
+        isBranchingStory ? 'โต้ตอบได้' : 'อ่านต่อเนื่อง',
+        dbStory.fandom?.trim() || null,
+        ...tagList,
+    ]
+        .map((chip) => (typeof chip === 'string' ? chip.trim() : ''))
+        .filter((chip) => chip.length > 0)
+        .slice(0, 8);
     const chapterSource = isBranchingStory
         ? dbChapters.filter((chapter) => chapter.id === entryChapterId || (entryChapterId === null && dbChapters.indexOf(chapter) === 0))
         : dbChapters;
-    const canToggleChapterList = !isBranchingStory && chapterSource.length > 3;
+    const canToggleChapterList = !isBranchingStory && chapterSource.length > 6;
     const displayChapters = isBranchingStory
         ? chapterSource
-        : (isChapterListExpanded ? chapterSource : chapterSource.slice(0, 3));
-    const showFollowButton = !isStoryOwner;
-    const authorProfileHref = `/writer/${dbStory.user_id}`;
-    const summaryItems: Array<{ label: string; value: string; accent?: boolean }> = [
-        { label: 'หมวดหมู่', value: storyTypeLabel },
-        { label: 'สถานะ', value: completionLabel, accent: true },
-        { label: 'จำนวนตอน', value: totalChapters.toLocaleString('th-TH') },
-        { label: 'ยอดอ่านรวม', value: totalViews.toLocaleString('th-TH') },
-        { label: 'ถูกใจ', value: likeCount.toLocaleString('th-TH') },
-        { label: 'ผู้ติดตาม', value: effectiveFollowerCount.toLocaleString('th-TH') },
-    ];
-    const chapterSectionTitle = isBranchingStory ? 'ตอนเริ่มต้น' : 'รายการตอน';
-    const chapterSectionMeta = isBranchingStory
-        ? 'เริ่มจากตอนเริ่มต้นและดำเนินเรื่องต่อด้วยการเลือกเส้นทาง'
-        : canToggleChapterList
-            ? `กำลังแสดง ${displayChapters.length.toLocaleString('th-TH')} จาก ${chapterSource.length.toLocaleString('th-TH')} ตอน`
-            : `กำลังแสดง ${chapterSource.length.toLocaleString('th-TH')} ตอน`;
+        : (isChapterListExpanded ? chapterSource : chapterSource.slice(0, 6));
+    const synopsisContent = dbStory.synopsis || 'ยังไม่มีเรื่องย่อสำหรับเรื่องนี้';
+    const hasSynopsisPreviewToggle = synopsisContent.trim().length > 180;
+    const commentPreviewItems = commentPreview.slice(0, STORY_COMMENT_PREVIEW_LIMIT);
     const readActionLabel = dbChapters.length === 0
         ? 'เริ่มอ่าน'
         : readerCtaState === 'completed'
@@ -1059,103 +1285,56 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
             : readerCtaState === 'in_progress'
                 ? 'อ่านต่อ'
                 : 'เริ่มอ่าน';
+    const readActionLabelMain = dbChapters.length === 0
+        ? 'ยังไม่มีตอน'
+        : readerCtaState === 'completed'
+            ? 'อ่านซ้ำเลย'
+            : readerCtaState === 'in_progress'
+                ? 'อ่านต่อเลย'
+                : 'เริ่มอ่านเลย';
     const actionNote = dbChapters.length === 0
         ? 'ยังไม่มีตอนที่เผยแพร่'
         : readerCtaState === 'completed'
             ? 'เริ่มใหม่จากตอนแรก'
             : readerCtaState === 'in_progress'
-                ? 'อ่านต่อจากจุดที่คุณอ่านล่าสุด'
+                ? 'อ่านต่อจากจุดล่าสุด'
                 : 'เริ่มจากตอนเปิดเรื่อง';
-    const readCtaVariantClassName = readerCtaState === 'completed'
-        ? styles.readCtaCompleted
-        : readerCtaState === 'in_progress'
-            ? styles.readCtaInProgress
-            : styles.readCtaUnread;
     const storyShareText = dbStory.synopsis.trim() || 'อ่านเรื่องนี้บน FlowFic';
-    const storyDetailMobileActions = (
-        <div className="ffMobileActionInner">
-            <Link
-                href={readHref}
-                className={`ffMobileActionBtn ffMobileActionBtnPrimary ${styles.mobileActionBtn} ${readCtaVariantClassName}`}
-                onClick={persistStoryDetailReturnState}
-            >
-                <PlaySquare size={18} fill="currentColor" />
-                <span>{readActionLabel}</span>
-            </Link>
-            {showFollowButton && (
-                <button
-                    type="button"
-                    className={[
-                        'ffMobileActionBtn',
-                        effectiveIsFollowing ? 'ffMobileActionBtnPrimary' : 'ffMobileActionBtnSecondary',
-                        styles.mobileActionBtn,
-                    ].join(' ')}
-                    onClick={toggleFollow}
-                    disabled={isFollowLoading}
-                >
-                    {effectiveIsFollowing ? <UserCheck size={18} /> : <UserPlus size={18} />}
-                    <span>{effectiveIsFollowing ? 'กำลังติดตาม' : 'ติดตาม'}</span>
-                </button>
-            )}
-        </div>
-    );
+    const statItems = [
+        { label: 'ยอดเลิฟ', value: likeCount.toLocaleString('th-TH'), tone: 'love' as const },
+        { label: 'ชั้นหนังสือ', value: effectiveFollowerCount.toLocaleString('th-TH'), tone: 'shelf' as const },
+        { label: 'จำนวนตอน', value: totalChapters.toLocaleString('th-TH'), tone: 'neutral' as const },
+        { label: 'ยอดอ่าน', value: totalViews.toLocaleString('th-TH'), tone: 'neutral' as const },
+    ];
 
     const renderChapterItem = (chapter: DBChapter) => {
         const chapterIndex = dbChapters.findIndex((item) => item.id === chapter.id);
         const safeChapterIndex = chapterIndex >= 0 ? chapterIndex : Math.max(0, chapter.order_index);
-        const chapterNumber = chapterIndex >= 0 ? chapterIndex + 1 : chapter.order_index + 1;
         const isPremium = chapter.is_premium && chapter.coin_price > 0;
-        const isAccessiblePremium = isPremium && chapter.can_read;
-        const premiumStatusLabel = !isPremium
-            ? null
-            : !chapter.can_read
-                ? `${chapter.coin_price.toLocaleString('th-TH')} เหรียญ`
-                : chapter.access_source === 'unlock'
-                    ? 'ปลดล็อกแล้ว'
-                    : chapter.access_source === 'vip'
-                        ? 'สิทธิ์ VIP'
-                        : chapter.access_source === 'owner'
-                            ? 'พรีเมียม'
-                            : 'อ่านได้';
-        const premiumStatusClass = !isPremium
-            ? ''
-            : isAccessiblePremium
-                ? styles.chapterStatusAccessible
-                : styles.chapterStatusPremium;
-        const chapterActionLabel = !isPremium || chapter.can_read
-            ? (isBranchingStory ? 'เริ่มอ่าน' : 'อ่าน')
-            : `ปลดล็อก ${chapter.coin_price.toLocaleString('th-TH')} เหรียญ`;
+        const isLocked = isPremium && !chapter.can_read;
 
         return (
             <button
                 key={chapter.id}
                 type="button"
-                className={[styles.chapterItem, isBranchingStory && styles.chapterItemBranching].filter(Boolean).join(' ')}
+                className={styles.chapterRow}
                 onClick={() => handleChapterClick(chapter, safeChapterIndex)}
             >
-                {!isBranchingStory && (
-                    <span className={styles.chapterNumber}>
-                        {String(chapterNumber).padStart(2, '0')}
+                <span className={styles.chapterRowBody}>
+                    <span className={styles.chapterRowTitle}>{chapter.title}</span>
+                    <span className={styles.chapterRowMeta}>
+                        <span><Clock size={12} /> {formatThaiRelativeTime(chapter.created_at)}</span>
+                        <span><Eye size={12} /> {chapter.read_count.toLocaleString('th-TH')}</span>
                     </span>
+                </span>
+                {isLocked ? (
+                    <span className={styles.chapterRowLockWrap}>
+                        <span className={styles.chapterRowPrice}>{chapter.coin_price.toLocaleString('th-TH')} เหรียญ</span>
+                        <span className={styles.chapterRowLockIcon}><Lock size={12} /></span>
+                    </span>
+                ) : (
+                    <span className={styles.chapterRowArrow}><ChevronRight size={18} /></span>
                 )}
-                <span className={styles.chapterBody}>
-                    <span className={styles.chapterHeadingRow}>
-                        <span className={styles.chapterTitle}>{chapter.title}</span>
-                        {premiumStatusLabel && (
-                            <span className={`${styles.chapterStatus} ${premiumStatusClass}`.trim()}>
-                                {premiumStatusLabel}
-                            </span>
-                        )}
-                    </span>
-                    <span className={styles.chapterMeta}>
-                        <span>{chapter.read_count.toLocaleString('th-TH')} อ่าน</span>
-                        <span>{formatThaiDate(chapter.created_at)}</span>
-                    </span>
-                </span>
-                <span className={styles.chapterActionLabel}>{chapterActionLabel}</span>
-                <span className={[styles.chapterAction, isBranchingStory && styles.chapterActionBranching].filter(Boolean).join(' ')}>
-                    {!isPremium || chapter.can_read ? <ChevronRight size={16} /> : <Lock size={14} />}
-                </span>
             </button>
         );
     };
@@ -1163,113 +1342,159 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
     return (
         <main className={styles.main}>
             <SharedNavbar
+                variant="case"
                 user={user}
                 isLoadingAuth={isLoadingAuth}
                 coinBalance={coinBalance}
                 unreadNotifCount={unreadNotifCount}
-                searchValue={topSearchInput}
-                onSearchChange={setTopSearchInput}
-                onSearchSubmit={handleTopSearchSubmit}
-                searchPanel={searchPanelContent}
-                onDashboardAccess={handleDashboardAccess}
                 isProfileMenuOpen={isProfileMenuOpen}
                 profileMenuRef={profileMenuRef}
                 onToggleProfileMenu={() => setIsProfileMenuOpen((prev) => !prev)}
                 onCloseProfileMenu={() => setIsProfileMenuOpen(false)}
-                onOpenLogin={() => {
-                    setAuthError(null);
-                    openLoginPage(`/story/${storyId}`);
+                onDashboardAccess={(event) => {
+                    if (user) return;
+                    event.preventDefault();
+                    router.push(`/login?next=${encodeURIComponent('/dashboard')}`);
                 }}
                 onSignOut={handleSignOut}
+                onOpenLogin={() => router.push(`/login?next=${encodeURIComponent(`/story/${storyId}`)}`)}
+                lovesLabel="รักเลย"
             />
 
-            <div className="ffPageContainer">
-                <section className={styles.heroSection}>
-                    <div className={styles.heroBackdrop} style={{ backgroundImage: `url(${heroBackdrop})` }} />
-                    <div className={styles.heroGradient} />
-                    <div className={styles.heroInner}>
-                        <div className={styles.heroCoverWrap}>
-                            <img src={cover} alt={dbStory.title} className={styles.heroCoverImage} />
-                        </div>
-                        <div className={styles.heroCopy}>
-                            <div className={styles.heroMetaRow}>
-                                <span className={styles.heroMetaTag}>{storyTypeLabel}</span>
-                                <span className={styles.heroMetaDot} />
-                                <span className={styles.heroMetaTag}>เรื่องแนะนำ</span>
-                                {isBranchingStory && (
-                                    <span className={styles.pathModePill}>โต้ตอบได้</span>
-                                )}
-                            </div>
-                            <h1 className={styles.heroTitle}>{dbStory.title}</h1>
-                            <p className={styles.heroAuthor}>
-                                โดย{' '}
-                                <Link href={authorProfileHref} className={styles.authorLink}>
-                                    {dbStory.pen_name}
-                                </Link>
-                            </p>
-                            <div className={styles.heroActions}>
-                                <Link
-                                    href={readHref}
-                                    className={`${styles.primaryActionBtn} ${readCtaVariantClassName}`}
-                                    onClick={persistStoryDetailReturnState}
-                                >
-                                    <PlaySquare size={18} fill="currentColor" />
-                                    {readActionLabel}
-                                </Link>
-                                <ShareButton
-                                    title={dbStory.title}
-                                    text={storyShareText}
-                                    urlPath={`/story/${storyId}`}
-                                    idleLabel="แชร์"
-                                    className={styles.shareBtn}
-                                    sharedLabel="แชร์แล้ว"
-                                    copiedLabel="คัดลอกแล้ว"
-                                    errorLabel="แชร์ไม่สำเร็จ"
-                                />
-                                {showFollowButton && (
+            <section className={styles.hero}>
+                <div className={styles.heroBackdrop} style={{ backgroundImage: `url(${heroBackdrop})` }} />
+                <div className={styles.heroShade} />
+                <div className={styles.heroContent}>
+                    <span className={styles.categoryPill}>{displayCategoryLabel}</span>
+                    <h1 className={styles.heroTitle}>{dbStory.title}</h1>
+                    <p className={styles.heroAuthor}>
+                        โดย <Link href={authorProfileHref}>{dbStory.pen_name}</Link>
+                    </p>
+                    <div className={styles.heroMeta}>
+                        <span className={styles.heroRating}>
+                            <Star size={14} fill="currentColor" />
+                            {ratingLabel}
+                        </span>
+                        <span>{totalChapters.toLocaleString('th-TH')} ตอน</span>
+                        <span>{totalViews.toLocaleString('th-TH')} วิว</span>
+                    </div>
+                    <div className={styles.heroActionRow}>
+                        <ShareButton
+                            title={dbStory.title}
+                            text={storyShareText}
+                            urlPath={`/story/${storyId}`}
+                            idleLabel="แชร์เรื่องนี้"
+                            className={styles.heroShareButton}
+                            sharedLabel="แชร์แล้ว"
+                            copiedLabel="คัดลอกแล้ว"
+                            errorLabel="ไม่สำเร็จ"
+                        />
+                    </div>
+                </div>
+            </section>
+
+            <section className={styles.content}>
+                <nav className={styles.tabs} aria-label="Story tabs">
+                    <button
+                        type="button"
+                        className={`${styles.tabButton} ${activeTab === 'overview' ? styles.tabButtonActive : ''}`.trim()}
+                        onClick={() => setActiveTab('overview')}
+                    >
+                        เรื่องย่อ
+                    </button>
+                    <button
+                        type="button"
+                        className={`${styles.tabButton} ${activeTab === 'chapters' ? styles.tabButtonActive : ''}`.trim()}
+                        onClick={() => setActiveTab('chapters')}
+                    >
+                        รายการตอน
+                    </button>
+                    <button
+                        type="button"
+                        className={`${styles.tabButton} ${activeTab === 'comments' ? styles.tabButtonActive : ''}`.trim()}
+                        onClick={() => setActiveTab('comments')}
+                    >
+                        ความคิดเห็น
+                    </button>
+                </nav>
+
+                <div className={styles.tabContent}>
+                    {activeTab === 'overview' && (
+                        <div className={styles.overviewStack}>
+                            <section className={styles.overviewCard}>
+                                <div className={styles.overviewHead}>
+                                    <h2>เรื่องย่อ</h2>
+                                    <span>{readActionLabel}</span>
+                                </div>
+                                <p className={`${styles.synopsisText} ${!isSynopsisExpanded ? styles.synopsisCollapsed : ''}`.trim()}>
+                                    {synopsisContent}
+                                </p>
+                                {hasSynopsisPreviewToggle && (
                                     <button
                                         type="button"
-                                        className={`${styles.followBtn} ${effectiveIsFollowing ? styles.followBtnActive : ''}`}
-                                        onClick={toggleFollow}
-                                        disabled={isFollowLoading}
+                                        className={styles.synopsisToggleButton}
+                                        onClick={() => setIsSynopsisExpanded((prev) => !prev)}
                                     >
-                                        {effectiveIsFollowing ? <UserCheck size={16} /> : <Bookmark size={16} />}
-                                        <span>{effectiveIsFollowing ? 'บันทึกแล้ว' : 'บันทึกเรื่อง'}</span>
+                                        {isSynopsisExpanded ? 'ย่อเรื่องย่อ' : 'อ่านต่อ'}
                                     </button>
                                 )}
-                            </div>
-                            <p className={styles.actionNote}>{actionNote}</p>
+                                {metadataChips.length > 0 && (
+                                    <div className={styles.tagList}>
+                                        {metadataChips.map((tag) => (
+                                            <span key={`tag-${tag}`} className={styles.tagChip}>#{tag}</span>
+                                        ))}
+                                    </div>
+                                )}
+                            </section>
+
+                            <section className={styles.promoCard}>
+                                <div>
+                                    <h3>สนับสนุนนักเขียนด้วยการอ่านต่อ</h3>
+                                    <p>{actionNote}</p>
+                                </div>
+                                <Link href={readHref} className={styles.promoButton} onClick={persistStoryDetailReturnState}>
+                                    ไปหน้าอ่าน
+                                </Link>
+                            </section>
+
+                            <section className={styles.statsGrid}>
+                                {statItems.map((item) => (
+                                    <article key={item.label} className={styles.statCard}>
+                                        <p>{item.label}</p>
+                                        <strong className={item.tone === 'love' ? styles.statLove : item.tone === 'shelf' ? styles.statShelf : ''}>
+                                            {item.value}
+                                        </strong>
+                                    </article>
+                                ))}
+                            </section>
+
+                            <section className={styles.authorCard}>
+                                <div className={styles.authorAvatar}>
+                                    {resolvedAuthorSummary.avatarUrl ? (
+                                        <img
+                                            src={resolvedAuthorSummary.avatarUrl}
+                                            alt={resolvedAuthorSummary.penName}
+                                            className={styles.authorAvatarImage}
+                                        />
+                                    ) : (
+                                        <span>{authorInitial}</span>
+                                    )}
+                                </div>
+                                <div className={styles.authorBody}>
+                                    <p className={styles.authorName}>{resolvedAuthorSummary.penName}</p>
+                                    <p className={styles.authorBio}>
+                                        {resolvedAuthorSummary.bio.trim() || 'นักเขียนยังไม่ได้เพิ่มคำแนะนำตัวเอง'}
+                                    </p>
+                                    <Link href={authorProfileHref} className={styles.authorLinkBtn}>
+                                        ดูโปรไฟล์นักเขียน
+                                    </Link>
+                                </div>
+                            </section>
                         </div>
-                    </div>
-                </section>
+                    )}
 
-                <section className={styles.statsStrip}>
-                    <div className={styles.statsInner}>
-                        {summaryItems.map((item) => (
-                            <div key={item.label} className={styles.statsItem}>
-                                <span className={styles.statsLabel}>{item.label}</span>
-                                <strong className={`${styles.statsValue} ${item.accent ? styles.statsValueAccent : ''}`}>
-                                    {item.value}
-                                </strong>
-                            </div>
-                        ))}
-                    </div>
-                </section>
-
-                <div className={styles.contentGrid}>
-                    <div className={styles.mainColumn}>
-                        <section className={styles.panel}>
-                            <div className={styles.panelHeader}>
-                                <h2 className={`${styles.panelTitle} ${styles.panelTitleSynopsis}`}>เรื่องย่อ</h2>
-                            </div>
-                            <p className={styles.synopsisText}>{dbStory.synopsis || 'ยังไม่มีเรื่องย่อสำหรับเรื่องนี้'}</p>
-                        </section>
-
-                        <section className={styles.panel}>
-                            <div className={styles.panelHeader}>
-                                <h2 className={styles.panelTitle}>{chapterSectionTitle}</h2>
-                                <span className={styles.panelMeta}>{chapterSectionMeta}</span>
-                            </div>
+                    {activeTab === 'chapters' && (
+                        <div className={styles.chapterListWrap}>
                             {displayChapters.length === 0 ? (
                                 <div className={styles.emptyState}>ยังไม่มีตอนที่เผยแพร่</div>
                             ) : (
@@ -1280,128 +1505,96 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
                             {canToggleChapterList && (
                                 <button
                                     type="button"
-                                    className={styles.chapterToggleBtn}
+                                    className={styles.chapterToggleButton}
                                     onClick={() => setIsChapterListExpanded((prev) => !prev)}
                                 >
                                     {isChapterListExpanded ? 'แสดงน้อยลง' : 'ดูตอนทั้งหมด'}
                                 </button>
                             )}
-                        </section>
+                        </div>
+                    )}
 
-                        {storyCharacters.length > 0 && (
-                            <section className={styles.panel}>
-                                <div className={styles.panelHeader}>
-                                    <h2 className={styles.panelTitle}>ตัวละคร ({storyCharacters.length.toLocaleString('th-TH')})</h2>
-                                </div>
-                                <div className={styles.characterShowcase}>
-                                    <div className={styles.characterCardGrid}>
-                                        {storyCharacters.map((character) => (
-                                            <article key={character.id} className={styles.readerCharacterCard}>
-                                                <div className={styles.readerCharacterPortrait}>
-                                                    {character.image_url ? (
-                                                        <img
-                                                            src={character.image_url}
-                                                            alt={character.name}
-                                                            className={styles.readerCharacterImage}
-                                                        />
-                                                    ) : (
-                                                        <div className={styles.readerCharacterPlaceholder}>
-                                                            {character.name.trim().charAt(0)}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className={styles.readerCharacterInfo}>
-                                                    <h3 className={styles.readerCharacterName}>{character.name}</h3>
-                                                    {character.age && (
-                                                        <div className={styles.readerCharacterMeta}>อายุ: {character.age}</div>
-                                                    )}
-                                                    {character.occupation && (
-                                                        <div className={styles.readerCharacterMeta}>อาชีพ: {character.occupation}</div>
-                                                    )}
-                                                </div>
-                                            </article>
-                                        ))}
-                                    </div>
-                                </div>
-                            </section>
-                        )}
-                    </div>
-
-                    <aside className={styles.sideColumn}>
-                        <section className={styles.sidePanel}>
-                            <h3 className={styles.sidePanelTitle}>
-                                ผลงานอื่นของ{' '}
-                                <Link href={authorProfileHref} className={styles.authorLink}>
-                                    {dbStory.pen_name}
-                                </Link>
-                            </h3>
-                            {relatedStories.length === 0 ? (
-                                <p className={styles.relatedEmpty}>ยังไม่มีเรื่องอื่นที่เผยแพร่</p>
+                    {activeTab === 'comments' && (
+                        <div className={styles.commentWrap}>
+                            <div className={styles.commentHead}>
+                                <h3>{commentPreviewItems.length.toLocaleString('th-TH')} ความคิดเห็นล่าสุด</h3>
+                                <span>ล่าสุด</span>
+                            </div>
+                            {commentPreviewItems.length === 0 ? (
+                                <div className={styles.emptyState}>ยังไม่มีคอมเมนต์ในเรื่องนี้</div>
                             ) : (
-                                <div className={styles.relatedList}>
-                                    {relatedStories.map((story) => (
-                                        <Link key={story.id} href={`/story/${story.id}`} className={styles.relatedItem}>
-                                            <div className={styles.relatedCover}>
-                                                <img src={story.cover} alt={story.title} className={styles.relatedCoverImage} />
+                                <div className={styles.commentList}>
+                                    {commentPreviewItems.map((comment) => (
+                                        <article key={comment.id} className={styles.commentItem}>
+                                            <div className={styles.commentAvatar}>
+                                                {comment.avatarUrl ? (
+                                                    <img src={comment.avatarUrl} alt={comment.penName} className={styles.commentAvatarImage} />
+                                                ) : (
+                                                    <span>{comment.penName.trim().charAt(0).toUpperCase() || 'U'}</span>
+                                                )}
                                             </div>
-                                            <div className={styles.relatedInfo}>
-                                                <h4 className={styles.relatedTitle}>{story.title}</h4>
-                                                <p className={styles.relatedMeta}>{story.categoryLabel} · {story.completionLabel}</p>
-                                                <p className={styles.relatedStat}>
-                                                    {story.readCount.toLocaleString('th-TH')} อ่าน · {formatThaiDate(story.createdAt)}
+                                            <div className={styles.commentBody}>
+                                                <p className={styles.commentMeta}>
+                                                    <strong>{comment.penName}</strong>
+                                                    <span>{formatThaiRelativeTime(comment.createdAt)}</span>
                                                 </p>
+                                                <p className={styles.commentText}>{comment.content}</p>
+                                                <div className={styles.commentActions}>
+                                                    <Link
+                                                        href={`/story/${storyId}/read`}
+                                                        className={styles.commentReplyButton}
+                                                        onClick={persistStoryDetailReturnState}
+                                                    >
+                                                        <MessageCircle size={12} />
+                                                        ตอบกลับ
+                                                    </Link>
+                                                </div>
                                             </div>
-                                        </Link>
+                                        </article>
                                     ))}
                                 </div>
                             )}
-                        </section>
-
-                    </aside>
+                        </div>
+                    )}
                 </div>
-            </div>
+            </section>
 
-            <div className="ffMobileActionBar">
-                {storyDetailMobileActions}
-            </div>
+            <footer className={styles.bottomBar}>
+                <button
+                    type="button"
+                    className={`${styles.likeButton} ${isLiked ? styles.likeButtonActive : ''}`.trim()}
+                    onClick={handleToggleLike}
+                    disabled={isLikePending}
+                    aria-label="กดเลิฟ"
+                >
+                    <Heart size={22} fill={isLiked ? 'currentColor' : 'none'} />
+                </button>
 
-            {isAuthDialogOpen && (
-                <div
-                    className={styles.authDialogOverlay}
-                    onClick={() => {
-                        setIsAuthDialogOpen(false);
-                        setAuthError(null);
+                <button
+                    type="button"
+                    className={styles.shelfButton}
+                    onClick={toggleFollow}
+                    disabled={isStoryOwner || isFollowLoading}
+                >
+                    <BookOpen size={18} />
+                    {isStoryOwner ? 'เรื่องของคุณ' : effectiveIsFollowing ? 'อยู่ในชั้นแล้ว' : 'เพิ่มเข้าชั้น'}
+                </button>
+
+                <Link
+                    href={readHref}
+                    className={`${styles.readButton} ${dbChapters.length === 0 ? styles.readButtonDisabled : ''}`.trim()}
+                    onClick={(event) => {
+                        if (dbChapters.length === 0) {
+                            event.preventDefault();
+                            return;
+                        }
+                        persistStoryDetailReturnState();
                     }}
                 >
-                    <div className={styles.authDialogCard} onClick={(event) => event.stopPropagation()}>
-                        <button
-                            type="button"
-                            className={styles.authDialogClose}
-                            onClick={() => {
-                                setIsAuthDialogOpen(false);
-                                setAuthError(null);
-                            }}
-                            aria-label="ปิด"
-                        >
-                            <X size={18} />
-                        </button>
-                        <h3 className={styles.authDialogTitle}>เข้าสู่ระบบก่อนเข้าแดชบอร์ดนักเขียน</h3>
-                        <p className={styles.authDialogMessage}>
-                            เข้าสู่ระบบเพื่อดูสถิติ จัดการเรื่อง และเครื่องมือเผยแพร่สำหรับนักเขียน
-                        </p>
-                        {authError && <p className={styles.authDialogError}>{authError}</p>}
-                        <div className={styles.authDialogActions}>
-                            <button
-                                type="button"
-                                className={styles.authDialogPrimaryBtn}
-                                onClick={() => openLoginPage('/dashboard')}
-                            >
-                                เข้าสู่ระบบ FlowFic
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+                    <Eye size={18} />
+                    {readActionLabelMain}
+                </Link>
+            </footer>
 
             {/* Coin Spending Dialog */}
             {unlockConfirmChapter && (

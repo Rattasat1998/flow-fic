@@ -20,6 +20,20 @@
     grid-template-columns: auto 1fr;
 }
 
+.navbarCase {
+    height: 70px;
+    background: rgba(10, 12, 18, 0.9);
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.navbarCase .navRight {
+    gap: 0.62rem;
+}
+
+.navbarCase .navSearchShell {
+    width: min(48vw, 440px);
+}
+
 .navLeft,
 .navRight {
     display: inline-flex;
@@ -37,13 +51,25 @@
 }
 
 .logo {
-    color: #f8fbff;
+    display: inline-flex;
+    align-items: center;
     flex-shrink: 0;
-    text-decoration: none;
-    font-size: 1rem;
+}
+
+.caseBrandWrap {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.12rem;
+}
+
+.caseBrandMeta {
+    font-size: 0.56rem;
     font-weight: 800;
-    letter-spacing: -0.02em;
-    line-height: 1;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(245, 199, 110, 0.78);
+    padding-left: 2.05rem;
 }
 
 .navSearchShell {
@@ -74,19 +100,19 @@
 }
 
 .navSearchWrap:focus-within {
-    border-color: rgba(255, 143, 112, 0.58);
+    border-color: rgba(245, 158, 11, 0.58);
     background: rgba(255, 255, 255, 0.11);
-    box-shadow: 0 0 0 3px rgba(255, 143, 112, 0.14);
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.14);
 }
 
 .navSearchWrap:focus-within .navSearchIcon {
-    color: rgba(255, 228, 220, 0.9);
+    color: rgba(255, 229, 173, 0.9);
 }
 
 .navSearchWrap:focus-within .navSearchHint {
-    border-color: rgba(255, 143, 112, 0.26);
+    border-color: rgba(245, 158, 11, 0.26);
     background: rgba(255, 255, 255, 0.06);
-    color: rgba(255, 228, 220, 0.82);
+    color: rgba(255, 229, 173, 0.82);
 }
 
 .navSearchIcon {
@@ -140,6 +166,25 @@
     padding: 0.75rem;
 }
 
+.caseMobileSearchBtn {
+    display: none;
+    width: 33px;
+    height: 33px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.85);
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.16s ease, color 0.16s ease;
+}
+
+.caseMobileSearchBtn:hover {
+    background: rgba(245, 158, 11, 0.16);
+    color: #f8d58a;
+}
+
 .pricingLink,
 .dashboardLink {
     color: rgba(239, 242, 248, 0.82);
@@ -174,8 +219,8 @@
     padding: 0 0.66rem;
     border-radius: 999px;
     border: 1px solid rgba(255, 200, 74, 0.4);
-    background: linear-gradient(180deg, rgba(255, 216, 128, 0.24) 0%, rgba(255, 168, 36, 0.14) 100%);
-    color: #ffd990;
+    background: linear-gradient(180deg, rgba(245, 204, 120, 0.24) 0%, rgba(245, 158, 11, 0.14) 100%);
+    color: #f8d58a;
     font-size: 0.76rem;
     font-weight: 800;
     white-space: nowrap;
@@ -234,14 +279,20 @@
 .navLoginBtn {
     min-height: 34px;
     border-radius: 999px;
-    border: 1px solid rgba(255, 143, 112, 0.5);
-    background: linear-gradient(180deg, rgba(255, 143, 112, 0.3) 0%, rgba(255, 78, 58, 0.22) 100%);
-    color: #ffe2d7;
+    border: 1px solid rgba(245, 158, 11, 0.5);
+    background: linear-gradient(180deg, rgba(245, 158, 11, 0.3) 0%, rgba(180, 83, 9, 0.22) 100%);
+    color: #ffefd0;
     font-size: 0.77rem;
     font-weight: 800;
     padding: 0 0.84rem;
     cursor: pointer;
     transition: transform 0.16s ease, filter 0.16s ease;
+}
+
+.caseNavLoginBtn {
+    min-height: 36px;
+    padding: 0 0.76rem;
+    border-radius: 10px;
 }
 
 .navLoginBtn:hover {
@@ -304,12 +355,9 @@
 }
 
 .mobileDrawerBrand {
-    color: #f8fbff;
+    display: inline-flex;
+    align-items: center;
     text-decoration: none;
-    font-size: 0.96rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    line-height: 1;
 }
 
 .mobileDrawerCloseBtn {
@@ -382,13 +430,46 @@
 }
 
 .mobileDrawerLoginBtn {
-    border: 1px solid rgba(255, 143, 112, 0.52);
-    background: linear-gradient(180deg, rgba(255, 143, 112, 0.32) 0%, rgba(214, 77, 43, 0.3) 100%);
-    color: #ffe2d7;
+    border: 1px solid rgba(245, 158, 11, 0.52);
+    background: linear-gradient(180deg, rgba(245, 158, 11, 0.32) 0%, rgba(180, 83, 9, 0.3) 100%);
+    color: #ffefd0;
 }
 
 .profileMenuWrapper {
     position: relative;
+}
+
+.caseProfileMenuWrapper {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.62rem;
+}
+
+.caseAgentInfo {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.05rem;
+    min-width: 0;
+}
+
+.caseAgentInfo span {
+    color: rgba(173, 184, 203, 0.74);
+    font-size: 0.56rem;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+}
+
+.caseAgentInfo strong {
+    color: #f8fbff;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    max-width: 120px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .profileAvatarBtn {
@@ -406,16 +487,22 @@
     transition: border-color 0.16s ease, background-color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
 }
 
+.caseProfileAvatarBtn {
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+}
+
 .profileAvatarBtn:hover {
-    border-color: rgba(255, 143, 112, 0.78);
+    border-color: rgba(245, 158, 11, 0.78);
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.08) 100%);
     transform: translateY(-1px);
 }
 
 .profileAvatarBtn:focus-visible {
     outline: none;
-    border-color: rgba(255, 143, 112, 0.9);
-    box-shadow: 0 0 0 3px rgba(255, 143, 112, 0.28), 0 10px 22px rgba(0, 0, 0, 0.3);
+    border-color: rgba(245, 158, 11, 0.9);
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.28), 0 10px 22px rgba(0, 0, 0, 0.3);
 }
 
 .userAvatar {
@@ -431,7 +518,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(180deg, #ff8f70 0%, #d64d2b 100%);
+    background: linear-gradient(180deg, #f59e0b 0%, #b45309 100%);
     color: #ffffff;
     font-weight: 800;
     font-size: 0.86rem;
@@ -472,7 +559,7 @@
     border-radius: 12px;
     overflow: hidden;
     flex-shrink: 0;
-    background: linear-gradient(180deg, #ff8f70 0%, #d64d2b 100%);
+    background: linear-gradient(180deg, #f59e0b 0%, #b45309 100%);
     color: #ffffff;
     display: flex;
     align-items: center;
@@ -550,8 +637,8 @@
 
 .profileDropdownItem:focus-visible {
     outline: none;
-    border-color: rgba(255, 143, 112, 0.7);
-    box-shadow: 0 0 0 2px rgba(255, 143, 112, 0.2);
+    border-color: rgba(245, 158, 11, 0.7);
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
 }
 
 .profileDropdownLogout {
@@ -591,6 +678,29 @@
     .profileMenuWrapper,
     .navLoginBtn,
     .authLoading {
+        display: none;
+    }
+
+    .navbarCase {
+        height: 62px;
+    }
+
+    .navbarCase .caseMobileSearchBtn,
+    .navbarCase .notifBellBtn,
+    .navbarCase .profileMenuWrapper,
+    .navbarCase .navLoginBtn {
+        display: inline-flex;
+    }
+
+    .navbarCase .caseAgentInfo {
+        display: none;
+    }
+
+    .navbarCase .mobileMenuBtn {
+        display: none;
+    }
+
+    .navbarCase .caseBrandMeta {
         display: none;
     }
 }

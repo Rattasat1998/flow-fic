@@ -1,8 +1,12 @@
 .root {
   --brand-logo-size: 28px;
-  --brand-logo-ink: #0f172a;
+  --brand-word-ink: #0f172a;
+  --brand-mark-badge: #0f172a;
+  --brand-mark-badge-stroke: transparent;
+  --brand-mark-glyph: #f97316;
   display: inline-flex;
   align-items: center;
+  gap: calc(var(--brand-logo-size) * 0.24);
   line-height: 1;
   vertical-align: middle;
   flex-shrink: 0;
@@ -13,21 +17,57 @@
   text-decoration: none;
 }
 
-.wordmark,
-.monogram {
+.variantWordmark {
+  gap: 0;
+}
+
+.variantMark {
+  gap: 0;
+}
+
+.variantLockup {
+  gap: calc(var(--brand-logo-size) * 0.24);
+}
+
+.toneLight {
+  --brand-word-ink: #0f172a;
+}
+
+.toneDark {
+  --brand-word-ink: #f8fbff;
+  --brand-mark-badge-stroke: rgba(248, 251, 255, 0.2);
+}
+
+.toneMono {
+  --brand-word-ink: currentColor;
+  --brand-mark-badge: transparent;
+  --brand-mark-badge-stroke: currentColor;
+  --brand-mark-glyph: currentColor;
+}
+
+.wordmark {
   display: inline-block;
-  color: var(--brand-logo-ink);
+  color: var(--brand-word-ink);
   font-family: inherit;
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.02em;
-}
-
-.wordmark {
   font-size: calc(var(--brand-logo-size) * 0.9);
 }
 
-.monogram {
-  font-size: calc(var(--brand-logo-size) * 0.82);
-  letter-spacing: -0.03em;
+.mark {
+  width: var(--brand-logo-size);
+  height: var(--brand-logo-size);
+  flex-shrink: 0;
+  display: block;
+}
+
+.markBadge {
+  fill: var(--brand-mark-badge);
+  stroke: var(--brand-mark-badge-stroke);
+  stroke-width: 2;
+}
+
+.markGlyph {
+  fill: var(--brand-mark-glyph);
 }

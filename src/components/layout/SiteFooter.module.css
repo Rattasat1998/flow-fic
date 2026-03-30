@@ -1,7 +1,9 @@
 .footer {
     margin-top: 0;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(4, 5, 8, 0.96);
+    background:
+        radial-gradient(circle at 50% -240%, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0) 72%),
+        rgba(7, 9, 14, 0.97);
     backdrop-filter: blur(6px);
 }
 
@@ -23,15 +25,15 @@
 }
 
 .brandName {
-    color: #f0f4fb;
-    font-size: 0.98rem;
-    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
 }
 
 .copy {
     margin: 0;
     color: rgba(240, 244, 251, 0.56);
     font-size: 0.72rem;
+    letter-spacing: 0.03em;
 }
 
 .links {
@@ -46,10 +48,26 @@
     color: rgba(240, 244, 251, 0.72);
     font-size: 0.74rem;
     font-weight: 600;
+    transition: color 0.16s ease;
 }
 
 .links a:hover {
-    color: #ffffff;
+    color: #f6ca72;
+}
+
+.cookieButton {
+    border: 0;
+    background: transparent;
+    color: rgba(240, 244, 251, 0.72);
+    font-size: 0.74rem;
+    font-weight: 600;
+    padding: 0;
+    cursor: pointer;
+    transition: color 0.16s ease;
+}
+
+.cookieButton:hover {
+    color: #f6ca72;
 }
 
 @media (max-width: 767px) {

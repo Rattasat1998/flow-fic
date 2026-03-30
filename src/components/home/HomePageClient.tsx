@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Heart, Settings, List, Eye } from 'lucide-react';
+import { Heart, Settings, Eye, Hash } from 'lucide-react';
 import styles from '@/app/home.module.css';
 import { supabase } from '@/lib/supabase';
 import {
@@ -44,6 +44,7 @@ const DISCOVERY_CACHE_PREFIX = 'ff_home_discovery::';
 const DISCOVERY_CACHE_TTL_MS = 5 * 60 * 1000;
 const HERO_ROTATION_MS = 7000;
 const HERO_STORY_LIMIT = 5;
+const QUICK_CASE_TAGS = ['ห้องปิดตาย', 'ฆาตกรต่อเนื่อง', 'จิตวิทยา', 'ย้อนยุค', 'นิติเวช', 'สายลับ'];
 
 type HomeRailState = {
   items: DiscoveryStory[];
@@ -731,7 +732,7 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
 
   const isGridMode = viewMode === 'grid';
   const renderHomeMediumCard = (story: DiscoveryStory, className: string, dataCard: string, imageSizes: string) => {
-    const isInteractiveStory = story.path_mode === 'branching';
+    const isNewStory = (story.published_chapter_count ?? 0) <= 16 && (story.total_view_count ?? 0) <= 350_000;
 
     return (
       <StoryMediumCard
@@ -744,26 +745,21 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
         dataCard={dataCard}
         enableTilt
         imageSizes={imageSizes}
+        variant="case"
+        badgeLabel={isNewStory ? 'Case New' : null}
         footer={(
           <div className={styles.mainCategoryShelfMetaRow}>
-            {story.writing_style === 'visual_novel' ? (
-              <span className={`${styles.posterModeChip} ${styles.posterVisualNovelChip}`}>Visual Novel</span>
-            ) : isInteractiveStory ? (
-              <span className={styles.posterModeChip}>Interactive</span>
-            ) : (
+            <div className={styles.mainCategoryShelfMetaStats}>
               <span className={styles.posterMetric}>
-                <List size={12} className={styles.posterMetricIcon} />
-                {story.published_chapter_count.toLocaleString('th-TH')} ตอน
+                <Hash size={11} className={styles.posterMetricIcon} />
+                {story.published_chapter_count.toLocaleString('th-TH')}
               </span>
-            )}
-            <span className={styles.posterMetric}>
-              <Eye size={12} className={styles.posterMetricIcon} />
-              {(story.total_view_count ?? 0).toLocaleString('th-TH')}
-            </span>
-            <span className={styles.posterMetric}>
-              <Heart size={12} className={styles.posterMetricIcon} />
-              {(story.total_like_count ?? 0).toLocaleString('th-TH')}
-            </span>
+              <span className={styles.posterMetric}>
+                <Eye size={11} className={styles.posterMetricIcon} />
+                {(story.total_view_count ?? 0).toLocaleString('th-TH')}
+              </span>
+            </div>
+            <Heart size={12} className={`${styles.posterMetricIcon} ${styles.mainCategoryShelfHeartIcon}`} />
           </div>
         )}
       />
@@ -788,6 +784,7 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
       <SharedNavbar
         navRef={navbarRef}
         navDataGsap="navbar"
+        variant="case"
         user={user}
         isLoadingAuth={isLoadingAuth}
         coinBalance={walletCoinBalance}
@@ -836,12 +833,6 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
             onDotClick={setHeroIndex}
           />
 
-          <TrendingSection
-            sectionRef={trendingSectionRef}
-            stories={trendingStories}
-            loading={trendingLoading}
-            error={trendingError}
-          />
 
           <CategoryShelvesSection
             sectionRef={mainCategoryMapSectionRef}
@@ -858,6 +849,15 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
             featuredStory={editorFeaturedStory}
             sideStories={editorSideStories}
           />
+
+          <section className={styles.quickTags} aria-label="แท็กยอดนิยม">
+            {QUICK_CASE_TAGS.map((tag) => (
+              <button key={tag} type="button" className={styles.quickTagButton}>
+                <Hash size={12} />
+                {tag}
+              </button>
+            ))}
+          </section>
 
           <WriterCtaSection sectionRef={writerCtaSectionRef} user={user} onOpenLogin={handleOpenLoginPage} />
         </div>

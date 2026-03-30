@@ -1,4 +1,9 @@
+'use client';
+
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useCookieConsent } from '@/contexts/CookieConsentContext';
+import { BrandLogo } from '@/components/brand/BrandLogo';
 
 import styles from './SiteFooter.module.css';
 
@@ -10,11 +15,28 @@ const FOOTER_LINKS = [
 ] as const;
 
 export function SiteFooter() {
+  const { openPreferences } = useCookieConsent();
+  const pathname = usePathname();
+  const pathSegments = (typeof pathname === 'string' ? pathname : '')
+    .split('/')
+    .filter(Boolean);
+  const isStoryDetailRoute = pathSegments.length === 2
+    && pathSegments[0] === 'story'
+    && pathSegments[1] !== 'create'
+    && pathSegments[1] !== 'manage';
+  const isStoryReaderRoute = pathSegments.length === 3
+    && pathSegments[0] === 'story'
+    && pathSegments[2] === 'read';
+
+  if (isStoryDetailRoute || isStoryReaderRoute) {
+    return null;
+  }
+
   return (
     <footer className={styles.footer}>
       <div className={styles.inner}>
         <div className={styles.brand}>
-          <span className={styles.brandName}>FlowFic</span>
+          <BrandLogo href="/" variant="lockup" tone="dark" size="sm" className={styles.brandName} />
           <p className={styles.copy}>© {new Date().getFullYear()} FlowFic Anthology. สงวนลิขสิทธิ์ทั้งหมด</p>
         </div>
 
@@ -24,6 +46,9 @@ export function SiteFooter() {
               {link.label}
             </Link>
           ))}
+          <button type="button" onClick={openPreferences} className={styles.cookieButton}>
+            ตั้งค่าคุกกี้
+          </button>
         </div>
       </div>
     </footer>

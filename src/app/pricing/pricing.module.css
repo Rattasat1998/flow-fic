@@ -5,11 +5,12 @@
 }
 
 .header {
-    background-color: white;
+    background: var(--panel-bg-strong);
     border-bottom: 1px solid var(--border);
     position: sticky;
     top: 0;
     z-index: 50;
+    backdrop-filter: blur(14px);
 }
 
 .headerContent {
@@ -23,19 +24,19 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    background-color: #fff7ed;
-    border: 1px solid #fed7aa;
+    background-color: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.34);
     padding: 0.4rem 0.8rem;
     border-radius: 999px;
 }
 
 .coinIcon {
-    color: #f97316;
+    color: #f4bf58;
 }
 
 .balanceAmount {
     font-weight: 700;
-    color: #c2410c;
+    color: #f8d58a;
     font-size: 0.9rem;
 }
 
@@ -63,7 +64,7 @@
 }
 
 .pageTitle p {
-    color: #64748b;
+    color: var(--text-muted);
     font-size: 1.05rem;
     margin: 0;
 }
@@ -74,12 +75,12 @@
 }
 
 .vipCard {
-    background: linear-gradient(135deg, #ffffff 0%, #fff7ed 100%);
-    border: 1px solid #fed7aa;
+    background: linear-gradient(135deg, rgba(20, 26, 39, 0.96) 0%, rgba(14, 19, 30, 0.96) 100%);
+    border: 1px solid rgba(245, 158, 11, 0.28);
     border-radius: 20px;
     padding: 2rem;
-    color: #0f172a;
-    box-shadow: 0 12px 28px rgba(249, 115, 22, 0.14);
+    color: #f4f6fb;
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.34);
     position: relative;
     overflow: hidden;
 }
@@ -91,7 +92,7 @@
     right: 0;
     width: 300px;
     height: 300px;
-    background: radial-gradient(circle, rgba(249, 115, 22, 0.14) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(245, 158, 11, 0.2) 0%, transparent 70%);
     transform: translate(30%, -30%);
     border-radius: 50%;
     pointer-events: none;
@@ -120,7 +121,7 @@
     font-size: 1.5rem;
     font-weight: 800;
     margin: 0;
-    color: #111827;
+    color: #ffffff;
 }
 
 .vipPrice {
@@ -131,7 +132,7 @@
 .currency {
     font-size: 1rem;
     font-weight: 600;
-    color: #64748b;
+    color: var(--text-muted);
 }
 
 .amount {
@@ -142,12 +143,12 @@
 
 .period {
     font-size: 0.9rem;
-    color: #64748b;
+    color: var(--text-muted);
     margin-left: 0.25rem;
 }
 
 .vipDesc {
-    color: #475569;
+    color: rgba(232, 238, 250, 0.78);
     font-size: 1rem;
     margin: 0 0 1.5rem 0;
     position: relative;
@@ -156,7 +157,7 @@
 
 .vipFootnote {
     margin: -0.5rem 0 1.25rem 0;
-    color: #64748b;
+    color: var(--text-muted);
     font-size: 0.82rem;
     line-height: 1.45;
     position: relative;
@@ -179,12 +180,12 @@
     align-items: flex-start;
     gap: 0.75rem;
     font-size: 0.95rem;
-    color: #334155;
+    color: rgba(232, 238, 250, 0.86);
     line-height: 1.4;
 }
 
 .featureIcon {
-    background-color: #fff7ed;
+    background-color: rgba(245, 158, 11, 0.12);
     color: var(--primary);
     border-radius: 50%;
     padding: 2px;
@@ -198,7 +199,7 @@
 .subscribeBtn {
     width: 100%;
     background: linear-gradient(90deg, var(--primary), var(--primary-hover));
-    color: #ffffff;
+    color: #1a1307;
     border: none;
     padding: 1.15rem;
     border-radius: 12px;
@@ -213,7 +214,7 @@
 
 .subscribeBtn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 14px 24px rgba(249, 115, 22, 0.28);
+    box-shadow: 0 14px 24px rgba(245, 158, 11, 0.35);
 }
 
 .divider {
@@ -244,7 +245,7 @@
 
 .sectionTitle p {
     font-size: 0.9rem;
-    color: #64748b;
+    color: var(--text-muted);
     margin: 0;
 }
 
@@ -261,7 +262,7 @@
 }
 
 .coinCard {
-    background-color: white;
+    background-color: var(--surface-elevated);
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 1.5rem 1rem;
@@ -275,13 +276,13 @@
 
 .coinCard:hover {
     border-color: var(--primary);
-    box-shadow: 0 10px 20px rgba(249, 115, 22, 0.08);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.25);
 }
 
 .popularCard {
     border-color: var(--primary);
     border-width: 2px;
-    background-color: #fff7ed;
+    background-color: rgba(245, 158, 11, 0.09);
 }
 
 .popularBadge {
@@ -304,7 +305,7 @@
 }
 
 .coinIconLg {
-    color: #f97316;
+    color: #f6c15a;
 }
 
 .coinAmount h3 {
@@ -317,8 +318,8 @@
 .bonusText {
     font-size: 0.8rem;
     font-weight: 600;
-    color: #f97316;
-    background-color: #fff7ed;
+    color: #f6c15a;
+    background-color: rgba(245, 158, 11, 0.12);
     padding: 0.2rem 0.5rem;
     border-radius: 4px;
     margin-bottom: 1.25rem;
@@ -341,7 +342,7 @@
 
 .purchaseBtn {
     width: 100%;
-    background-color: white;
+    background-color: rgba(255, 255, 255, 0.02);
     border: 1px solid var(--border);
     color: var(--foreground);
     font-weight: 700;
@@ -353,9 +354,9 @@
 
 .purchaseBtnSecondary {
     width: 100%;
-    background-color: #fff7ed;
-    border: 1px solid #fed7aa;
-    color: #9a3412;
+    background-color: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.32);
+    color: #f9d493;
     font-weight: 700;
     padding: 0.6rem;
     border-radius: 8px;
@@ -365,26 +366,26 @@
 
 .coinCard:hover .purchaseBtn {
     background-color: var(--primary);
-    color: white;
+    color: #1a1307;
     border-color: var(--primary);
 }
 
 .coinCard:hover .purchaseBtnSecondary {
-    background-color: #ffedd5;
-    color: #9a3412;
-    border-color: #fdba74;
+    background-color: rgba(245, 158, 11, 0.2);
+    color: #ffe3b0;
+    border-color: rgba(245, 158, 11, 0.46);
 }
 
 .popularCard .purchaseBtn {
     background-color: var(--primary);
-    color: white;
+    color: #1a1307;
     border-color: var(--primary);
 }
 
 .popularCard .purchaseBtnSecondary {
-    background-color: #ffedd5;
-    color: #9a3412;
-    border-color: #fdba74;
+    background-color: rgba(245, 158, 11, 0.2);
+    color: #ffe3b0;
+    border-color: rgba(245, 158, 11, 0.46);
 }
 
 .checkoutDialogBackdrop {
@@ -400,11 +401,11 @@
 
 .checkoutDialogCard {
     width: min(92vw, 340px);
-    background: #ffffff;
+    background: #121827;
     border-radius: 14px;
     padding: 1.25rem 1rem 1rem;
     box-shadow: 0 18px 38px rgba(15, 23, 42, 0.22);
-    border: 1px solid #e2e8f0;
+    border: 1px solid rgba(255, 255, 255, 0.16);
     text-align: center;
 }
 
@@ -412,7 +413,7 @@
     margin: 0 0 0.9rem 0;
     font-size: 1.1rem;
     font-weight: 800;
-    color: #0f172a;
+    color: #f4f6fb;
 }
 
 .checkoutDialogButton {

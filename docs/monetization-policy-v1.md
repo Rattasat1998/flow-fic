@@ -9,11 +9,11 @@ Updated: 2026-03-05
 - Premium chapter unlock
 - Wallet ledger + checkout/webhook settlement
 - Finance risk enforcement + dispute workflows
+- Creator payout/revenue share (v1)
 
 Out of scope:
 
 - Gift economy
-- Creator payout/revenue share
 - Membership/live monetization
 - Ad entitlement
 
@@ -39,6 +39,7 @@ Out of scope:
 - C-25 to C-28: risk signal scoring and finance status escalation.
 - C-29: audit fields (`reference`, `policy_version`, `reason`, `correlation_id`, `actor_user_id`).
 - C-30: reconciliation run + mismatch alert status.
+- C-31: creator revenue settlement automation (`pending -> available`) via internal cron endpoint.
 
 ## Admin Operations
 
@@ -48,3 +49,10 @@ Out of scope:
 - `POST /api/admin/payments/reconcile`
 
 Admin access is restricted by `FINANCE_ADMIN_USER_IDS`.
+
+## Internal Operations
+
+- `GET|POST /api/internal/reconciliation/daily`
+- `GET|POST /api/internal/creator-revenue/settle`
+
+Internal cron access is protected by `CRON_SECRET`.

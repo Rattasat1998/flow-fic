@@ -10,6 +10,7 @@ export const metadata: Metadata = {
 export default function CopyrightTakedownPolicyPage() {
   return (
     <main
+      className="ffLegalPage"
       style={{
         maxWidth: "760px",
         margin: "0 auto",
@@ -18,7 +19,7 @@ export default function CopyrightTakedownPolicyPage() {
       }}
     >
       <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>นโยบายลิขสิทธิ์และการแจ้งถอดเนื้อหา</h1>
-      <p style={{ color: "#666", marginBottom: "2rem" }}>มีผลบังคับใช้: March 5, 2026</p>
+      <p style={{ color: "var(--text-muted)", marginBottom: "2rem" }}>มีผลบังคับใช้: March 5, 2026</p>
 
       <section style={{ marginBottom: "1.5rem" }}>
         <h2>1. การแจ้งละเมิดลิขสิทธิ์</h2>
