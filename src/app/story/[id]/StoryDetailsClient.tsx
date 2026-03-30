@@ -22,6 +22,7 @@ import { useFollow } from '@/hooks/useFollow';
 import { useAuth } from '@/contexts/AuthContext';
 import { ShareButton } from '@/components/share/ShareButton';
 import { SharedNavbar } from '@/components/navigation/SharedNavbar';
+import { ChatStoryDetailsLayout } from '@/components/story/chat/ChatStoryDetailsLayout';
 import { getMainCategoryLabel, getSubCategoryLabel } from '@/lib/categories';
 import {
     deriveReaderCtaState,
@@ -1338,6 +1339,19 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
             </button>
         );
     };
+
+    if (dbStory.writing_style === 'chat') {
+        return (
+            <ChatStoryDetailsLayout
+                storyId={storyId}
+                story={dbStory}
+                authorSummary={authorSummary}
+                followerCount={effectiveFollowerCount}
+                likeCount={likeCount}
+                onBack={() => router.back()}
+            />
+        );
+    }
 
     return (
         <main className={styles.main}>

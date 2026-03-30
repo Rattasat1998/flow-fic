@@ -1,0 +1,224 @@
+.main {
+    min-height: 100vh;
+    background-color: #000;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow-x: hidden;
+}
+
+.heroSection {
+    position: relative;
+    width: 100%;
+    height: 340px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    padding-top: calc(2rem + env(safe-area-inset-top, 0px));
+}
+
+.heroBackground {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    filter: blur(12px) brightness(0.4);
+    transform: scale(1.1);
+    z-index: 0;
+}
+
+.heroContent {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.75rem;
+}
+
+.coverImage {
+    width: 110px;
+    height: 165px;
+    border-radius: 8px;
+    object-fit: cover;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.authorRow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.9rem;
+}
+
+.statsRow {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.85rem;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 0.4rem 1rem;
+    border-radius: 999px;
+    backdrop-filter: blur(8px);
+}
+
+.statItem {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.topBar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 1rem;
+    padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 20;
+}
+
+.iconBtn {
+    background: rgba(0, 0, 0, 0.3);
+    border: none;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    cursor: pointer;
+}
+
+.navActions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Bottom Sheet Area */
+.contentSheet {
+    position: relative;
+    z-index: 10;
+    flex: 1;
+    background: #111;
+    border-top-left-radius: 24px;
+    border-top-right-radius: 24px;
+    margin-top: -24px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Tabs */
+.tabsContainer {
+    display: flex;
+    gap: 1.5rem;
+    padding: 1.25rem 1.5rem 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: #111;
+    border-top-left-radius: 24px;
+    border-top-right-radius: 24px;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.tabsContainer::-webkit-scrollbar {
+    display: none;
+}
+
+.tabBtn {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 1rem;
+    font-weight: 500;
+    padding: 0.5rem 0;
+    cursor: pointer;
+    position: relative;
+    white-space: nowrap;
+}
+
+.tabBtnActive {
+    color: white;
+    font-weight: 600;
+}
+
+.tabIndicator {
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #FF3366;
+    border-radius: 2px 2px 0 0;
+}
+
+/* Content Area */
+.tabContent {
+    padding: 1.5rem;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+
+.synopsisText {
+    margin-bottom: 2rem;
+}
+
+.placeholderSection {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 1rem;
+    color: rgba(255, 255, 255, 0.4);
+    text-align: center;
+    gap: 1rem;
+}
+
+/* Fixed Bottom Action */
+.bottomActionWrap {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 1rem;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(to top, rgba(17,17,17,1) 60%, rgba(17,17,17,0) 100%);
+    z-index: 30;
+    display: flex;
+    justify-content: center;
+}
+
+.readBtn {
+    background: #FF3366;
+    color: white;
+    border: none;
+    padding: 0.85rem 3rem;
+    border-radius: 999px;
+    font-size: 1rem;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(255, 51, 102, 0.3);
+    cursor: pointer;
+}
