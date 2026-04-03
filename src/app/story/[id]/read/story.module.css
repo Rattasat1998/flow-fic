@@ -2187,13 +2187,19 @@
 
 .visualNovelViewportFrame {
   position: relative;
-  width: min(100%, 580px);
+  width: 100%;
   height: 100dvh;
   margin: 0 auto;
 }
 
 .visualNovelHiddenAudio {
   display: none;
+}
+
+.visualNovelHeader,
+.visualNovelDialogueDock,
+.visualNovelBottomBar {
+  transition: opacity 0.25s ease;
 }
 
 .visualNovelHeader {
@@ -2837,6 +2843,120 @@
     align-items: flex-start;
     flex-direction: column;
     gap: 0.28rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .visualNovelHeader {
+    inset-inline-start: max(1.25rem, env(safe-area-inset-left));
+    inset-inline-end: max(1.25rem, env(safe-area-inset-right));
+    top: calc(var(--vn-safe-top) + 0.75rem);
+  }
+
+  .visualNovelBackBtn,
+  .visualNovelHeaderAction {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+  }
+
+  .visualNovelStoryTitle {
+    font-size: 0.78rem;
+  }
+
+  .visualNovelChapterTitle {
+    font-size: 1.05rem;
+  }
+
+  .visualNovelDialogueDock {
+    padding: 6rem 2rem calc(5.2rem + var(--vn-safe-bottom)) 2rem;
+  }
+
+  .visualNovelDialogueBox {
+    max-width: 780px;
+    margin-inline: auto;
+  }
+
+  .visualNovelDialogueText {
+    font-size: clamp(1rem, 1.5vw, 1.14rem);
+    line-height: 1.8;
+  }
+
+  .visualNovelBottomBar {
+    inset-inline-start: max(1.25rem, env(safe-area-inset-left));
+    inset-inline-end: max(1.25rem, env(safe-area-inset-right));
+    bottom: calc(var(--vn-safe-bottom) + 0.9rem);
+  }
+
+  .visualNovelBottomAction {
+    width: 54px;
+    min-width: 54px;
+    height: 54px;
+  }
+
+  .visualNovelBottomAction span {
+    font-size: 0.72rem;
+  }
+
+  .visualNovelBottomUtilityBtn,
+  .visualNovelBottomPrimaryBtn {
+    min-height: 48px;
+    padding-inline: 1.25rem;
+    font-size: 0.88rem;
+  }
+
+  .visualNovelBranchPrompt {
+    inset-inline: 2rem;
+    max-width: min(520px, calc(100% - 4rem));
+    padding: 1rem 1.2rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .visualNovelHeader {
+    inset-inline-start: max(1.75rem, env(safe-area-inset-left));
+    inset-inline-end: max(1.75rem, env(safe-area-inset-right));
+    top: calc(var(--vn-safe-top) + 1rem);
+  }
+
+  .visualNovelBackBtn,
+  .visualNovelHeaderAction {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+  }
+
+  .visualNovelChapterTitle {
+    font-size: 1.15rem;
+  }
+
+  .visualNovelDialogueDock {
+    padding: 8rem 3rem calc(6rem + var(--vn-safe-bottom)) 3rem;
+  }
+
+  .visualNovelDialogueBox {
+    max-width: 900px;
+  }
+
+  .visualNovelDialogueText {
+    font-size: 1.12rem;
+  }
+
+  .visualNovelBottomBar {
+    inset-inline-start: max(1.75rem, env(safe-area-inset-left));
+    inset-inline-end: max(1.75rem, env(safe-area-inset-right));
+    bottom: calc(var(--vn-safe-bottom) + 1.2rem);
+  }
+
+  .visualNovelBottomAction {
+    width: 58px;
+    min-width: 58px;
+    height: 58px;
+  }
+
+  .visualNovelBranchPrompt {
+    inset-inline: 3rem;
+    max-width: min(600px, calc(100% - 6rem));
   }
 }
 

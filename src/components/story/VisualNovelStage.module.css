@@ -416,6 +416,30 @@
     white-space: pre-wrap;
 }
 
+@media (min-width: 1024px) {
+    .portraitSlot {
+        width: min(38%, 560px);
+        height: min(78%, 820px);
+    }
+
+    .leftSlot {
+        inset-inline-start: clamp(2rem, 5vw, 5rem);
+    }
+
+    .rightSlot {
+        inset-inline-end: clamp(2rem, 5vw, 5rem);
+    }
+
+    .readerStage {
+        min-height: clamp(520px, 80vh, 960px);
+    }
+
+    .dialogueText {
+        font-size: clamp(1rem, 1.1vw, 1.12rem);
+        line-height: 1.75;
+    }
+}
+
 @media (max-width: 900px) {
     .portraitSlot {
         width: min(46%, 300px);

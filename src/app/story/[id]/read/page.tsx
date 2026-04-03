@@ -17,7 +17,7 @@ import { ChatMessage } from '@/types/chat';
 import { VisualNovelStage } from '@/components/story/VisualNovelStage';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { List, Heart, Bookmark, BookmarkCheck, MoreVertical, X, Send, Lock, Coins, Play, Pause, Volume2, VolumeX, ChevronLeft, MessageSquare, RefreshCcw, Settings } from 'lucide-react';
+import { List, Heart, Bookmark, BookmarkCheck, MoreVertical, X, Send, Lock, Coins, Play, Pause, Volume2, VolumeX, ChevronLeft, MessageSquare, RefreshCcw, Settings, EyeOff } from 'lucide-react';
 import { BranchChoiceOverlay, OverlayChoice } from '@/components/story/BranchChoiceOverlay';
 import styles from './story.module.css';
 import { supabase } from '@/lib/supabase';
@@ -663,6 +663,7 @@ export default function StoryPage({ params }: StoryPageProps) {
   const [isTocOpen, setIsTocOpen] = useState(false);
   const [isReaderCommentSheetOpen, setIsReaderCommentSheetOpen] = useState(false);
   const [isVisualNovelSettingsOpen, setIsVisualNovelSettingsOpen] = useState(false);
+  const [isVNUIHidden, setIsVNUIHidden] = useState(false);
   const [chatIntroDismissedKeys, setChatIntroDismissedKeys] = useState<Record<string, true>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const narrativeChoicePanelRef = useRef<HTMLDivElement>(null);
@@ -3446,17 +3447,18 @@ export default function StoryPage({ params }: StoryPageProps) {
         ? `มี ${chapterChoicesForRead.length} ทางเลือกให้เลือกต่อ`
         : choicesErrorForRead;
 
-  let visualNovelPrimaryActionLabel = 'ข้ามไปท้ายตอน';
-  let visualNovelPrimaryActionDisabled = visualNovelScenes.length === 0 || isVisualNovelChapterComplete;
-  let visualNovelPrimaryActionHandler: (() => void) | null = visualNovelPrimaryActionDisabled
-    ? null
-    : () => setCurrentIndex(visualNovelScenes.length);
+  let visualNovelPrimaryActionLabel = '';
+  let visualNovelPrimaryActionDisabled = true;
+  let visualNovelPrimaryActionHandler: (() => void) | null = null;
+  let visualNovelShowPrimaryAction = false;
 
   if (isCurrentChapterLocked) {
+    visualNovelShowPrimaryAction = true;
     visualNovelPrimaryActionLabel = 'ตอนนี้ถูกล็อก';
     visualNovelPrimaryActionDisabled = true;
     visualNovelPrimaryActionHandler = null;
   } else if (isVisualNovelChapterComplete && showVisualNovelBranchSection) {
+    visualNovelShowPrimaryAction = true;
     if (isLoadingChoicesForRead) {
       visualNovelPrimaryActionLabel = 'กำลังโหลดทางเลือก';
       visualNovelPrimaryActionDisabled = true;
@@ -3475,10 +3477,12 @@ export default function StoryPage({ params }: StoryPageProps) {
       visualNovelPrimaryActionHandler = null;
     }
   } else if (isVisualNovelChapterComplete && hasNextLinearChapter) {
+    visualNovelShowPrimaryAction = true;
     visualNovelPrimaryActionLabel = 'ตอนถัดไป';
     visualNovelPrimaryActionDisabled = false;
     visualNovelPrimaryActionHandler = () => navigateToChapter(selectedChapterIndex + 1);
   } else if (isVisualNovelChapterComplete) {
+    visualNovelShowPrimaryAction = true;
     visualNovelPrimaryActionLabel = 'จบตอนสุดท้าย';
     visualNovelPrimaryActionDisabled = true;
     visualNovelPrimaryActionHandler = null;
@@ -3775,23 +3779,6 @@ export default function StoryPage({ params }: StoryPageProps) {
               <span>ให้ระบบเดินฉากต่ออัตโนมัติเมื่อข้อความพิมพ์ครบ</span>
             </div>
           </button>
-          <button
-            type="button"
-            className={styles.visualNovelSheetAction}
-            onClick={() => {
-              setIsVisualNovelSettingsOpen(false);
-              if (currentIndex < visualNovelScenes.length) {
-                setCurrentIndex(visualNovelScenes.length);
-              }
-            }}
-            disabled={visualNovelScenes.length === 0 || currentIndex >= visualNovelScenes.length}
-          >
-            <RefreshCcw size={18} />
-            <div>
-              <strong>ข้ามไปท้ายตอน</strong>
-              <span>แสดงฉากสุดท้ายของตอนนี้ทันที</span>
-            </div>
-          </button>
         </div>
         {visualNovelBgmStartError && (
           <p className={styles.visualNovelSheetNotice}>{visualNovelBgmStartError}</p>
@@ -3912,7 +3899,7 @@ export default function StoryPage({ params }: StoryPageProps) {
                 />
               )}
 
-              <header className={styles.visualNovelHeader}>
+              <header className={styles.visualNovelHeader} style={isVNUIHidden ? { opacity: 0, pointerEvents: 'none' } : undefined}>
                 <div className={styles.visualNovelHeaderMain}>
                   <div className={styles.visualNovelContext}>
                     <span className={styles.visualNovelStoryTitle}>{activeStory.title}</span>
@@ -3948,6 +3935,10 @@ export default function StoryPage({ params }: StoryPageProps) {
                   <div
                     className={styles.visualNovelStageWrap}
                     onClick={() => {
+                      if (isVNUIHidden) {
+                        setIsVNUIHidden(false);
+                        return;
+                      }
                       if (!isVisualNovelInteractionBlocked) {
                         handleNextLine();
                       }
@@ -3967,6 +3958,7 @@ export default function StoryPage({ params }: StoryPageProps) {
 
                     <div
                       className={styles.visualNovelDialogueDock}
+                      style={isVNUIHidden ? { opacity: 0, pointerEvents: 'none' } : undefined}
                     >
                       <div className={styles.visualNovelDialogueBox}>
                         <div className={styles.visualNovelDialogueMeta}>
@@ -4037,7 +4029,7 @@ export default function StoryPage({ params }: StoryPageProps) {
                 )}
               </div>
 
-              <footer className={styles.visualNovelBottomBar}>
+              <footer className={styles.visualNovelBottomBar} style={isVNUIHidden ? { opacity: 0, pointerEvents: 'none' } : undefined}>
                 <div className={styles.visualNovelBottomGroup}>
                   <button
                     type="button"
@@ -4060,6 +4052,14 @@ export default function StoryPage({ params }: StoryPageProps) {
                     <MessageSquare size={18} />
                     <span>{storySettings.allowComments ? comments.length.toLocaleString('th-TH') : 'ปิด'}</span>
                   </button>
+                  <button
+                    type="button"
+                    className={styles.visualNovelBottomAction}
+                    onClick={() => setIsVNUIHidden(true)}
+                  >
+                    <EyeOff size={18} />
+                    <span>ซ่อน UI</span>
+                  </button>
                 </div>
                 <div className={styles.visualNovelBottomGroup}>
                   <button
@@ -4070,19 +4070,21 @@ export default function StoryPage({ params }: StoryPageProps) {
                     <RefreshCcw size={16} />
                     <span>เริ่มใหม่</span>
                   </button>
-                  <button
-                    type="button"
-                    className={`${styles.visualNovelBottomPrimaryBtn} ${visualNovelPrimaryActionDisabled ? styles.visualNovelBottomPrimaryBtnDisabled : ''}`}
-                    onClick={() => {
-                      if (!visualNovelPrimaryActionHandler) return;
-                      setIsVisualNovelSettingsOpen(false);
-                      visualNovelPrimaryActionHandler();
-                    }}
-                    disabled={visualNovelPrimaryActionDisabled}
-                  >
-                    <span>{visualNovelPrimaryActionLabel}</span>
-                    {!visualNovelPrimaryActionDisabled && <ChevronLeft size={16} className={styles.visualNovelBottomPrimaryChevron} />}
-                  </button>
+                  {visualNovelShowPrimaryAction && (
+                    <button
+                      type="button"
+                      className={`${styles.visualNovelBottomPrimaryBtn} ${visualNovelPrimaryActionDisabled ? styles.visualNovelBottomPrimaryBtnDisabled : ''}`}
+                      onClick={() => {
+                        if (!visualNovelPrimaryActionHandler) return;
+                        setIsVisualNovelSettingsOpen(false);
+                        visualNovelPrimaryActionHandler();
+                      }}
+                      disabled={visualNovelPrimaryActionDisabled}
+                    >
+                      <span>{visualNovelPrimaryActionLabel}</span>
+                      {!visualNovelPrimaryActionDisabled && <ChevronLeft size={16} className={styles.visualNovelBottomPrimaryChevron} />}
+                    </button>
+                  )}
                 </div>
               </footer>
             </div>
