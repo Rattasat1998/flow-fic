@@ -25,6 +25,14 @@
     border: 1px solid rgba(148, 163, 184, 0.36);
 }
 
+.avatarPlaceholder {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(30, 41, 59, 0.88);
+    color: rgba(226, 232, 240, 0.86);
+}
+
 .characterWrapper .avatar {
     margin-right: 0.5rem;
 }
@@ -38,6 +46,11 @@
     flex-direction: column;
     max-width: 78%;
     min-width: 0;
+}
+
+.imageBubbleContainer {
+    width: fit-content;
+    max-width: min(100%, 340px);
 }
 
 .playerContainer {
@@ -65,6 +78,12 @@
     font-size: 0.92rem;
     line-height: 1.62;
     word-break: break-word;
+}
+
+.imageBubble {
+    width: fit-content;
+    max-width: min(100%, 340px);
+    padding: 0.26rem;
 }
 
 .playerBubble {
@@ -162,15 +181,99 @@
 
 .systemImage,
 .chatImage {
-    width: min(100%, 300px);
-    max-height: min(44vh, 330px);
+    width: auto;
+    max-width: min(72vw, 320px);
+    max-height: min(36vh, 250px);
     object-fit: contain;
     border-radius: 12px;
     display: block;
+    transition: filter 0.2s ease;
 }
 
 .systemImage {
     margin-top: 0.25rem;
+}
+
+.imageWrapper {
+    position: relative;
+    display: inline-block;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.imageWrapper:focus-visible {
+    outline: 2px solid rgba(249, 115, 22, 0.7);
+    outline-offset: 2px;
+}
+
+.blurredImage {
+    filter: blur(12px);
+    transform: scale(1.04);
+}
+
+.imageRevealHint {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: 0.04em;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+}
+
+.lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(2, 6, 23, 0.88);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.lightboxImageWrap {
+    position: relative;
+    display: inline-block;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.lightboxImage {
+    display: block;
+    max-width: min(92vw, 800px);
+    max-height: 88vh;
+    object-fit: contain;
+    border-radius: 12px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+
+.lightboxCloseHint {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 0.5rem;
+    background: linear-gradient(to top, rgba(2, 6, 23, 0.72), transparent);
+    color: #e2e8f0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-align: center;
+    pointer-events: none;
 }
 
 @media (max-width: 640px) {
@@ -195,7 +298,8 @@
 
     .systemImage,
     .chatImage {
-        width: min(100%, 264px);
+        max-width: min(82vw, 270px);
+        max-height: min(32vh, 210px);
     }
 }
 
@@ -230,6 +334,11 @@
 :global(.theme-light) .avatar {
     border-color: #e2e8f0;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+:global(.theme-light) .avatarPlaceholder {
+    background: #e2e8f0;
+    color: #64748b;
 }
 
 /* Pink Theme */

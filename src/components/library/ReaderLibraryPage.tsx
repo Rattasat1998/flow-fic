@@ -409,12 +409,14 @@ export function ReaderLibraryPage({ kind }: { kind: ReaderLibraryKind }) {
 
                 <section className={styles.content}>
                     {isLoadingAuth || isLoading ? (
-                        <div className={styles.stateCard}>
-                            <div className={stateIconClassName}>
-                                <Icon size={34} />
-                            </div>
-                            <h2 className={styles.stateTitle}>{config.loadingLabel}</h2>
-                            <p className={styles.stateDescription}>ระบบกำลังเตรียมรายการของคุณจากคลังอ่านส่วนตัว</p>
+                        <div className={styles.skeletonGrid}>
+                            {Array.from({ length: 6 }).map((_, i) => (
+                                <div key={i} className={styles.skeletonCard}>
+                                    <div className={`${styles.skeletonCover} skeletonBlock`} />
+                                    <div className={`${styles.skeletonCardTitle} skeletonBlock`} />
+                                    <div className={`${styles.skeletonCardAuthor} skeletonBlock`} />
+                                </div>
+                            ))}
                         </div>
                     ) : stories.length === 0 ? (
                         <div className={styles.stateCard}>

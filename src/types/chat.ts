@@ -15,7 +15,7 @@ export interface ChatMessage {
 export interface Character {
     id: string;
     name: string;
-    avatarUrl: string;
+    avatarUrl: string | null;
 }
 
 export interface Story {

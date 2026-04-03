@@ -336,7 +336,24 @@ export default function WriterProfileClient({ writerId }: WriterProfileClientPro
             <main className={`${styles.main} ffStudioShell`}>
                 {navbarNode}
                 <div className={`ffStudioPage ${styles.statePage}`}>
-                    <div className={`ffStudioEmpty ${styles.stateCard}`}>กำลังโหลดโปรไฟล์ผู้เขียน...</div>
+                    <div className={styles.skeletonProfile}>
+                        <div className={styles.skeletonProfileHeader}>
+                            <div className={`${styles.skeletonAvatar} skeletonBlock`} />
+                            <div className={styles.skeletonProfileBody}>
+                                <div className={`${styles.skeletonName} skeletonBlock`} />
+                                <div className={`${styles.skeletonBio} skeletonBlock`} />
+                                <div className={`${styles.skeletonBio} skeletonBlock`} style={{ width: '70%' }} />
+                            </div>
+                        </div>
+                        <div className={styles.skeletonStoryGrid}>
+                            {Array.from({ length: 6 }).map((_, i) => (
+                                <div key={i} className={styles.skeletonStoryCard}>
+                                    <div className={`${styles.skeletonStoryCover} skeletonBlock`} />
+                                    <div className={`${styles.skeletonStoryTitle} skeletonBlock`} />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </main>
         );

@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/internal/creator-revenue/settle",
-      "schedule": "5 * * * *"
+      "schedule": "5 0 * * *"
     },
     {
       "path": "/api/internal/reconciliation/daily",

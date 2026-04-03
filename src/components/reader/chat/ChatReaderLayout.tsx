@@ -1,105 +1,121 @@
-import { useState, type ReactNode } from 'react';
-import { ChevronLeft, Share2, Coins, MoreHorizontal, Plus } from 'lucide-react';
+import { type PointerEvent, type ReactNode } from 'react';
+import { ChevronLeft, Heart, List, MessageCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import styles from './chat-reader.module.css';
 
 interface ChatReaderLayoutProps {
-    story: any;
-    chapter: any;
-    coinBalance: number;
-    children: ReactNode;
-    onPointerDown?: (e: any) => void;
-    onPointerUp?: (e: any) => void;
-    onPointerCancel?: (e: any) => void;
+  storyTitle: string;
+  chapterLabel: string;
+  backgroundImageUrl: string | null;
+  isLiked: boolean;
+  likeCount: number;
+  hideHeartCount: boolean;
+  onToggleLike: () => void;
+  commentCount: number;
+  canOpenComments: boolean;
+  onOpenComments: () => void;
+  onOpenToc?: () => void;
+  children: ReactNode;
+  onPointerDown?: (e: PointerEvent<HTMLDivElement>) => void;
+  onPointerUp?: (e: PointerEvent<HTMLDivElement>) => void;
+  onPointerCancel?: (e: PointerEvent<HTMLDivElement>) => void;
 }
 
+const fallbackBackgroundImage =
+  'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=900&q=80';
+
 export function ChatReaderLayout({
-    story,
-    chapter,
-    coinBalance,
-    children,
-    onPointerDown,
-    onPointerUp,
-    onPointerCancel
+  storyTitle,
+  chapterLabel,
+  backgroundImageUrl,
+  isLiked,
+  likeCount,
+  hideHeartCount,
+  onToggleLike,
+  commentCount,
+  canOpenComments,
+  onOpenComments,
+  onOpenToc,
+  children,
+  onPointerDown,
+  onPointerUp,
+  onPointerCancel,
 }: ChatReaderLayoutProps) {
-    const router = useRouter();
-    const bgUrl = story?.cover_url || story?.cover_wide_url || 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=600&q=80';
+  const router = useRouter();
+  const backgroundUrl = backgroundImageUrl || fallbackBackgroundImage;
+  const shouldShowCommentAction = commentCount >= 0;
+  const visibleCommentCount = Math.max(0, commentCount);
 
-    return (
-        <div className={styles.main}>
-            {/* Background Layer */}
-            <div 
-                className={styles.backgroundOverlay} 
-                style={{ backgroundImage: `url(${bgUrl})` }}
-            />
-            <div className={styles.backgroundDarken} />
+  return (
+    <div className={styles.main}>
+      <div
+        className={styles.backgroundOverlay}
+        style={{ backgroundImage: `url(${backgroundUrl})` }}
+      />
+      <div className={styles.backgroundDarken} />
 
-            {/* Top Navigation */}
-            <div className={styles.topNav}>
-                <button type="button" onClick={() => router.back()} className={styles.iconButton}>
-                    <ChevronLeft size={24} />
-                </button>
-                <div className={styles.storyTitle}>
-                    {chapter?.title || story?.title || 'ตอนที่กำลังอ่าน'}
-                </div>
-                <div className={styles.navActions}>
-                    <div className={styles.coinBadge}>
-                        <Coins size={14} color="#fcd34d" />
-                        {coinBalance}
-                    </div>
-                    <button type="button" className={styles.iconButton}>
-                        <Plus size={20} />
-                    </button>
-                    <button type="button" className={styles.iconButton}>
-                        <Share2 size={18} />
-                    </button>
-                </div>
-            </div>
-
-            {/* Floating Hearts */}
-            <div className={styles.floatingHeartContainer}>
-                <span className={styles.heartNumber}>10</span>
-                <span style={{fontSize: '10px', color: 'rgba(255,255,255,0.8)'}}>คนรู้จัก</span>
-            </div>
-
-            {/* Chat Content Area */}
-            <div 
-                className={styles.chatContainer} 
-                onPointerDown={onPointerDown}
-                onPointerUp={onPointerUp}
-                onPointerCancel={onPointerCancel}
+      <header className={styles.topBar}>
+        <div className={styles.topBarInner}>
+          <div className={styles.topBarLeft}>
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className={`${styles.actionBtn} ${styles.backBtn}`}
+              aria-label="ย้อนกลับ"
             >
-                {children}
+              <ChevronLeft size={18} />
+            </button>
+            <div className={styles.topBarCopy}>
+              <p className={styles.topBarTitle}>{storyTitle || 'กำลังอ่านเรื่อง'}</p>
+              <p className={styles.topBarMeta}>{chapterLabel || 'ไม่พบตอน'}</p>
             </div>
-
-            {/* Bottom Input & Quick Actions */}
-            <div className={styles.bottomArea}>
-                <div className={styles.quickActionsRow}>
-                    <button type="button" className={styles.actionPill}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 4v16m-8-8h16"></path></svg>
-                        แฟ้มข้อมูล
-                    </button>
-                    <button type="button" className={styles.actionPill}>
-                        ดั้งเดิม-พื้นฐาน
-                    </button>
-                    <button type="button" className={`${styles.actionPill} ${styles.pillPurple}`}>
-                        ความทรงจำ
-                    </button>
-                </div>
-
-                <div className={styles.inputBarContainer}>
-                    <div className={styles.inputFieldWrap} onPointerUp={onPointerUp}>
-                        <span className={styles.inputFieldPlaceholder}>ป้อนข้อความ (แตะเพื่อไปต่อ)</span>
-                        <button type="button" className={styles.inputIconBtn}>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"></path></svg>
-                        </button>
-                    </div>
-                    <button type="button" className={styles.plusBtn}>
-                        <Plus size={20} />
-                        <span className={styles.redDot} />
-                    </button>
-                </div>
-            </div>
+          </div>
+          <div className={styles.topBarActions}>
+            {onOpenToc && (
+              <button
+                type="button"
+                className={styles.actionBtn}
+                onClick={onOpenToc}
+                aria-label="เปิดสารบัญ"
+              >
+                <List size={16} />
+              </button>
+            )}
+            <button
+              type="button"
+              className={`${styles.actionBtn} ${isLiked ? styles.actionBtnActive : ''}`}
+              onClick={onToggleLike}
+              aria-label="กดหัวใจ"
+            >
+              <Heart size={16} fill={isLiked ? 'currentColor' : 'none'} />
+              <span>{hideHeartCount ? 'หัวใจ' : likeCount.toLocaleString('th-TH')}</span>
+            </button>
+            {shouldShowCommentAction && (
+              <button
+                type="button"
+                className={styles.actionBtn}
+                onClick={onOpenComments}
+                disabled={!canOpenComments}
+                aria-label="เปิดคอมเมนต์"
+              >
+                <MessageCircle size={16} />
+                <span>{visibleCommentCount.toLocaleString('th-TH')}</span>
+              </button>
+            )}
+          </div>
         </div>
-    );
+      </header>
+
+      <div className={styles.chatViewport}>
+        <div
+          className={styles.chatContainer}
+          onPointerDown={onPointerDown}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerCancel}
+        >
+          {children}
+        </div>
+      </div>
+    </div>
+  );
 }

@@ -14,6 +14,7 @@ import {
     Heart,
     Lock,
     MessageCircle,
+    RotateCcw,
     Star,
 } from 'lucide-react';
 import styles from './details.module.css';
@@ -22,7 +23,6 @@ import { useFollow } from '@/hooks/useFollow';
 import { useAuth } from '@/contexts/AuthContext';
 import { ShareButton } from '@/components/share/ShareButton';
 import { SharedNavbar } from '@/components/navigation/SharedNavbar';
-import { ChatStoryDetailsLayout } from '@/components/story/chat/ChatStoryDetailsLayout';
 import { getMainCategoryLabel, getSubCategoryLabel } from '@/lib/categories';
 import {
     deriveReaderCtaState,
@@ -1208,10 +1208,18 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
 
     if (isLoading) {
         return (
-            <main className={styles.main}>
-                <div className={styles.statePage}>
-                    <div className={styles.stateMessage}>
-                        <p>กำลังโหลดข้อมูล...</p>
+            <main className={`${styles.main} ${styles.skeletonWrap}`}>
+                <div className={`${styles.skeletonHero} skeletonBlock`} />
+                <div className={styles.skeletonContent}>
+                    <div className={styles.skeletonTabRow}>
+                        {[0, 1, 2].map((i) => (
+                            <div key={i} className={`${styles.skeletonTab} skeletonBlock`} />
+                        ))}
+                    </div>
+                    <div className={styles.skeletonStack}>
+                        {Array.from({ length: 5 }).map((_, i) => (
+                            <div key={i} className={`${styles.skeletonChapterRow} skeletonBlock`} />
+                        ))}
                     </div>
                 </div>
             </main>
@@ -1339,19 +1347,6 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
             </button>
         );
     };
-
-    if (dbStory.writing_style === 'chat') {
-        return (
-            <ChatStoryDetailsLayout
-                storyId={storyId}
-                story={dbStory}
-                authorSummary={authorSummary}
-                followerCount={effectiveFollowerCount}
-                likeCount={likeCount}
-                onBack={() => router.back()}
-            />
-        );
-    }
 
     return (
         <main className={styles.main}>
@@ -1593,6 +1588,19 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
                     <BookOpen size={18} />
                     {isStoryOwner ? 'เรื่องของคุณ' : effectiveIsFollowing ? 'อยู่ในชั้นแล้ว' : 'เพิ่มเข้าชั้น'}
                 </button>
+
+                <Link
+                    href={`/story/${storyId}/read?restart=1`}
+                    className={`${styles.readFromBeginBtn} ${dbChapters.length === 0 ? styles.readButtonDisabled : ''}`.trim()}
+                    onClick={(event) => {
+                        if (dbChapters.length === 0) { event.preventDefault(); return; }
+                        persistStoryDetailReturnState();
+                    }}
+                    title="เริ่มอ่าน"
+                >
+                    <RotateCcw size={16} />
+                    <span>เริ่มอ่าน</span>
+                </Link>
 
                 <Link
                     href={readHref}

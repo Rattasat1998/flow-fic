@@ -8,7 +8,6 @@ import {
   use,
   useCallback,
   type PointerEvent as ReactPointerEvent,
-  type TouchEvent as ReactTouchEvent,
 } from 'react';
 
 import { ChatBubble } from '@/components/chat/ChatBubble';
@@ -17,8 +16,8 @@ import { ChatReaderLayout } from '@/components/reader/chat/ChatReaderLayout';
 import { ChatMessage } from '@/types/chat';
 import { VisualNovelStage } from '@/components/story/VisualNovelStage';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
-import { List, Heart, Bookmark, BookmarkCheck, MoreVertical, X, Send, Lock, Coins, Play, Pause, Volume2, VolumeX } from 'lucide-react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { List, Heart, Bookmark, BookmarkCheck, MoreVertical, X, Send, Lock, Coins, Play, Pause, Volume2, VolumeX, ChevronLeft } from 'lucide-react';
 import { BranchChoiceOverlay, OverlayChoice } from '@/components/story/BranchChoiceOverlay';
 import styles from './story.module.css';
 import { supabase } from '@/lib/supabase';
@@ -168,6 +167,11 @@ type ReaderChatMessage = ChatMessage & {
   chapterIndex: number;
 };
 
+type ChatRuntimeAliasState = {
+  displayNameByMessageId: Record<string, string>;
+  latestAliasByCharacterId: Record<string, string>;
+};
+
 type ChapterNavigationMode = 'restore' | 'top';
 
 type CommentRow = {
@@ -221,11 +225,15 @@ type ReaderBootstrapRpcRow = {
   comments: ReaderBootstrapCommentRow[] | null;
 };
 const CHAPTER_READ_SESSION_CACHE_PREFIX = 'flowfic:chapter-read-session';
+const CHAT_INTRO_HINT_STORAGE_PREFIX = 'flowfic:chat-intro-dismissed';
 let readerBootstrapRpcAvailability: boolean | null = null;
 let readerChapterReadRpcAvailability: boolean | null = null;
 
 const getChapterReadSessionCacheKey = (sessionId: string) =>
   `${CHAPTER_READ_SESSION_CACHE_PREFIX}:${sessionId}`;
+
+const getChatIntroHintStorageKey = (storyId: string, userId?: string | null) =>
+  `${CHAT_INTRO_HINT_STORAGE_PREFIX}:${userId || 'guest'}:${storyId}`;
 
 const hasChapterReadSessionCacheEntry = (sessionId: string, chapterId: string): boolean => {
   if (typeof window === 'undefined') return false;
@@ -389,6 +397,36 @@ const normalizeBackgroundSound = (value: unknown): string | null => {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+};
+
+const CHAT_GROUP_RENAME_MESSAGE_REGEX = /^(.+?)\s+เปลี่ยนชื่อกลุ่มจาก\s*["“”'‘’](.+?)["“”'‘’]\s*เป็น\s*["“”'‘’](.+?)["“”'‘’]\s*$/i;
+const normalizeNameForMatch = (value: string): string => value.trim().toLocaleLowerCase();
+
+const parseRuntimeChatRenameEvent = (value: unknown): { actorName: string; oldName: string; newName: string } | null => {
+  if (typeof value !== 'string') return null;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const candidates = [
+    trimmed,
+    trimmed.replace(/^\[(.+)\]$/u, '$1').trim(),
+    trimmed.replace(/^\[\s*([^\]]+)\s*\]\s*/u, '$1 ').trim(),
+  ];
+
+  for (const candidate of candidates) {
+    const match = candidate.match(CHAT_GROUP_RENAME_MESSAGE_REGEX);
+    if (!match) continue;
+
+    const actorName = (match[1] || '').trim();
+    const oldName = (match[2] || '').trim();
+    const newName = (match[3] || '').trim();
+    if (!actorName || !oldName || !newName) return null;
+
+    return { actorName, oldName, newName };
+  }
+
+  return null;
 };
 
 const fallbackAvatar = 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=200&q=80';
@@ -582,9 +620,11 @@ const getReaderParagraphClassName = (hasCharacter: boolean, isFlashback: boolean
 export default function StoryPage({ params }: StoryPageProps) {
   const unwrappedParams = use(params);
   const storyId = unwrappedParams.id;
+  const router = useRouter();
   const { user } = useAuth();
   const userId = user?.id || null;
   const { trackEvent } = useTracking({ autoPageView: true, pagePath: `/story/${storyId}/read`, storyId });
+  const chatIntroHintStorageKey = useMemo(() => getChatIntroHintStorageKey(storyId, userId), [storyId, userId]);
 
   const [messages, setMessages] = useState<ReaderChatMessage[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -621,8 +661,8 @@ export default function StoryPage({ params }: StoryPageProps) {
   const [choicesError, setChoicesError] = useState<string | null>(null);
   const [showChoiceOverlay, setShowChoiceOverlay] = useState(false);
   const [isTocOpen, setIsTocOpen] = useState(false);
-  const [isChatTopbarHidden, setIsChatTopbarHidden] = useState(false);
-  const [isChatOverflowOpen, setIsChatOverflowOpen] = useState(false);
+  const [isChatCommentSheetOpen, setIsChatCommentSheetOpen] = useState(false);
+  const [chatIntroDismissedKeys, setChatIntroDismissedKeys] = useState<Record<string, true>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const narrativeChoicePanelRef = useRef<HTMLDivElement>(null);
   const narrativeCompletionSentinelRef = useRef<HTMLDivElement>(null);
@@ -650,7 +690,6 @@ export default function StoryPage({ params }: StoryPageProps) {
   const visualNovelAutoPlayTimerRef = useRef<number | null>(null);
   const visualNovelBgmAudioRef = useRef<HTMLAudioElement | null>(null);
   const chatTypingTimerRef = useRef<number | null>(null);
-  const chatOverflowTouchStartYRef = useRef<number | null>(null);
   const chatAdvancePointerRef = useRef<{
     pointerId: number;
     startX: number;
@@ -683,6 +722,45 @@ export default function StoryPage({ params }: StoryPageProps) {
   const [visibleNarrativeBookmark, setVisibleNarrativeBookmark] = useState<{ chapterId: string; blockId: string } | null>(null);
   const [hoveredBookmarkBlockId, setHoveredBookmarkBlockId] = useState<string | null>(null);
   const [storyProgressVersion, setStoryProgressVersion] = useState<string | null>(null);
+  const [isNarrativeUIVisible, setIsNarrativeUIVisible] = useState(true);
+  const hasChatReadProgress = useMemo(() => {
+    if (isPreviewMode || typeof window === 'undefined') return false;
+    const storedProgress = readStoredStoryProgress(storyId, userId);
+    if (!storedProgress) return false;
+
+    return Object.values(storedProgress.chapterStates || {}).some(
+      (chapterState) =>
+        typeof chapterState?.chatNextIndex === 'number'
+        && chapterState.chatNextIndex > 0
+    );
+  }, [isPreviewMode, storyId, userId]);
+
+  const isChatIntroDismissed = useMemo(() => {
+    if (chatIntroDismissedKeys[chatIntroHintStorageKey]) return true;
+    if (typeof window === 'undefined') return false;
+
+    try {
+      return !!localStorage.getItem(chatIntroHintStorageKey);
+    } catch {
+      return false;
+    }
+  }, [chatIntroDismissedKeys, chatIntroHintStorageKey]);
+
+  const markChatIntroDismissed = useCallback(() => {
+    if (typeof window === 'undefined' || isChatIntroDismissed) return;
+
+    try {
+      localStorage.setItem(chatIntroHintStorageKey, new Date().toISOString());
+    } catch {
+      // Ignore storage failures
+    }
+
+    setChatIntroDismissedKeys((prev) => (
+      prev[chatIntroHintStorageKey]
+        ? prev
+        : { ...prev, [chatIntroHintStorageKey]: true }
+    ));
+  }, [chatIntroHintStorageKey, isChatIntroDismissed]);
 
   const setVisibleNarrativeBookmarkForChapter = useCallback((chapterId: string, blockId: string | null) => {
     setVisibleNarrativeBookmark((prev) => {
@@ -1577,38 +1655,14 @@ export default function StoryPage({ params }: StoryPageProps) {
   }, [isVisualNovelStyle]);
 
   useEffect(() => {
-    if (!isChatStyle) return;
-
-    let lastScrollY = window.scrollY;
-    let ticking = false;
-
-    const handleScroll = () => {
-      if (ticking) return;
-      ticking = true;
-
-      window.requestAnimationFrame(() => {
-        const currentScrollY = window.scrollY;
-        const deltaY = currentScrollY - lastScrollY;
-
-        if (currentScrollY <= 52) {
-          setIsChatTopbarHidden(false);
-        } else if (deltaY > 10) {
-          setIsChatTopbarHidden(true);
-        } else if (deltaY < -8) {
-          setIsChatTopbarHidden(false);
-        }
-
-        lastScrollY = currentScrollY;
-        ticking = false;
-      });
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [isChatStyle, isTocOpen, isChatOverflowOpen]);
+    if (isChatStyle || isVisualNovelStyle) return;
+    if (!isNarrativeUIVisible) return;
+    const timer = setTimeout(() => setIsNarrativeUIVisible(false), 3000);
+    return () => clearTimeout(timer);
+  }, [isChatStyle, isVisualNovelStyle, isNarrativeUIVisible]);
 
   useEffect(() => {
-    if (!isChatStyle || !isChatOverflowOpen) return;
+    if (!isChatStyle || !isChatCommentSheetOpen) return;
 
     const previousBodyOverflow = document.body.style.overflow;
     const previousHtmlOverflow = document.documentElement.style.overflow;
@@ -1619,20 +1673,20 @@ export default function StoryPage({ params }: StoryPageProps) {
       document.body.style.overflow = previousBodyOverflow;
       document.documentElement.style.overflow = previousHtmlOverflow;
     };
-  }, [isChatStyle, isChatOverflowOpen]);
+  }, [isChatStyle, isChatCommentSheetOpen]);
 
   useEffect(() => {
-    if (!isChatStyle || !isChatOverflowOpen) return;
+    if (!isChatStyle || !isChatCommentSheetOpen) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setIsChatOverflowOpen(false);
+        setIsChatCommentSheetOpen(false);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isChatStyle, isChatOverflowOpen]);
+  }, [isChatStyle, isChatCommentSheetOpen]);
 
   const activeChapter = dbChapters[selectedChapterIndex] || null;
   const activeChapterId = activeChapter?.id || null;
@@ -2003,8 +2057,7 @@ export default function StoryPage({ params }: StoryPageProps) {
     setChatTypingPreview(null);
     clearPendingLongPressBookmark();
     if (isChatStyle) {
-      setIsChatTopbarHidden(false);
-      setIsChatOverflowOpen(false);
+      setIsChatCommentSheetOpen(false);
       chatAdvancePointerRef.current = null;
     }
 
@@ -2420,6 +2473,7 @@ export default function StoryPage({ params }: StoryPageProps) {
     }
 
     if (!isChatStyle || currentIndex >= chatScript.length || isChatTyping) return;
+    markChatIntroDismissed();
 
     const nextMessage = chatScript[currentIndex];
     clearChatTypingTimer();
@@ -2450,10 +2504,11 @@ export default function StoryPage({ params }: StoryPageProps) {
     clearVisualNovelTypewriterTimer,
     clearVisualNovelAutoPlayTimer,
     clearChatTypingTimer,
+    markChatIntroDismissed,
   ]);
 
   const handleChatContainerPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!isChatStyle || isChatOverflowOpen || isTocOpen || showChoiceOverlay) return;
+    if (!isChatStyle || isChatCommentSheetOpen || isTocOpen || showChoiceOverlay) return;
     if (!event.isPrimary || event.button !== 0) return;
     if (isInteractiveChatTarget(event.target)) {
       chatAdvancePointerRef.current = null;
@@ -2465,7 +2520,7 @@ export default function StoryPage({ params }: StoryPageProps) {
       startX: event.clientX,
       startY: event.clientY,
     };
-  }, [isChatStyle, isChatOverflowOpen, isTocOpen, showChoiceOverlay]);
+  }, [isChatStyle, isChatCommentSheetOpen, isTocOpen, showChoiceOverlay]);
 
   const handleChatContainerPointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (!isChatStyle) return;
@@ -2474,7 +2529,7 @@ export default function StoryPage({ params }: StoryPageProps) {
     const pendingTap = chatAdvancePointerRef.current;
     chatAdvancePointerRef.current = null;
     if (!pendingTap || pendingTap.pointerId !== event.pointerId) return;
-    if (isChatOverflowOpen || isTocOpen || showChoiceOverlay) return;
+    if (isChatCommentSheetOpen || isTocOpen || showChoiceOverlay) return;
     if (isInteractiveChatTarget(event.target)) return;
 
     const movedX = Math.abs(event.clientX - pendingTap.startX);
@@ -2482,7 +2537,7 @@ export default function StoryPage({ params }: StoryPageProps) {
     if (movedX > CHAT_ADVANCE_TAP_DISTANCE_PX || movedY > CHAT_ADVANCE_TAP_DISTANCE_PX) return;
 
     handleNextLine();
-  }, [isChatStyle, isChatOverflowOpen, isTocOpen, showChoiceOverlay, handleNextLine]);
+  }, [isChatStyle, isChatCommentSheetOpen, isTocOpen, showChoiceOverlay, handleNextLine]);
 
   const handleChatContainerPointerCancel = useCallback(() => {
     chatAdvancePointerRef.current = null;
@@ -2600,6 +2655,12 @@ export default function StoryPage({ params }: StoryPageProps) {
       }
     };
   }, [clearVisualNovelTypewriterTimer, clearVisualNovelAutoPlayTimer]);
+
+  const handleNarrativeContentClick = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button, a, input, select, textarea, [role="button"], [data-bookmark-control]')) return;
+    setIsNarrativeUIVisible((prev) => !prev);
+  }, []);
 
   // Interaction handlers
   const handleToggleLike = async () => {
@@ -3170,11 +3231,101 @@ export default function StoryPage({ params }: StoryPageProps) {
     return () => resetChoiceCountdown();
   }, [resetChoiceCountdown]);
 
+  const characterById = useMemo(() => {
+    const byId = new Map<string, Character>();
+    characters.forEach((character) => {
+      byId.set(character.id, character);
+    });
+    return byId;
+  }, [characters]);
+  const chatRuntimeAliasState = useMemo<ChatRuntimeAliasState>(() => {
+    if (!isChatStyle || messages.length === 0 || characters.length === 0) {
+      return {
+        displayNameByMessageId: {},
+        latestAliasByCharacterId: {},
+      };
+    }
+
+    const displayNameByMessageId: Record<string, string> = {};
+    const latestAliasByCharacterId: Record<string, string> = {};
+
+    const findCharacterIdByDisplayName = (displayName: string): string | null => {
+      const normalizedDisplayName = normalizeNameForMatch(displayName);
+      if (!normalizedDisplayName) return null;
+
+      for (const character of characters) {
+        const baseName = character.name.trim();
+        if (!baseName) continue;
+        const activeName = latestAliasByCharacterId[character.id] || baseName;
+        if (normalizeNameForMatch(activeName) === normalizedDisplayName) {
+          return character.id;
+        }
+      }
+
+      return null;
+    };
+
+    messages.forEach((message) => {
+      if (message.sender === 'system') {
+        const renameEvent = parseRuntimeChatRenameEvent(message.text);
+        if (!renameEvent) return;
+
+        const targetCharacterId = findCharacterIdByDisplayName(renameEvent.oldName);
+        if (!targetCharacterId) return;
+        latestAliasByCharacterId[targetCharacterId] = renameEvent.newName;
+        return;
+      }
+
+      const characterId = typeof message.characterId === 'string' ? message.characterId : null;
+      if (!characterId) return;
+
+      const baseName = characterById.get(characterId)?.name.trim();
+      if (!baseName) return;
+
+      displayNameByMessageId[message.id] = latestAliasByCharacterId[characterId] || baseName;
+    });
+
+    return {
+      displayNameByMessageId,
+      latestAliasByCharacterId,
+    };
+  }, [isChatStyle, messages, characters, characterById]);
+  const resolveChatCharacter = useCallback((
+    message: ReaderChatMessage,
+    aliasState?: ChatRuntimeAliasState,
+  ) => {
+    const characterId = typeof message.characterId === 'string' ? message.characterId : null;
+    const blockChar = characterId ? characterById.get(characterId) || null : null;
+    const displayNameFromMessage = aliasState?.displayNameByMessageId?.[message.id];
+    const displayNameFromAlias = characterId ? aliasState?.latestAliasByCharacterId?.[characterId] : null;
+    const baseName = blockChar?.name.trim() || activeStory?.characterName || 'ไม่ระบุ';
+    const name = (displayNameFromMessage || displayNameFromAlias || baseName).trim() || baseName;
+    const avatarUrl = blockChar?.image_url?.trim() || null;
+
+    return {
+      id: blockChar?.id || characterId || 'chat-character',
+      name,
+      avatarUrl,
+    };
+  }, [characterById, activeStory?.characterName]);
+  const chatTypingCharacter = chatTypingPreview
+    ? resolveChatCharacter(chatTypingPreview, {
+      displayNameByMessageId: {},
+      latestAliasByCharacterId: chatRuntimeAliasState.latestAliasByCharacterId,
+    })
+    : null;
+
   if (isLoading) {
     return (
-      <main className={styles.main}>
-        <div className={styles.emptyState}>กำลังโหลดข้อมูลเรื่อง...</div>
-      </main>
+      <div className={styles.skeletonReader}>
+        <div className={`${styles.skeletonNavbar} skeletonBlock`} />
+        <div className={styles.skeletonContent}>
+          <div className={`${styles.skeletonChapterTitle} skeletonBlock`} />
+          {[100, 95, 88, 100, 92, 85, 100, 78, 95, 60].map((w, i) => (
+            <div key={i} className={`${styles.skeletonPara} skeletonBlock`} style={{ width: `${w}%` }} />
+          ))}
+        </div>
+      </div>
     );
   }
 
@@ -3246,37 +3397,12 @@ export default function StoryPage({ params }: StoryPageProps) {
       ? `ตอนที่ ${selectedChapterIndex + 1} · ${currentChapter.title}`
       : `ตอนที่ ${selectedChapterIndex + 1}`
     : 'ไม่พบตอน';
-  const chatMenuLikeLabel = storySettings.hideHeartCount
-    ? 'หัวใจ'
-    : `หัวใจ ${likeCount.toLocaleString('th-TH')}`;
-  const shouldHideChatTopbar = isChatTopbarHidden && !isTocOpen && !isChatOverflowOpen;
-  const resolveChatCharacter = (message: ReaderChatMessage) => {
-    const blockChar = characters.find((item) => item.id === message.characterId);
-    return blockChar
-      ? { id: blockChar.id, name: blockChar.name, avatarUrl: blockChar.image_url || fallbackAvatar }
-      : { id: 'reader-char', name: activeStory.characterName, avatarUrl: activeStory.avatarUrl || fallbackAvatar };
-  };
-  const chatTypingCharacter = chatTypingPreview ? resolveChatCharacter(chatTypingPreview) : null;
-
-  const closeChatOverflowMenu = () => {
-    setIsChatOverflowOpen(false);
-  };
-
-  const handleChatOverflowTouchStart = (event: ReactTouchEvent<HTMLDivElement>) => {
-    chatOverflowTouchStartYRef.current = event.touches[0]?.clientY ?? null;
-  };
-
-  const handleChatOverflowTouchEnd = (event: ReactTouchEvent<HTMLDivElement>) => {
-    const startY = chatOverflowTouchStartYRef.current;
-    chatOverflowTouchStartYRef.current = null;
-
-    const endY = event.changedTouches[0]?.clientY;
-    if (startY === null || typeof endY !== 'number') return;
-
-    if (endY - startY > 72) {
-      setIsChatOverflowOpen(false);
-    }
-  };
+  const canOpenChatComments = storySettings.allowComments && !isCurrentChapterLocked;
+  const shouldShowChatStarterHint = isChatStyle
+    && messages.length === 0
+    && !isChatTyping
+    && !isChatIntroDismissed
+    && !hasChatReadProgress;
 
   const readerMobileActions = (
     <div className="ffMobileActionInner">
@@ -3421,6 +3547,82 @@ export default function StoryPage({ params }: StoryPageProps) {
     </div>
   );
 
+  const chatCommentSheetJSX = isChatStyle
+    && storySettings.allowComments
+    && !isCurrentChapterLocked
+    && !isTocOpen
+    && isChatCommentSheetOpen ? (
+    <div
+      className={styles.chatCommentSheetBackdrop}
+      onClick={() => setIsChatCommentSheetOpen(false)}
+    >
+      <div
+        className={styles.chatCommentSheet}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className={styles.chatCommentSheetHeader}>
+          <h3>💬 ความคิดเห็น ({comments.length})</h3>
+          <button
+            type="button"
+            className={styles.chatCommentSheetCloseBtn}
+            onClick={() => setIsChatCommentSheetOpen(false)}
+            aria-label="ปิดคอมเมนต์"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div className={`${styles.commentList} ${styles.chatCommentList}`}>
+          {comments.length === 0 ? (
+            <p style={{ color: '#94a3b8', textAlign: 'center', padding: '1rem' }}>ยังไม่มีคอมเมนต์ เป็นคนแรกเลย!</p>
+          ) : (
+            comments.map((comment) => (
+              <div key={comment.id} className={styles.commentItem}>
+                <div className={styles.commentAvatar}>
+                  {comment.profiles?.avatar_url ? (
+                    <img src={comment.profiles.avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                  ) : (
+                    (comment.profiles?.pen_name || 'U').charAt(0).toUpperCase()
+                  )}
+                </div>
+                <div className={styles.commentBody}>
+                  <div className={styles.commentMeta}>
+                    <strong>{comment.profiles?.pen_name || 'ผู้อ่าน'}</strong>
+                    <span>{new Date(comment.created_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                  <p>{comment.content}</p>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+        {user && (
+          <div className={styles.commentForm}>
+            <input
+              type="text"
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="แสดงความคิดเห็น..."
+              className={styles.commentInput}
+              onKeyDown={(e) => e.key === 'Enter' && handleSubmitComment()}
+            />
+            <button
+              onClick={handleSubmitComment}
+              className={styles.commentSendBtn}
+              disabled={isSubmittingComment || !newComment.trim()}
+            >
+              <Send size={18} />
+            </button>
+          </div>
+        )}
+        {!user && (
+          <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', padding: '0.5rem' }}>
+            <Link href="/" style={{ color: 'var(--primary)' }}>เข้าสู่ระบบ</Link> เพื่อแสดงความคิดเห็น
+          </p>
+        )}
+      </div>
+    </div>
+  ) : null;
+
   const themeWrapperClass = isChatStyle ? 'theme-midnight' : '';
 
   return (
@@ -3428,94 +3630,118 @@ export default function StoryPage({ params }: StoryPageProps) {
       <div className={isChatStyle ? styles.main : isVisualNovelStyle ? styles.visualNovelShell : styles.readerLayout}>
         {isChatStyle ? (
           <ChatReaderLayout
-             story={dbStory}
-             chapter={currentChapter}
-             coinBalance={coinBalance}
-             onPointerDown={handleChatContainerPointerDown}
-             onPointerUp={handleChatContainerPointerUp}
-             onPointerCancel={handleChatContainerPointerCancel}
+            storyTitle={activeStory.title}
+            chapterLabel={chatChapterMetaLabel}
+            backgroundImageUrl={activeStory.wideCoverUrl || activeStory.avatarUrl}
+            isLiked={isCurrentChapterLiked}
+            likeCount={likeCount}
+            hideHeartCount={storySettings.hideHeartCount}
+            onToggleLike={handleToggleLike}
+            commentCount={storySettings.allowComments ? comments.length : -1}
+            canOpenComments={canOpenChatComments}
+            onOpenComments={() => {
+              if (canOpenChatComments) {
+                setIsChatCommentSheetOpen(true);
+              }
+            }}
+            onOpenToc={allowTocInReader ? () => {
+              setIsChatCommentSheetOpen(false);
+              setIsTocOpen(true);
+            } : undefined}
+            onPointerDown={handleChatContainerPointerDown}
+            onPointerUp={handleChatContainerPointerUp}
+            onPointerCancel={handleChatContainerPointerCancel}
           >
-              <div className={styles.chatConversation}>
-                {messages.length === 0 ? (
-                  <div className={styles.chatStarterHint}>
-                    แตะที่หน้าจอเพื่อเริ่มอ่าน {activeStory.title}
-                  </div>
-                ) : (
-                  messages.map((msg) => (
-                    <ChatBubble
-                      key={msg.id}
-                      message={msg}
-                      character={resolveChatCharacter(msg)}
+            <div className={styles.chatConversation}>
+              {shouldShowChatStarterHint && (
+                <div className={styles.chatStarterHint}>
+                  แตะที่หน้าจอเพื่อเริ่มอ่าน {activeStory.title}
+                </div>
+              )}
+              {messages.map((msg) => (
+                <ChatBubble
+                  key={msg.id}
+                  message={msg}
+                  character={resolveChatCharacter(msg, chatRuntimeAliasState)}
+                />
+              ))}
+              {isChatTyping && chatTypingPreview && (
+                <ChatTypingIndicator
+                  sender={chatTypingPreview.sender}
+                  character={chatTypingCharacter}
+                />
+              )}
+              <div ref={messagesEndRef} className={styles.scrollAnchor} />
+              {premiumGateJSX}
+              {showChatBranchSection && (
+                <>
+                  {isLoadingChoicesForRead ? (
+                    <div className={styles.chatBranchPanel}>
+                      <p className={styles.branchChoiceInfo}>กำลังโหลดตัวเลือก...</p>
+                    </div>
+                  ) : showEndingNotice ? (
+                    <div className={`${styles.chatBranchPanel} ${styles.branchEndingPanel}`}>
+                      <div className={styles.branchChoiceHeader}>
+                        <h3>จบเส้นทางแล้ว</h3>
+                        <span className={styles.branchEndingTag}>Ending</span>
+                      </div>
+                      <p className={styles.branchChoiceInfo}>ตอนนี้เป็นตอนจบของเส้นทางนี้</p>
+                    </div>
+                  ) : chapterChoicesForRead.length === 0 ? (
+                    choicesErrorForRead ? (
+                      <div className={styles.chatBranchPanel}>
+                        <p className={styles.branchChoiceError}>{choicesErrorForRead}</p>
+                      </div>
+                    ) : null
+                  ) : !showChoiceOverlay ? (
+                    <div className={styles.chatBranchPanel}>
+                      {choicesErrorForRead && (
+                        <p className={styles.branchChoiceError}>{choicesErrorForRead}</p>
+                      )}
+                      <button
+                        type="button"
+                        className={styles.branchChoiceBtn}
+                        onClick={() => setShowChoiceOverlay(true)}
+                      >
+                        <span>⚡ เลือกเส้นทางถัดไป ({chapterChoicesForRead.length} ทางเลือก)</span>
+                      </button>
+                    </div>
+                  ) : null}
+                  {showChoiceOverlay && chapterChoicesForRead.length > 0 && (
+                    <BranchChoiceOverlay
+                      choices={chapterChoicesForRead}
+                      onSelect={handleSelectBranchChoice}
+                      timerSeconds={activeChapterChoiceTimerSeconds}
+                      remainingSeconds={choiceCountdownRemainingSeconds}
+                      progressPercent={choiceCountdownProgressPercent}
                     />
-                  ))
-                )}
-                {isChatTyping && chatTypingPreview && (
-                  <ChatTypingIndicator
-                    sender={chatTypingPreview.sender}
-                    character={chatTypingCharacter}
-                  />
-                )}
-                <div ref={messagesEndRef} className={styles.scrollAnchor} />
-                {premiumGateJSX}
-                {showChatBranchSection && (
-                  <>
-                    {isLoadingChoicesForRead ? (
-                      <div className={styles.chatBranchPanel}>
-                        <p className={styles.branchChoiceInfo}>กำลังโหลดตัวเลือก...</p>
-                      </div>
-                    ) : showEndingNotice ? (
-                      <div className={`${styles.chatBranchPanel} ${styles.branchEndingPanel}`}>
-                        <div className={styles.branchChoiceHeader}>
-                          <h3>จบเส้นทางแล้ว</h3>
-                          <span className={styles.branchEndingTag}>Ending</span>
-                        </div>
-                        <p className={styles.branchChoiceInfo}>ตอนนี้เป็นตอนจบของเส้นทางนี้</p>
-                      </div>
-                    ) : chapterChoicesForRead.length === 0 ? (
-                      choicesErrorForRead ? (
-                        <div className={styles.chatBranchPanel}>
-                          <p className={styles.branchChoiceError}>{choicesErrorForRead}</p>
-                        </div>
-                      ) : null
-                    ) : !showChoiceOverlay ? (
-                      <div className={styles.chatBranchPanel}>
-                        {choicesErrorForRead && (
-                          <p className={styles.branchChoiceError}>{choicesErrorForRead}</p>
-                        )}
-                        <button
-                          type="button"
-                          className={styles.branchChoiceBtn}
-                          onClick={() => setShowChoiceOverlay(true)}
-                        >
-                          <span>⚡ เลือกเส้นทางถัดไป ({chapterChoicesForRead.length} ทางเลือก)</span>
-                        </button>
-                      </div>
-                    ) : null}
-                    {showChoiceOverlay && chapterChoicesForRead.length > 0 && (
-                      <BranchChoiceOverlay
-                        choices={chapterChoicesForRead}
-                        onSelect={handleSelectBranchChoice}
-                        timerSeconds={activeChapterChoiceTimerSeconds}
-                        remainingSeconds={choiceCountdownRemainingSeconds}
-                        progressPercent={choiceCountdownProgressPercent}
-                      />
-                    )}
-                  </>
-                )}
-              </div>
+                  )}
+                </>
+              )}
+            </div>
           </ChatReaderLayout>
         ) : isVisualNovelStyle ? (
           <>
             <div className={styles.visualNovelViewport}>
               <div className={styles.visualNovelTopbar}>
-                <div className={styles.visualNovelContext}>
-                  <span className={styles.visualNovelStoryTitle}>{activeStory.title}</span>
-                  <span className={styles.visualNovelChapterTitle}>
-                    {currentChapter?.title?.trim()
-                      ? `ตอนที่ ${selectedChapterIndex + 1}: ${currentChapter.title}`
-                      : `ตอนที่ ${selectedChapterIndex + 1}`}
-                  </span>
-                  <span className={styles.visualNovelTapHint}>{visualNovelTapHint}</span>
+                <div className={styles.visualNovelTopbarRow}>
+                  <button
+                    type="button"
+                    className={styles.visualNovelBackBtn}
+                    onClick={() => router.back()}
+                    aria-label="ย้อนกลับ"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <div className={styles.visualNovelContext}>
+                    <span className={styles.visualNovelStoryTitle}>{activeStory.title}</span>
+                    <span className={styles.visualNovelChapterTitle}>
+                      {currentChapter?.title?.trim()
+                        ? `ตอนที่ ${selectedChapterIndex + 1}: ${currentChapter.title}`
+                        : `ตอนที่ ${selectedChapterIndex + 1}`}
+                    </span>
+                    <span className={styles.visualNovelTapHint}>{visualNovelTapHint}</span>
+                  </div>
                 </div>
 
                 <div className={styles.visualNovelTopbarActions}>
@@ -3657,7 +3883,7 @@ export default function StoryPage({ params }: StoryPageProps) {
         ) : (
           <>
             {/* Reader Top Navbar */}
-            <nav className={styles.readerNavbar}>
+            <nav className={[styles.readerNavbar, !isNarrativeUIVisible ? styles.readerNavbarHidden : ''].filter(Boolean).join(' ')}>
               <div className={styles.readerNavContext}>
                 <span className={styles.readerNavContextEyebrow}>{activeStory.title}</span>
                 <span className={styles.readerNavContextTitle}>{readerContextTitle}</span>
@@ -3694,7 +3920,7 @@ export default function StoryPage({ params }: StoryPageProps) {
               </div>
             </nav>
 
-            <main className={styles.readerContainer}>
+            <main className={styles.readerContainer} onClick={handleNarrativeContentClick}>
               {dbChapters.length === 0 ? (
                 <div className={styles.emptyState}>{isPreviewMode ? 'ยังไม่พบตอนสำหรับพรีวิว' : 'เรื่องนี้ยังไม่มีตอนที่เผยแพร่'}</div>
               ) : (
@@ -3980,7 +4206,7 @@ export default function StoryPage({ params }: StoryPageProps) {
                 </>
               )}
             </main>
-            <div className="ffMobileActionBar">
+            <div className={['ffMobileActionBar', !isNarrativeUIVisible ? styles.readerFooterBarHidden : ''].filter(Boolean).join(' ')}>
               {readerMobileActions}
             </div>
 
@@ -4040,6 +4266,7 @@ export default function StoryPage({ params }: StoryPageProps) {
             </div>
           </div>
         )}
+        {chatCommentSheetJSX}
         {unlockConfirmChapter && (
           <div
             className={styles.unlockConfirmOverlay}

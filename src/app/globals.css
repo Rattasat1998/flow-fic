@@ -229,6 +229,7 @@ body.ffMobileDrawerOpen {
     bottom: 0;
     z-index: 80;
     display: block;
+    transition: transform 0.28s ease, opacity 0.28s ease;
     padding:
       0.75rem
       max(0.85rem, env(safe-area-inset-right))
@@ -331,4 +332,15 @@ a {
 
 .appContent {
   flex: 1;
+}
+
+@keyframes skeletonShimmer {
+  to { background-position-x: -220%; }
+}
+
+.skeletonBlock {
+  background: linear-gradient(110deg, rgba(255,255,255,0.05) 12%, rgba(255,255,255,0.12) 26%, rgba(255,255,255,0.05) 40%);
+  background-size: 240% 100%;
+  animation: skeletonShimmer 1.2s linear infinite;
+  border-radius: 8px;
 }

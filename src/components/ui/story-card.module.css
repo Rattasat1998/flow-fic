@@ -2,7 +2,7 @@
     display: flex;
     flex-direction: column;
     background-color: transparent;
-    width: 140px;
+    width: 0px;
     flex-shrink: 0;
     transition: transform 0.2s ease;
     cursor: pointer;

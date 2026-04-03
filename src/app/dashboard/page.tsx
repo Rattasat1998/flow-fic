@@ -1171,7 +1171,18 @@ export default function DashboardPage() {
 
                             <div className={styles.storyList}>
                                 {isStoryListLoading ? (
-                                    <div className={styles.listLoading}>กำลังโหลดรายการนิยาย...</div>
+                                    <div className={styles.skeletonList}>
+                                        {Array.from({ length: 4 }).map((_, i) => (
+                                            <div key={i} className={styles.skeletonRow}>
+                                                <div className={`${styles.skeletonThumb} skeletonBlock`} />
+                                                <div className={styles.skeletonRowBody}>
+                                                    <div className={`${styles.skeletonRowTitle} skeletonBlock`} />
+                                                    <div className={`${styles.skeletonRowTitle} skeletonBlock`} style={{ width: '80%' }} />
+                                                    <div className={`${styles.skeletonRowMeta} skeletonBlock`} />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 ) : pageStories.length === 0 ? (
                                     <div className={styles.emptyStories}>
                                         <p>

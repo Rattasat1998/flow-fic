@@ -128,7 +128,7 @@ type CharacterUpdatePayload = {
     age: string | null;
     occupation: string | null;
     personality: string | null;
-    image_url?: string;
+    image_url?: string | null;
 };
 
 type MutableChapterContentBlock = Record<string, unknown> & {
@@ -572,6 +572,7 @@ export default function StoryManagerPage() {
     const [charImageFile, setCharImageFile] = useState<File | null>(null);
     const [isSavingChar, setIsSavingChar] = useState(false);
     const [editingCharId, setEditingCharId] = useState<string | null>(null);
+    const charImageInputRef = useRef<HTMLInputElement | null>(null);
 
     // Confirm Modal state
     const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -1451,6 +1452,14 @@ export default function StoryManagerPage() {
         }
     };
 
+    const handleRemoveCharImage = () => {
+        setCharImageFile(null);
+        setCharForm((prev) => ({ ...prev, imageUrl: null }));
+        if (charImageInputRef.current) {
+            charImageInputRef.current.value = '';
+        }
+    };
+
     const handleSaveCharacter = async () => {
         if (!user) return;
 
@@ -1494,6 +1503,8 @@ export default function StoryManagerPage() {
                 // Only update image_url if a new image was uploaded
                 if (uploadedImageUrl) {
                     updateData.image_url = uploadedImageUrl;
+                } else if (!charForm.imageUrl) {
+                    updateData.image_url = null;
                 }
 
                 const { data: updatedChar, error: updateError } = await supabase
@@ -1548,6 +1559,9 @@ export default function StoryManagerPage() {
         setEditingCharId(null);
         setCharForm({ name: '', age: '', occupation: '', personality: '', imageUrl: null });
         setCharImageFile(null);
+        if (charImageInputRef.current) {
+            charImageInputRef.current.value = '';
+        }
         setShowCharModal(true);
     };
 
@@ -1561,6 +1575,9 @@ export default function StoryManagerPage() {
             imageUrl: char.image_url
         });
         setCharImageFile(null); // Clear any pending file
+        if (charImageInputRef.current) {
+            charImageInputRef.current.value = '';
+        }
         setShowCharModal(true);
     };
 
@@ -1569,6 +1586,9 @@ export default function StoryManagerPage() {
         setEditingCharId(null);
         setCharForm({ name: '', age: '', occupation: '', personality: '', imageUrl: null });
         setCharImageFile(null);
+        if (charImageInputRef.current) {
+            charImageInputRef.current.value = '';
+        }
     };
 
     const handleDeleteCharacter = (charId: string) => {
@@ -2595,7 +2615,7 @@ export default function StoryManagerPage() {
 
             {/* Character Add/Edit Modal */}
             {showCharModal && (
-                <div className={styles.modalOverlay} onClick={handleCloseCharModal}>
+                <div className={styles.modalOverlay}>
                     <div className={styles.modal} onClick={e => e.stopPropagation()}>
                         <div className={styles.modalHeader}>
                             <h2 className={styles.modalTitle}>{editingCharId ? 'แก้ไขตัวละคร' : 'เพิ่มตัวละครใหม่'}</h2>
@@ -2622,10 +2642,23 @@ export default function StoryManagerPage() {
                                         type="file"
                                         accept="image/*"
                                         style={{ display: 'none' }}
+                                        ref={charImageInputRef}
                                         onChange={handleCharImageChange}
                                     />
                                 </label>
                             </div>
+                            {charForm.imageUrl && (
+                                <div className={styles.coverActionRow}>
+                                    <button
+                                        type="button"
+                                        className={styles.clearCoverBtn}
+                                        onClick={handleRemoveCharImage}
+                                        disabled={isSavingChar}
+                                    >
+                                        ลบรูปตัวละคร
+                                    </button>
+                                </div>
+                            )}
 
                             <div className={styles.editField}>
                                 <label>ชื่อตัวละคร <span className={styles.requiredMark}>*</span></label>

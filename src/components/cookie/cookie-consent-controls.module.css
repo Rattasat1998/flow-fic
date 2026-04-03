@@ -1,46 +1,72 @@
+.bannerOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 109;
+  pointer-events: none;
+  background: transparent;
+}
+
 .banner {
   position: fixed;
-  left: 1rem;
-  right: 1rem;
-  bottom: 1rem;
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 110;
-  display: grid;
-  gap: 0.85rem;
-  border: 1px solid rgba(148, 163, 184, 0.34);
-  border-radius: 16px;
-  background: rgba(2, 6, 23, 0.95);
-  color: #e2e8f0;
-  box-shadow: 0 20px 36px rgba(2, 6, 23, 0.46);
-  padding: 0.9rem 0.95rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  pointer-events: auto;
+  border-top: 1px solid var(--panel-border-strong, var(--border));
+  background: rgba(10, 14, 23, 0.98);
+  color: var(--foreground);
+  box-shadow: 0 -12px 24px rgba(0, 0, 0, 0.34);
+  padding:
+    1rem
+    max(1.25rem, env(safe-area-inset-right))
+    calc(1rem + env(safe-area-inset-bottom, 0px))
+    max(1.25rem, env(safe-area-inset-left));
 }
 
 .bannerTitle {
-  font-size: 0.92rem;
-  font-weight: 700;
-  margin-bottom: 0.2rem;
+  margin: 0 0 0.32rem;
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.24;
+  letter-spacing: -0.02em;
 }
 
 .bannerDescription {
   margin: 0;
-  color: rgba(226, 232, 240, 0.86);
-  font-size: 0.8rem;
-  line-height: 1.45;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  line-height: 1.52;
+}
+
+.bannerLink {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.bannerLink:hover {
+  color: var(--primary-hover);
+  text-decoration: underline;
 }
 
 .bannerActions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .btnGhost,
 .btnPrimary {
-  min-height: 34px;
-  border-radius: 999px;
-  padding: 0.42rem 0.8rem;
+  min-height: 52px;
+  border-radius: 8px;
+  padding: 0.42rem 2.3rem;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 1.05rem;
   font-weight: 700;
   cursor: pointer;
 }
@@ -56,13 +82,14 @@
 }
 
 .btnPrimary {
-  border: 1px solid rgba(34, 197, 94, 0.45);
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.95), rgba(22, 163, 74, 0.95));
-  color: #f0fdf4;
+  border: 1px solid rgba(var(--primary-rgb, 245, 158, 11), 0.45);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
+  color: #1d1407;
+  box-shadow: 0 12px 22px rgba(var(--primary-rgb, 245, 158, 11), 0.24);
 }
 
 .btnPrimary:hover:not(:disabled) {
-  filter: brightness(1.05);
+  filter: brightness(1.02);
 }
 
 .btnPrimary:disabled {
@@ -205,9 +232,52 @@
 }
 
 @media (min-width: 768px) {
+  .bannerText {
+    max-width: 78%;
+  }
+}
+
+@media (max-width: 960px) {
+  .bannerTitle {
+    font-size: 1.04rem;
+  }
+
+  .bannerDescription {
+    font-size: 0.88rem;
+  }
+
+  .btnPrimary {
+    min-height: 52px;
+    padding: 0.45rem 1.8rem;
+    font-size: 1.08rem;
+  }
+}
+
+@media (max-width: 720px) {
   .banner {
-    left: auto;
-    right: 1rem;
-    max-width: 520px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.8rem;
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+
+  .bannerTitle {
+    font-size: 0.98rem;
+  }
+
+  .bannerDescription {
+    font-size: 0.82rem;
+  }
+
+  .bannerActions {
+    justify-content: stretch;
+  }
+
+  .btnPrimary {
+    width: 100%;
+    min-height: 46px;
+    font-size: 0.98rem;
+    padding: 0.45rem 1rem;
   }
 }

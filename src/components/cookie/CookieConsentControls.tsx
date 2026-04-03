@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { ShieldCheck, X } from 'lucide-react';
 import { useCookieConsent } from '@/contexts/CookieConsentContext';
 import styles from './cookie-consent-controls.module.css';
@@ -83,8 +84,6 @@ export function CookieConsentControls() {
     consent,
     showBanner,
     isPreferencesOpen,
-    openPreferences,
-    acceptAll,
     rejectAnalytics,
     savePreferences,
     closePreferences,
@@ -93,29 +92,24 @@ export function CookieConsentControls() {
   return (
     <>
       {showBanner && (
-        <section className={styles.banner} role="dialog" aria-live="polite" aria-label="Cookie consent">
-          <div className={styles.bannerText}>
-            <p className={styles.bannerTitle}>การตั้งค่าคุกกี้</p>
-            <p className={styles.bannerDescription}>
-              เราใช้คุกกี้ที่จำเป็นเพื่อการทำงานของระบบ และจะเปิด Analytics ต่อเมื่อคุณยินยอมเท่านั้น
-            </p>
-          </div>
-          <div className={styles.bannerActions}>
-            <button type="button" className={styles.btnGhost} onClick={rejectAnalytics}>
-              ปฏิเสธ Analytics
-            </button>
-            <button
-              type="button"
-              className={styles.btnGhost}
-              onClick={openPreferences}
-            >
-              ตั้งค่า
-            </button>
-            <button type="button" className={styles.btnPrimary} onClick={acceptAll}>
-              ยอมรับทั้งหมด
-            </button>
-          </div>
-        </section>
+        <div className={styles.bannerOverlay}>
+          <section className={styles.banner} role="dialog" aria-live="polite" aria-label="Cookie consent">
+            <div className={styles.bannerText}>
+              <p className={styles.bannerTitle}>เว็บไซต์นี้ใช้คุกกี้</p>
+              <p className={styles.bannerDescription}>
+                เราใช้คุกกี้เพื่อให้ระบบทำงานได้อย่างถูกต้องและปรับปรุงประสบการณ์ใช้งานของคุณ
+                รายละเอียดเพิ่มเติมดูได้ที่
+                {' '}
+                <Link href="/privacy" className={styles.bannerLink}>นโยบายความเป็นส่วนตัว</Link>
+              </p>
+            </div>
+            <div className={styles.bannerActions}>
+              <button type="button" className={styles.btnPrimary} onClick={rejectAnalytics}>
+                ทราบแล้ว
+              </button>
+            </div>
+          </section>
+        </div>
       )}
 
       {isPreferencesOpen && (

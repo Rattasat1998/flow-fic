@@ -2594,3 +2594,41 @@
         padding: 0 0.6rem;
     }
 }
+
+/* ── Skeleton Loading ─────────────────────────────── */
+.skeletonList {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.skeletonRow {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.skeletonThumb {
+    width: 80px;
+    height: 80px;
+    flex-shrink: 0;
+    border-radius: 8px;
+}
+
+.skeletonRowBody {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.skeletonRowTitle {
+    height: 16px;
+    border-radius: 4px;
+}
+
+.skeletonRowMeta {
+    height: 12px;
+    width: 50%;
+    border-radius: 4px;
+}

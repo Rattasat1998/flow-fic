@@ -1452,6 +1452,11 @@
     gap: 0.5rem;
 }
 
+.chatInputRow .spellcheckInlineFieldFull {
+    flex: 1;
+    min-width: 0;
+}
+
 .imageUploadBtn {
     width: 36px;
     height: 36px;
@@ -1495,7 +1500,9 @@
 }
 
 .chatTextInput {
-    flex: 1;
+    width: 100%;
+    display: block;
+    box-sizing: border-box;
     min-height: 36px;
     max-height: 88px;
     border: 1px solid #e2e8f0;
@@ -4090,6 +4097,11 @@
     outline: none;
     border-color: rgba(249, 115, 22, 0.34);
     box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.14);
+}
+
+.chatTextInput:focus {
+    background: rgba(2, 6, 23, 0.76);
+    color: #f8fafc;
 }
 
 .chatTextInput::placeholder,

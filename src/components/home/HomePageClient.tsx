@@ -731,9 +731,16 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
   }, [mainCategoryShelves, resolvedGridCategoryId, viewMode]);
 
   const isGridMode = viewMode === 'grid';
-  const renderHomeMediumCard = (story: DiscoveryStory, className: string, dataCard: string, imageSizes: string) => {
-    const isNewStory = (story.published_chapter_count ?? 0) <= 16 && (story.total_view_count ?? 0) <= 350_000;
+  const getWritingStyleLabel = (writingStyle: string | null): string | null => {
+    switch (writingStyle) {
+      case 'chat': return 'Chat';
+      case 'visual_novel': return 'Visual Novel';
+      case 'narrative': return 'Narrative';
+      default: return null;
+    }
+  };
 
+  const renderHomeMediumCard = (story: DiscoveryStory, className: string, dataCard: string, imageSizes: string) => {
     return (
       <StoryMediumCard
         key={`${dataCard}-${story.id}`}
@@ -746,7 +753,7 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
         enableTilt
         imageSizes={imageSizes}
         variant="case"
-        badgeLabel={isNewStory ? 'Case New' : null}
+        badgeLabel={getWritingStyleLabel(story.writing_style)}
         footer={(
           <div className={styles.mainCategoryShelfMetaRow}>
             <div className={styles.mainCategoryShelfMetaStats}>

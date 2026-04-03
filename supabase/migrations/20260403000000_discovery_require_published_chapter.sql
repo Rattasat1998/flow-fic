@@ -1,16 +1,5 @@
--- FlowFic reference SQL (non-migration)
--- This file documents the current get_discovery_rail definition.
--- Do not modify old migration files because they are already applied remotely.
---
--- Historical migrations that define/redefine this function:
--- 1) supabase/migrations/20260306201500_story_branching_graph_and_discovery_focus.sql
--- 2) supabase/migrations/20260309170000_story_wide_cover_for_home.sql
--- 3) supabase/migrations/20260309184500_discovery_rail_card_counts.sql
--- 4) supabase/migrations/20260323224300_homepage_visual_novel_indicator.sql
--- 5) supabase/migrations/20260325000000_discovery_rail_pagination.sql
---
--- Current authoritative definition copied from:
--- supabase/migrations/20260325000000_discovery_rail_pagination.sql
+-- Require at least one published chapter for a story to appear in discovery rails.
+-- Previously, a published story with no published chapters could appear in results.
 
 CREATE OR REPLACE FUNCTION public.get_discovery_rail(
   p_rail text,

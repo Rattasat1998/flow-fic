@@ -27,8 +27,14 @@ export function SiteFooter() {
   const isStoryReaderRoute = pathSegments.length === 3
     && pathSegments[0] === 'story'
     && pathSegments[2] === 'read';
+  const isStoryCreateRoute = pathSegments.length >= 2
+    && pathSegments[0] === 'story'
+    && pathSegments[1] === 'create';
+  const isStoryManageRoute = pathSegments.length >= 2
+    && pathSegments[0] === 'story'
+    && pathSegments[1] === 'manage';
 
-  if (isStoryDetailRoute || isStoryReaderRoute) {
+  if (isStoryDetailRoute || isStoryReaderRoute || isStoryCreateRoute || isStoryManageRoute) {
     return null;
   }
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Bell, CheckCheck, Loader2 } from 'lucide-react';
+import { Bell, CheckCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import styles from './notifications.module.css';
@@ -181,9 +181,17 @@ export default function NotificationsPage() {
             {/* Content */}
             <div className={`ffPageContainer ${styles.contentShell}`}>
                 {isLoading ? (
-                    <div className={styles.loadingState}>
-                        <Loader2 size={20} className={styles.spinner} />
-                        กำลังโหลดการแจ้งเตือน...
+                    <div className={styles.skeletonList}>
+                        {Array.from({ length: 5 }).map((_, i) => (
+                            <div key={i} className={styles.skeletonItem}>
+                                <div className={`${styles.skeletonAvatar} skeletonBlock`} />
+                                <div className={styles.skeletonItemBody}>
+                                    <div className={`${styles.skeletonItemTitle} skeletonBlock`} />
+                                    <div className={`${styles.skeletonItemTitle} skeletonBlock`} style={{ width: '80%' }} />
+                                    <div className={`${styles.skeletonItemMeta} skeletonBlock`} />
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 ) : notifications.length === 0 ? (
                     <div className={styles.emptyState}>
