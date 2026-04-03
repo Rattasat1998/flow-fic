@@ -1054,6 +1054,18 @@
     position: relative;
 }
 
+.mainCategoryShelfRailWrap::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0.36rem;
+    width: 3rem;
+    background: linear-gradient(to right, transparent, rgba(10, 12, 16, 0.72));
+    pointer-events: none;
+    border-radius: 0 14px 14px 0;
+}
+
 .mainCategoryShelfRail {
     display: flex;
     gap: 0.78rem;
@@ -1177,21 +1189,25 @@
 }
 
 .mainCategoryShelfArrowButton {
-    display: none;
+    display: inline-flex;
     position: absolute;
     right: 0;
     top: 50%;
     transform: translateY(-50%);
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 999px;
-    background: rgba(39, 44, 57, 0.84);
+    background: rgba(39, 44, 57, 0.9);
     color: #f1f6ff;
     cursor: pointer;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.45);
+}
+
+.mainCategoryShelfRail {
+    padding-right: 2rem;
 }
 
 .mainCategoryShelfArrowButton:hover {
@@ -1200,7 +1216,8 @@
 
 @media (min-width: 768px) {
     .mainCategoryShelfArrowButton {
-        display: inline-flex;
+        width: 40px;
+        height: 40px;
     }
 
     .mainCategoryShelfRail {
@@ -1947,7 +1964,7 @@
 
     .mainCategoryShelfRail {
         gap: 0.62rem;
-        padding-right: 0.1rem;
+        padding-right: 2rem;
     }
 
     .mainCategoryShelfCard {

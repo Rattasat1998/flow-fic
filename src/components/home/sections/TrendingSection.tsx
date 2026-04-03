@@ -55,7 +55,7 @@ export function TrendingSection({ sectionRef, stories, loading, error }: Trendin
                 className={styles.trendingCaseCard}
                 dataCard="trending"
                 enableTilt
-                badgeLabel={isNewStory ? 'Case New' : null}
+                badgeLabel={isNewStory ? 'เคสใหม่' : null}
                 imageSizes="(max-width: 767px) 47vw, (max-width: 1180px) 31vw, 320px"
                 footer={(
                   <div className={styles.mainCategoryShelfMetaRow}>

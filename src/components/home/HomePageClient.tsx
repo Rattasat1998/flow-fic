@@ -731,11 +731,11 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
   }, [mainCategoryShelves, resolvedGridCategoryId, viewMode]);
 
   const isGridMode = viewMode === 'grid';
-  const getWritingStyleLabel = (writingStyle: string | null): string | null => {
+  const getWritingStyleLabel = (writingStyle: string | null, pathMode?: string | null): string | null => {
     switch (writingStyle) {
-      case 'chat': return 'Chat';
-      case 'visual_novel': return 'Visual Novel';
-      case 'narrative': return 'Narrative';
+      case 'chat': return 'แชท';
+      case 'visual_novel': return 'วิชวลโนเวล';
+      case 'narrative': return pathMode === 'branching' ? 'บรรยาย · Interactive' : 'บรรยาย';
       default: return null;
     }
   };
@@ -753,7 +753,7 @@ export default function HomePageClient({ initialDiscovery }: HomePageClientProps
         enableTilt
         imageSizes={imageSizes}
         variant="case"
-        badgeLabel={getWritingStyleLabel(story.writing_style)}
+        badgeLabel={getWritingStyleLabel(story.writing_style, story.path_mode)}
         footer={(
           <div className={styles.mainCategoryShelfMetaRow}>
             <div className={styles.mainCategoryShelfMetaStats}>

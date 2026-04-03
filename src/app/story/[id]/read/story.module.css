@@ -1677,7 +1677,7 @@
   cursor: not-allowed;
 }
 
-.chatCommentSheetBackdrop {
+.readerCommentSheetBackdrop {
   position: fixed;
   inset: 0;
   z-index: 130;
@@ -1688,7 +1688,7 @@
   backdrop-filter: blur(5px);
 }
 
-.chatCommentSheet {
+.readerCommentSheet {
   width: min(700px, 100%);
   max-height: min(82vh, 760px);
   border-radius: 20px 20px 0 0;
@@ -1706,20 +1706,20 @@
   gap: 0.75rem;
 }
 
-.chatCommentSheetHeader {
+.readerCommentSheetHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
 }
 
-.chatCommentSheetHeader h3 {
+.readerCommentSheetHeader h3 {
   margin: 0;
   font-size: 1rem;
   color: #f8fafc;
 }
 
-.chatCommentSheetCloseBtn {
+.readerCommentSheetCloseBtn {
   width: 34px;
   height: 34px;
   border-radius: 10px;
@@ -1732,20 +1732,20 @@
   cursor: pointer;
 }
 
-.chatCommentList {
+.readerCommentList {
   margin-top: 0;
   max-height: min(50vh, 430px);
   padding-right: 0.15rem;
 }
 
 @media (max-width: 560px) {
-  .chatCommentSheet {
+  .readerCommentSheet {
     border-radius: 16px 16px 0 0;
     gap: 0.65rem;
     padding-top: 0.72rem;
   }
 
-  .chatCommentSheetHeader h3 {
+  .readerCommentSheetHeader h3 {
     font-size: 0.92rem;
   }
 }
@@ -2169,169 +2169,162 @@
 
 .visualNovelShell {
   min-height: 100dvh;
-  height: 100dvh;
   background:
-    #0c0c0c;
-  color: #f8fafc;
-  display: flex;
-  flex-direction: column;
+    radial-gradient(ellipse at 50% 0%, rgba(220, 38, 38, 0.16), transparent 38%),
+    linear-gradient(180deg, #0f0f0f 0%, #0a0a0a 100%);
+  color: #ffffff;
   overflow: hidden;
   --vn-safe-top: max(env(safe-area-inset-top), 0px);
   --vn-safe-bottom: max(env(safe-area-inset-bottom), 0px);
-  --vn-topbar-height: 78px;
 }
 
 .visualNovelViewport {
   position: relative;
-  flex: 1;
   min-height: 100dvh;
-  height: 100dvh;
+  height: 100%;
   overflow: hidden;
-  padding:
-    calc(var(--vn-safe-top) + clamp(0.65rem, 1.6vw, 1rem))
-    clamp(0.75rem, 2vw, 1.4rem)
-    calc(var(--vn-safe-bottom) + 0.8rem);
-  display: grid;
-  grid-template-rows: var(--vn-topbar-height) minmax(0, 1fr);
-  gap: 0.75rem;
 }
 
-.visualNovelTopbar {
-  position: sticky;
-  top: 0;
-  z-index: 8;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  min-height: var(--vn-topbar-height);
-  padding: 0.7rem 0.9rem;
-  border-radius: 20px;
-  background: rgba(12, 12, 12, 0.74);
-  border: 1px solid rgba(245, 158, 11, 0.22);
-  backdrop-filter: blur(12px);
+.visualNovelViewportFrame {
+  position: relative;
+  width: min(100%, 580px);
+  height: 100dvh;
+  margin: 0 auto;
 }
 
 .visualNovelHiddenAudio {
   display: none;
 }
 
-.visualNovelTopbarRow {
+.visualNovelHeader {
+  position: absolute;
+  inset-inline-start: max(0.7rem, env(safe-area-inset-left));
+  inset-inline-end: max(0.7rem, env(safe-area-inset-right));
+  top: calc(var(--vn-safe-top) + 0.5rem);
+  z-index: 10;
   display: flex;
   align-items: center;
-  gap: 0.48rem;
-  min-width: 0;
-  flex: 1;
+  justify-content: space-between;
+  gap: 0.85rem;
+  padding: 0;
+  background: transparent;
+  border: none;
 }
 
 .visualNovelBackBtn {
-  display: none;
-  width: 34px;
-  min-width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  background: rgba(15, 23, 42, 0.48);
-  color: #e2e8f0;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .visualNovelBackBtn:hover {
-  border-color: rgba(251, 146, 60, 0.55);
-  background: rgba(124, 45, 18, 0.38);
-  color: #fff7ed;
+  background: rgba(220, 38, 38, 0.28);
+  color: #ffffff;
+}
+
+.visualNovelHeaderMain {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
 }
 
 .visualNovelContext {
   display: flex;
   flex-direction: column;
-  gap: 0.18rem;
+  gap: 0.16rem;
   min-width: 0;
 }
 
 .visualNovelStoryTitle {
-  color: #f6c66f;
-  font-size: 0.74rem;
+  color: #ff4444;
+  font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .visualNovelChapterTitle {
-  color: #f8fafc;
-  font-size: 0.95rem;
+  color: #ffffff;
+  font-size: 0.96rem;
   font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.3;
 }
 
 .visualNovelTapHint {
-  color: rgba(226, 232, 240, 0.74);
-  font-size: 0.74rem;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.73rem;
   font-weight: 600;
   line-height: 1.4;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.visualNovelTopbarActions {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  flex-wrap: nowrap;
-  justify-content: flex-end;
-  overflow-x: auto;
-  max-width: 100%;
-  padding-bottom: 2px;
-}
-
-.visualNovelTopbarActions::-webkit-scrollbar {
-  height: 6px;
-}
-
-.visualNovelTopbarActions::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.34);
-  border-radius: 999px;
-}
-
-.visualNovelTopbarBtn {
-  flex: 0 0 auto;
-  min-height: 38px;
+.visualNovelHeaderAction {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0 0.9rem;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  background: rgba(15, 23, 42, 0.48);
-  color: #e2e8f0;
-  font-size: 0.82rem;
-  font-weight: 700;
+  justify-content: center;
   cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-.visualNovelTopbarBtnActive {
-  border-color: rgba(245, 158, 11, 0.52);
-  background: rgba(245, 158, 11, 0.16);
-  color: #fef3c7;
+.visualNovelHeaderAction:hover {
+  background: rgba(220, 38, 38, 0.28);
+  color: #ffffff;
 }
 
-.visualNovelTopbarBtn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+.visualNovelHeaderActionActive {
+  background: rgba(220, 38, 38, 0.32);
+  color: #ffffff;
+}
+
+.visualNovelStatusNotice {
+  position: absolute;
+  inset-inline-start: max(0.7rem, env(safe-area-inset-left));
+  inset-inline-end: max(0.7rem, env(safe-area-inset-right));
+  top: calc(var(--vn-safe-top) + 3.6rem);
+  z-index: 10;
+  color: #ff8888;
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.visualNovelSceneShell {
+  position: absolute;
+  inset: 0;
 }
 
 .visualNovelStageWrap {
   position: relative;
-  min-height: 0;
   height: 100%;
   overflow: hidden;
+}
+
+.visualNovelStageSurface {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 0;
+  background: #0f0f0f;
+  border: none;
 }
 
 .visualNovelStage {
@@ -2339,44 +2332,177 @@
   height: 100%;
 }
 
+.visualNovelDialogueDock {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  z-index: 4;
+  display: block;
+  padding: 5.5rem 1.1rem calc(4.8rem + var(--vn-safe-bottom)) 1.1rem;
+  background:
+    linear-gradient(
+      to bottom,
+      transparent 0%,
+      rgba(6, 6, 6, 0.8) 38%,
+      rgba(4, 4, 4, 0.97) 68%,
+      #040404 100%
+    );
+  pointer-events: auto;
+}
+
+.visualNovelDialogueBox {
+  width: 100%;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  backdrop-filter: none;
+}
+
+.visualNovelDialogueMeta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.38rem;
+}
+
+.visualNovelSpeakerTag,
+.visualNovelNarratorTag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  border: none;
+  min-height: auto;
+  font-size: 0.73rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.visualNovelSpeakerTag {
+  color: #ff4444;
+}
+
+.visualNovelNarratorTag {
+  color: rgba(255, 255, 255, 0.38);
+}
+
 .visualNovelProgressPill {
   display: inline-flex;
   align-items: center;
-  min-height: 24px;
-  padding: 0 0.55rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(226, 232, 240, 0.62);
-  font-size: 0.68rem;
+  min-height: auto;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: rgba(255, 255, 255, 0.28);
+  font-size: 0.65rem;
   font-weight: 700;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
+}
+
+.visualNovelDialogueText {
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(1rem, 2.8vw, 1.14rem);
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+.visualNovelDialogueTextNarration {
+  color: rgba(255, 255, 255, 0.68);
+  font-style: italic;
+}
+
+.visualNovelDialogueFooter {
+  margin-top: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.visualNovelAutoState {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  padding: 0.3rem 0.6rem 0.3rem 0.4rem;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.visualNovelAutoState:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.visualNovelAutoStateActive {
+  background: rgba(220, 38, 38, 0.2);
+  color: #ff8888;
+}
+
+.visualNovelAutoStateActive:hover {
+  background: rgba(220, 38, 38, 0.3);
+  color: #ffaaaa;
+}
+
+.visualNovelTapIndicator {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
 .visualNovelBranchPrompt {
   position: absolute;
   inset-inline: 1rem;
-  inset-block-end: 1rem;
-  z-index: 7;
-  max-width: min(520px, 100%);
+  inset-block-end: calc(clamp(5rem, 14vw, 6.5rem) + var(--vn-safe-bottom));
+  z-index: 5;
+  max-width: min(420px, calc(100% - 2rem));
   margin-inline: auto;
-  padding: 0.9rem;
-  border-radius: 18px;
-  background: rgba(2, 6, 23, 0.76);
-  border: 1px solid rgba(125, 211, 252, 0.14);
-  backdrop-filter: blur(12px);
+  padding: 0.85rem 0.95rem;
+  border-radius: 16px;
+  background: rgba(18, 18, 18, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(20px);
   text-align: center;
+}
+
+.visualNovelBranchPrompt h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.96rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.visualNovelBranchPromptHint {
+  display: inline-flex;
+  margin-top: 0.45rem;
+  color: rgba(255, 136, 136, 0.9);
+  font-size: 0.76rem;
+  font-weight: 700;
 }
 
 .visualNovelChoiceOverlay {
   position: absolute;
   inset: 0;
-  z-index: 8;
+  z-index: 6;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  background: rgba(2, 6, 23, 0.4);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
 }
 
 .visualNovelGateWrap {
@@ -2387,80 +2513,330 @@
   justify-content: center;
 }
 
-@media (max-width: 980px) {
-  .visualNovelViewport {
-    gap: 0.65rem;
-  }
+.visualNovelBottomBar {
+  position: absolute;
+  inset-inline-start: max(0.7rem, env(safe-area-inset-left));
+  inset-inline-end: max(0.7rem, env(safe-area-inset-right));
+  bottom: calc(var(--vn-safe-bottom) + 0.6rem);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+}
 
-  .visualNovelTopbar {
-    border-radius: 16px;
-    padding: 0.6rem 0.75rem;
-  }
+.visualNovelBottomGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
 
-  .visualNovelTopbarActions {
-    justify-content: flex-start;
-  }
+.visualNovelBottomAction,
+.visualNovelBottomUtilityBtn,
+.visualNovelBottomPrimaryBtn {
+  border: none;
+  color: #e2e8f0;
+  cursor: pointer;
+  transition: transform 0.18s ease, opacity 0.18s ease, border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+}
+
+.visualNovelBottomAction {
+  width: 50px;
+  min-width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.14rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+}
+
+.visualNovelBottomAction span {
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.visualNovelBottomActionLiked {
+  color: #ff5555;
+  background: rgba(220, 38, 38, 0.22);
+}
+
+.visualNovelBottomAction:disabled,
+.visualNovelBottomUtilityBtn:disabled,
+.visualNovelBottomPrimaryBtn:disabled,
+.visualNovelSheetAction:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.visualNovelBottomUtilityBtn {
+  min-height: 46px;
+  padding: 0 1rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.visualNovelBottomPrimaryBtn {
+  min-height: 46px;
+  min-width: 150px;
+  padding: 0 1.1rem 0 1.25rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  background: #dc2626;
+  border: none;
+  color: #ffffff;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.visualNovelBottomPrimaryChevron {
+  transform: rotate(180deg);
+}
+
+.visualNovelBottomPrimaryBtnDisabled {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.visualNovelBottomAction:hover,
+.visualNovelBottomUtilityBtn:hover,
+.visualNovelBottomPrimaryBtn:hover,
+.visualNovelSheetAction:hover {
+  transform: translateY(-1px);
+}
+
+.visualNovelSheetBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 132;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(10px);
+}
+
+.visualNovelSheet {
+  width: min(640px, 100%);
+  border-radius: 20px 20px 0 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: none;
+  background: #161616;
+  padding:
+    0.85rem
+    max(1rem, env(safe-area-inset-right))
+    calc(1rem + env(safe-area-inset-bottom, 0px))
+    max(1rem, env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.visualNovelSheetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.visualNovelSheetHeader h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #ffffff;
+}
+
+.visualNovelSheetCloseBtn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(40, 40, 40, 0.9);
+  color: rgba(255, 255, 255, 0.8);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.visualNovelSheetActions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.visualNovelSheetAction {
+  width: 100%;
+  min-height: 56px;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.8rem 0.85rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: #212121;
+  color: rgba(255, 255, 255, 0.8);
+  text-align: left;
+  cursor: pointer;
+}
+
+.visualNovelSheetAction div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+}
+
+.visualNovelSheetAction strong {
+  color: #ffffff;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.visualNovelSheetAction span {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.visualNovelSheetActionActive {
+  border-color: rgba(220, 38, 38, 0.4);
+  background: rgba(220, 38, 38, 0.18);
+  color: #ff9999;
+}
+
+.visualNovelSheetNotice {
+  margin: 0;
+  color: #ff8888;
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.45;
 }
 
 @media (max-width: 640px) {
-  .visualNovelViewport {
-    padding:
-      calc(var(--vn-safe-top) + 0.6rem)
-      0.65rem
-      calc(var(--vn-safe-bottom) + 0.7rem);
-    grid-template-rows: auto minmax(0, 1fr);
+  .visualNovelHeaderMain {
+    gap: 0.5rem;
   }
 
-  .visualNovelTopbar {
-    flex-direction: column;
-    align-items: stretch;
-    min-height: unset;
-    gap: 0.48rem;
-    border-radius: 14px;
-    padding: 0.55rem 0.7rem;
-  }
-
-  .visualNovelTopbarRow {
-    gap: 0.42rem;
-  }
-
-  .visualNovelBackBtn {
-    display: inline-flex;
-    width: 30px;
-    min-width: 30px;
-    height: 30px;
+  .visualNovelBackBtn,
+  .visualNovelHeaderAction {
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
   }
 
   .visualNovelStoryTitle {
-    font-size: 0.68rem;
+    font-size: 0.67rem;
   }
 
   .visualNovelChapterTitle {
-    font-size: 0.86rem;
+    font-size: 0.88rem;
   }
 
   .visualNovelTapHint {
-    font-size: 0.7rem;
+    font-size: 0.68rem;
   }
 
-  .visualNovelTopbarActions {
-    gap: 0.38rem;
-    justify-content: flex-start;
+  .visualNovelDialogueDock {
+    padding: 4.5rem 0.95rem calc(4.5rem + var(--vn-safe-bottom)) 0.95rem;
   }
 
-  .visualNovelTopbarBtn {
-    min-height: 32px;
-    padding: 0 0.62rem;
-    font-size: 0.73rem;
+  .visualNovelDialogueMeta {
+    margin-bottom: 0.32rem;
   }
 
   .visualNovelBranchPrompt {
-    inset-inline: 0.75rem;
-    inset-block-end: 0.75rem;
+    inset-inline: 0.65rem;
+    inset-block-end: calc(clamp(4.8rem, 13vw, 6rem) + var(--vn-safe-bottom));
+    max-width: calc(100% - 1.3rem);
+    padding: 0.7rem 0.8rem;
+    border-radius: 14px;
   }
 
   .visualNovelChoiceOverlay {
     padding: 0.85rem 0.65rem;
+  }
+
+  .visualNovelBottomGroup {
+    gap: 0.38rem;
+  }
+
+  .visualNovelBottomAction {
+    width: 46px;
+    min-width: 46px;
+    height: 46px;
+  }
+
+  .visualNovelBottomAction span {
+    font-size: 0.62rem;
+  }
+
+  .visualNovelBottomUtilityBtn,
+  .visualNovelBottomPrimaryBtn {
+    min-height: 42px;
+    padding-inline: 0.85rem;
+    font-size: 0.76rem;
+  }
+
+  .visualNovelBottomPrimaryBtn {
+    min-width: 130px;
+  }
+
+  .visualNovelSheet {
+    border-radius: 16px 16px 0 0;
+    padding-top: 0.75rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .visualNovelBottomBar {
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+
+  .visualNovelBottomGroup {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .visualNovelBottomGroup:last-child {
+    gap: 0.42rem;
+  }
+
+  .visualNovelBottomUtilityBtn,
+  .visualNovelBottomPrimaryBtn {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .visualNovelBottomUtilityBtn span,
+  .visualNovelBottomPrimaryBtn span {
+    white-space: nowrap;
+  }
+
+  .visualNovelDialogueFooter {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.28rem;
   }
 }
 

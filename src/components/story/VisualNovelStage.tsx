@@ -33,6 +33,7 @@ type VisualNovelStageProps = {
     characters: VisualNovelStageCharacter[];
     fallbackBackgroundUrl?: string | null;
     variant?: 'reader' | 'editor';
+    presentation?: 'default' | 'immersiveReader';
     className?: string;
     speakerFallback?: string;
     footerSlot?: ReactNode;
@@ -45,6 +46,7 @@ export function VisualNovelStage({
     characters,
     fallbackBackgroundUrl = null,
     variant = 'reader',
+    presentation = 'default',
     className,
     speakerFallback = 'ผู้บรรยาย',
     footerSlot = null,
@@ -90,6 +92,7 @@ export function VisualNovelStage({
     const shouldShowSpeakerLabel = hasSpeaker || !hideNarratorFallback;
     const speakerLabel = hasSpeaker ? (speakerCharacter?.name || speakerFallback) : speakerFallback;
     const hasFooterSlot = footerSlot !== null && footerSlot !== undefined && footerSlot !== false;
+    const shouldRenderDialogueDock = presentation !== 'immersiveReader';
     const stageClassName = [
         styles.stage,
         variant === 'editor' ? styles.editorStage : styles.readerStage,
@@ -98,6 +101,7 @@ export function VisualNovelStage({
             : effectiveLayoutMode === 'solo'
                 ? styles.soloStage
                 : styles.stageLayoutStage,
+        presentation === 'immersiveReader' ? styles.immersiveReaderStage : '',
         className,
     ].filter(Boolean).join(' ');
 
@@ -254,17 +258,19 @@ export function VisualNovelStage({
                 </>
             )}
 
-            <div className={styles.dialogueDock}>
-                <div className={styles.dialogueBox}>
-                    {(shouldShowSpeakerLabel || hasFooterSlot) && (
-                        <div className={`${styles.dialogueHeader} ${!shouldShowSpeakerLabel ? styles.dialogueHeaderFooterOnly : ''}`}>
-                            {shouldShowSpeakerLabel && <span className={styles.speakerTag}>{speakerLabel}</span>}
-                            {footerSlot}
-                        </div>
-                    )}
-                    <p className={styles.dialogueText}>{dialogueText}</p>
+            {shouldRenderDialogueDock && (
+                <div className={styles.dialogueDock}>
+                    <div className={styles.dialogueBox}>
+                        {(shouldShowSpeakerLabel || hasFooterSlot) && (
+                            <div className={`${styles.dialogueHeader} ${!shouldShowSpeakerLabel ? styles.dialogueHeaderFooterOnly : ''}`}>
+                                {shouldShowSpeakerLabel && <span className={styles.speakerTag}>{speakerLabel}</span>}
+                                {footerSlot}
+                            </div>
+                        )}
+                        <p className={styles.dialogueText}>{dialogueText}</p>
+                    </div>
                 </div>
-            </div>
+            )}
         </section>
     );
 }

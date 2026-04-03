@@ -17,7 +17,7 @@ import { ChatMessage } from '@/types/chat';
 import { VisualNovelStage } from '@/components/story/VisualNovelStage';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { List, Heart, Bookmark, BookmarkCheck, MoreVertical, X, Send, Lock, Coins, Play, Pause, Volume2, VolumeX, ChevronLeft } from 'lucide-react';
+import { List, Heart, Bookmark, BookmarkCheck, MoreVertical, X, Send, Lock, Coins, Play, Pause, Volume2, VolumeX, ChevronLeft, MessageSquare, RefreshCcw, Settings } from 'lucide-react';
 import { BranchChoiceOverlay, OverlayChoice } from '@/components/story/BranchChoiceOverlay';
 import styles from './story.module.css';
 import { supabase } from '@/lib/supabase';
@@ -661,7 +661,8 @@ export default function StoryPage({ params }: StoryPageProps) {
   const [choicesError, setChoicesError] = useState<string | null>(null);
   const [showChoiceOverlay, setShowChoiceOverlay] = useState(false);
   const [isTocOpen, setIsTocOpen] = useState(false);
-  const [isChatCommentSheetOpen, setIsChatCommentSheetOpen] = useState(false);
+  const [isReaderCommentSheetOpen, setIsReaderCommentSheetOpen] = useState(false);
+  const [isVisualNovelSettingsOpen, setIsVisualNovelSettingsOpen] = useState(false);
   const [chatIntroDismissedKeys, setChatIntroDismissedKeys] = useState<Record<string, true>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const narrativeChoicePanelRef = useRef<HTMLDivElement>(null);
@@ -1662,7 +1663,7 @@ export default function StoryPage({ params }: StoryPageProps) {
   }, [isChatStyle, isVisualNovelStyle, isNarrativeUIVisible]);
 
   useEffect(() => {
-    if (!isChatStyle || !isChatCommentSheetOpen) return;
+    if (!isReaderCommentSheetOpen && !isVisualNovelSettingsOpen) return;
 
     const previousBodyOverflow = document.body.style.overflow;
     const previousHtmlOverflow = document.documentElement.style.overflow;
@@ -1673,20 +1674,21 @@ export default function StoryPage({ params }: StoryPageProps) {
       document.body.style.overflow = previousBodyOverflow;
       document.documentElement.style.overflow = previousHtmlOverflow;
     };
-  }, [isChatStyle, isChatCommentSheetOpen]);
+  }, [isReaderCommentSheetOpen, isVisualNovelSettingsOpen]);
 
   useEffect(() => {
-    if (!isChatStyle || !isChatCommentSheetOpen) return;
+    if (!isReaderCommentSheetOpen && !isVisualNovelSettingsOpen) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setIsChatCommentSheetOpen(false);
+        setIsReaderCommentSheetOpen(false);
+        setIsVisualNovelSettingsOpen(false);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isChatStyle, isChatCommentSheetOpen]);
+  }, [isReaderCommentSheetOpen, isVisualNovelSettingsOpen]);
 
   const activeChapter = dbChapters[selectedChapterIndex] || null;
   const activeChapterId = activeChapter?.id || null;
@@ -2051,13 +2053,16 @@ export default function StoryPage({ params }: StoryPageProps) {
     setUnlockError(null);
     setUnlockNotice(null);
     setShowChoiceOverlay(false);
+    setIsVisualNovelSettingsOpen(false);
     setHoveredBookmarkBlockId(null);
     clearChatTypingTimer();
     setIsChatTyping(false);
     setChatTypingPreview(null);
     clearPendingLongPressBookmark();
+    if (isChatStyle || isVisualNovelStyle) {
+      setIsReaderCommentSheetOpen(false);
+    }
     if (isChatStyle) {
-      setIsChatCommentSheetOpen(false);
       chatAdvancePointerRef.current = null;
     }
 
@@ -2446,13 +2451,21 @@ export default function StoryPage({ params }: StoryPageProps) {
     markCurrentChapterCompleted,
   ]);
 
+  const isVisualNovelInteractionBlocked = isVisualNovelStyle && (
+    showChoiceOverlay
+    || isTocOpen
+    || isReaderCommentSheetOpen
+    || isVisualNovelSettingsOpen
+    || !!unlockConfirmChapter
+  );
+
   const handleNextLine = useCallback(() => {
     if (!activeStory) return;
     const currentChapter = dbChapters[selectedChapterIndex];
     if (!currentChapter || !canReadChapter(currentChapter)) return;
 
     if (isVisualNovelStyle) {
-      if (showChoiceOverlay) return;
+      if (isVisualNovelInteractionBlocked) return;
       if (currentIndex >= visualNovelScenes.length) return;
 
       const activeScene = visualNovelScenes[currentIndex];
@@ -2500,7 +2513,7 @@ export default function StoryPage({ params }: StoryPageProps) {
     isChatStyle,
     isChatTyping,
     chatScript,
-    showChoiceOverlay,
+    isVisualNovelInteractionBlocked,
     clearVisualNovelTypewriterTimer,
     clearVisualNovelAutoPlayTimer,
     clearChatTypingTimer,
@@ -2508,7 +2521,7 @@ export default function StoryPage({ params }: StoryPageProps) {
   ]);
 
   const handleChatContainerPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!isChatStyle || isChatCommentSheetOpen || isTocOpen || showChoiceOverlay) return;
+    if (!isChatStyle || isReaderCommentSheetOpen || isTocOpen || showChoiceOverlay) return;
     if (!event.isPrimary || event.button !== 0) return;
     if (isInteractiveChatTarget(event.target)) {
       chatAdvancePointerRef.current = null;
@@ -2520,7 +2533,7 @@ export default function StoryPage({ params }: StoryPageProps) {
       startX: event.clientX,
       startY: event.clientY,
     };
-  }, [isChatStyle, isChatCommentSheetOpen, isTocOpen, showChoiceOverlay]);
+  }, [isChatStyle, isReaderCommentSheetOpen, isTocOpen, showChoiceOverlay]);
 
   const handleChatContainerPointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (!isChatStyle) return;
@@ -2529,7 +2542,7 @@ export default function StoryPage({ params }: StoryPageProps) {
     const pendingTap = chatAdvancePointerRef.current;
     chatAdvancePointerRef.current = null;
     if (!pendingTap || pendingTap.pointerId !== event.pointerId) return;
-    if (isChatCommentSheetOpen || isTocOpen || showChoiceOverlay) return;
+    if (isReaderCommentSheetOpen || isTocOpen || showChoiceOverlay) return;
     if (isInteractiveChatTarget(event.target)) return;
 
     const movedX = Math.abs(event.clientX - pendingTap.startX);
@@ -2537,7 +2550,7 @@ export default function StoryPage({ params }: StoryPageProps) {
     if (movedX > CHAT_ADVANCE_TAP_DISTANCE_PX || movedY > CHAT_ADVANCE_TAP_DISTANCE_PX) return;
 
     handleNextLine();
-  }, [isChatStyle, isChatCommentSheetOpen, isTocOpen, showChoiceOverlay, handleNextLine]);
+  }, [isChatStyle, isReaderCommentSheetOpen, isTocOpen, showChoiceOverlay, handleNextLine]);
 
   const handleChatContainerPointerCancel = useCallback(() => {
     chatAdvancePointerRef.current = null;
@@ -2551,6 +2564,9 @@ export default function StoryPage({ params }: StoryPageProps) {
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target && ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target.tagName)) {
+        return;
+      }
+      if (isVisualNovelInteractionBlocked) {
         return;
       }
 
@@ -2569,6 +2585,7 @@ export default function StoryPage({ params }: StoryPageProps) {
     selectedChapterIndex,
     canReadChapter,
     handleNextLine,
+    isVisualNovelInteractionBlocked,
   ]);
 
   useEffect(() => {
@@ -2577,7 +2594,7 @@ export default function StoryPage({ params }: StoryPageProps) {
     if (!isVisualNovelStyle || isPreviewMode) return;
     if (!isVisualNovelAutoPlayEnabled) return;
     if (!activeChapter || !canReadChapter(activeChapter)) return;
-    if (showChoiceOverlay) return;
+    if (isVisualNovelInteractionBlocked) return;
     if (currentIndex >= visualNovelScenes.length) return;
     if (!isTypingComplete) return;
 
@@ -2598,7 +2615,7 @@ export default function StoryPage({ params }: StoryPageProps) {
     isVisualNovelAutoPlayEnabled,
     activeChapter,
     canReadChapter,
-    showChoiceOverlay,
+    isVisualNovelInteractionBlocked,
     currentIndex,
     visualNovelScenes,
     isTypingComplete,
@@ -3397,12 +3414,75 @@ export default function StoryPage({ params }: StoryPageProps) {
       ? `ตอนที่ ${selectedChapterIndex + 1} · ${currentChapter.title}`
       : `ตอนที่ ${selectedChapterIndex + 1}`
     : 'ไม่พบตอน';
-  const canOpenChatComments = storySettings.allowComments && !isCurrentChapterLocked;
+  const canOpenReaderComments = storySettings.allowComments && !isCurrentChapterLocked;
   const shouldShowChatStarterHint = isChatStyle
     && messages.length === 0
     && !isChatTyping
     && !isChatIntroDismissed
     && !hasChatReadProgress;
+  const visualNovelSpeakerCharacterId = currentVisualNovelScene?.speakerCharacterId
+    || currentVisualNovelScene?.soloCharacterId
+    || (currentVisualNovelScene?.leftCharacterId && !currentVisualNovelScene?.rightCharacterId
+      ? currentVisualNovelScene.leftCharacterId
+      : null)
+    || null;
+  const currentVisualNovelSpeaker = visualNovelSpeakerCharacterId
+    ? characterById.get(visualNovelSpeakerCharacterId) || null
+    : null;
+  const hasVisualNovelSpeaker = !!currentVisualNovelSpeaker?.name?.trim();
+  const visualNovelDialogueText = visualNovelTypedDialogueText || (currentIndex >= visualNovelScenes.length
+    ? currentVisualNovelScene?.text || ''
+    : '');
+  const isVisualNovelChapterComplete = currentIndex >= visualNovelScenes.length;
+  const hasNextLinearChapter = !isBranchingPath && selectedChapterIndex < dbChapters.length - 1;
+  const shouldShowVisualNovelBranchPrompt = showVisualNovelBranchSection
+    && !showChoiceOverlay
+    && (isLoadingChoicesForRead || showEndingNotice || chapterChoicesForRead.length > 0 || !!choicesErrorForRead);
+  const visualNovelBranchPromptMessage = isLoadingChoicesForRead
+    ? 'กำลังเตรียมทางเลือกถัดไป...'
+    : showEndingNotice
+      ? 'ตอนนี้เป็นตอนจบของเส้นทางนี้'
+      : chapterChoicesForRead.length > 0
+        ? `มี ${chapterChoicesForRead.length} ทางเลือกให้เลือกต่อ`
+        : choicesErrorForRead;
+
+  let visualNovelPrimaryActionLabel = 'ข้ามไปท้ายตอน';
+  let visualNovelPrimaryActionDisabled = visualNovelScenes.length === 0 || isVisualNovelChapterComplete;
+  let visualNovelPrimaryActionHandler: (() => void) | null = visualNovelPrimaryActionDisabled
+    ? null
+    : () => setCurrentIndex(visualNovelScenes.length);
+
+  if (isCurrentChapterLocked) {
+    visualNovelPrimaryActionLabel = 'ตอนนี้ถูกล็อก';
+    visualNovelPrimaryActionDisabled = true;
+    visualNovelPrimaryActionHandler = null;
+  } else if (isVisualNovelChapterComplete && showVisualNovelBranchSection) {
+    if (isLoadingChoicesForRead) {
+      visualNovelPrimaryActionLabel = 'กำลังโหลดทางเลือก';
+      visualNovelPrimaryActionDisabled = true;
+      visualNovelPrimaryActionHandler = null;
+    } else if (chapterChoicesForRead.length > 0) {
+      visualNovelPrimaryActionLabel = `เลือกเส้นทาง (${chapterChoicesForRead.length})`;
+      visualNovelPrimaryActionDisabled = false;
+      visualNovelPrimaryActionHandler = () => setShowChoiceOverlay(true);
+    } else if (showEndingNotice) {
+      visualNovelPrimaryActionLabel = 'จบเส้นทางแล้ว';
+      visualNovelPrimaryActionDisabled = true;
+      visualNovelPrimaryActionHandler = null;
+    } else {
+      visualNovelPrimaryActionLabel = 'ตัวเลือกยังไม่พร้อม';
+      visualNovelPrimaryActionDisabled = true;
+      visualNovelPrimaryActionHandler = null;
+    }
+  } else if (isVisualNovelChapterComplete && hasNextLinearChapter) {
+    visualNovelPrimaryActionLabel = 'ตอนถัดไป';
+    visualNovelPrimaryActionDisabled = false;
+    visualNovelPrimaryActionHandler = () => navigateToChapter(selectedChapterIndex + 1);
+  } else if (isVisualNovelChapterComplete) {
+    visualNovelPrimaryActionLabel = 'จบตอนสุดท้าย';
+    visualNovelPrimaryActionDisabled = true;
+    visualNovelPrimaryActionHandler = null;
+  }
 
   const readerMobileActions = (
     <div className="ffMobileActionInner">
@@ -3547,31 +3627,32 @@ export default function StoryPage({ params }: StoryPageProps) {
     </div>
   );
 
-  const chatCommentSheetJSX = isChatStyle
+  const readerCommentSheetJSX = (isChatStyle || isVisualNovelStyle)
     && storySettings.allowComments
     && !isCurrentChapterLocked
     && !isTocOpen
-    && isChatCommentSheetOpen ? (
+    && !isVisualNovelSettingsOpen
+    && isReaderCommentSheetOpen ? (
     <div
-      className={styles.chatCommentSheetBackdrop}
-      onClick={() => setIsChatCommentSheetOpen(false)}
+      className={styles.readerCommentSheetBackdrop}
+      onClick={() => setIsReaderCommentSheetOpen(false)}
     >
       <div
-        className={styles.chatCommentSheet}
+        className={styles.readerCommentSheet}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className={styles.chatCommentSheetHeader}>
+        <div className={styles.readerCommentSheetHeader}>
           <h3>💬 ความคิดเห็น ({comments.length})</h3>
           <button
             type="button"
-            className={styles.chatCommentSheetCloseBtn}
-            onClick={() => setIsChatCommentSheetOpen(false)}
+            className={styles.readerCommentSheetCloseBtn}
+            onClick={() => setIsReaderCommentSheetOpen(false)}
             aria-label="ปิดคอมเมนต์"
           >
             <X size={18} />
           </button>
         </div>
-        <div className={`${styles.commentList} ${styles.chatCommentList}`}>
+        <div className={`${styles.commentList} ${styles.readerCommentList}`}>
           {comments.length === 0 ? (
             <p style={{ color: '#94a3b8', textAlign: 'center', padding: '1rem' }}>ยังไม่มีคอมเมนต์ เป็นคนแรกเลย!</p>
           ) : (
@@ -3623,6 +3704,102 @@ export default function StoryPage({ params }: StoryPageProps) {
     </div>
   ) : null;
 
+  const visualNovelSettingsSheetJSX = isVisualNovelStyle && isVisualNovelSettingsOpen ? (
+    <div
+      className={styles.visualNovelSheetBackdrop}
+      onClick={() => setIsVisualNovelSettingsOpen(false)}
+    >
+      <div
+        className={styles.visualNovelSheet}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className={styles.visualNovelSheetHeader}>
+          <h3>การตั้งค่าอ่านแบบ VN</h3>
+          <button
+            type="button"
+            className={styles.visualNovelSheetCloseBtn}
+            onClick={() => setIsVisualNovelSettingsOpen(false)}
+            aria-label="ปิดการตั้งค่า"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div className={styles.visualNovelSheetActions}>
+          {allowTocInReader && (
+            <button
+              type="button"
+              className={styles.visualNovelSheetAction}
+              onClick={() => {
+                setIsVisualNovelSettingsOpen(false);
+                setIsTocOpen(true);
+              }}
+            >
+              <List size={18} />
+              <div>
+                <strong>สารบัญ</strong>
+                <span>เปิดรายการตอนและตัวละคร</span>
+              </div>
+            </button>
+          )}
+          <button
+            type="button"
+            className={`${styles.visualNovelSheetAction} ${isCurrentChapterFavorited ? styles.visualNovelSheetActionActive : ''}`}
+            onClick={handleToggleFavorite}
+          >
+            {isCurrentChapterFavorited ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}
+            <div>
+              <strong>{isCurrentChapterFavorited ? 'อยู่ในชั้นแล้ว' : 'เก็บเข้าชั้น'}</strong>
+              <span>บันทึกตอนนี้ไว้ในชั้นหนังสือ</span>
+            </div>
+          </button>
+          <button
+            type="button"
+            className={`${styles.visualNovelSheetAction} ${isVisualNovelBgmEnabled ? styles.visualNovelSheetActionActive : ''}`}
+            onClick={handleToggleVisualNovelBgm}
+            disabled={!visualNovelBgmSource}
+          >
+            {isVisualNovelBgmEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+            <div>
+              <strong>{isVisualNovelBgmEnabled ? 'BGM เปิดอยู่' : 'BGM ปิดอยู่'}</strong>
+              <span>{visualNovelBgmSource ? 'สลับเพลงพื้นหลังของตอนนี้' : 'ตอนนี้ไม่มี BGM ให้เล่น'}</span>
+            </div>
+          </button>
+          <button
+            type="button"
+            className={`${styles.visualNovelSheetAction} ${isVisualNovelAutoPlayEnabled ? styles.visualNovelSheetActionActive : ''}`}
+            onClick={() => setIsVisualNovelAutoPlayEnabled((prev) => !prev)}
+          >
+            {isVisualNovelAutoPlayEnabled ? <Pause size={18} /> : <Play size={18} />}
+            <div>
+              <strong>{isVisualNovelAutoPlayEnabled ? 'Auto Play เปิดอยู่' : 'Auto Play ปิดอยู่'}</strong>
+              <span>ให้ระบบเดินฉากต่ออัตโนมัติเมื่อข้อความพิมพ์ครบ</span>
+            </div>
+          </button>
+          <button
+            type="button"
+            className={styles.visualNovelSheetAction}
+            onClick={() => {
+              setIsVisualNovelSettingsOpen(false);
+              if (currentIndex < visualNovelScenes.length) {
+                setCurrentIndex(visualNovelScenes.length);
+              }
+            }}
+            disabled={visualNovelScenes.length === 0 || currentIndex >= visualNovelScenes.length}
+          >
+            <RefreshCcw size={18} />
+            <div>
+              <strong>ข้ามไปท้ายตอน</strong>
+              <span>แสดงฉากสุดท้ายของตอนนี้ทันที</span>
+            </div>
+          </button>
+        </div>
+        {visualNovelBgmStartError && (
+          <p className={styles.visualNovelSheetNotice}>{visualNovelBgmStartError}</p>
+        )}
+      </div>
+    </div>
+  ) : null;
+
   const themeWrapperClass = isChatStyle ? 'theme-midnight' : '';
 
   return (
@@ -3638,14 +3815,15 @@ export default function StoryPage({ params }: StoryPageProps) {
             hideHeartCount={storySettings.hideHeartCount}
             onToggleLike={handleToggleLike}
             commentCount={storySettings.allowComments ? comments.length : -1}
-            canOpenComments={canOpenChatComments}
+            canOpenComments={canOpenReaderComments}
             onOpenComments={() => {
-              if (canOpenChatComments) {
-                setIsChatCommentSheetOpen(true);
+              if (canOpenReaderComments) {
+                setIsReaderCommentSheetOpen(true);
               }
             }}
             onOpenToc={allowTocInReader ? () => {
-              setIsChatCommentSheetOpen(false);
+              setIsReaderCommentSheetOpen(false);
+              setIsVisualNovelSettingsOpen(false);
               setIsTocOpen(true);
             } : undefined}
             onPointerDown={handleChatContainerPointerDown}
@@ -3721,18 +3899,21 @@ export default function StoryPage({ params }: StoryPageProps) {
             </div>
           </ChatReaderLayout>
         ) : isVisualNovelStyle ? (
-          <>
-            <div className={styles.visualNovelViewport}>
-              <div className={styles.visualNovelTopbar}>
-                <div className={styles.visualNovelTopbarRow}>
-                  <button
-                    type="button"
-                    className={styles.visualNovelBackBtn}
-                    onClick={() => router.back()}
-                    aria-label="ย้อนกลับ"
-                  >
-                    <ChevronLeft size={18} />
-                  </button>
+          <div className={styles.visualNovelViewport}>
+            <div className={styles.visualNovelViewportFrame}>
+              {visualNovelBgmSource && (
+                <audio
+                  ref={visualNovelBgmAudioRef}
+                  src={visualNovelBgmSource}
+                  preload="none"
+                  loop
+                  playsInline
+                  className={styles.visualNovelHiddenAudio}
+                />
+              )}
+
+              <header className={styles.visualNovelHeader}>
+                <div className={styles.visualNovelHeaderMain}>
                   <div className={styles.visualNovelContext}>
                     <span className={styles.visualNovelStoryTitle}>{activeStory.title}</span>
                     <span className={styles.visualNovelChapterTitle}>
@@ -3743,143 +3924,169 @@ export default function StoryPage({ params }: StoryPageProps) {
                     <span className={styles.visualNovelTapHint}>{visualNovelTapHint}</span>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  className={`${styles.visualNovelHeaderAction} ${isVisualNovelSettingsOpen ? styles.visualNovelHeaderActionActive : ''}`}
+                  onClick={() => {
+                    setIsReaderCommentSheetOpen(false);
+                    setIsVisualNovelSettingsOpen((prev) => !prev);
+                  }}
+                  aria-label="เปิดการตั้งค่า"
+                >
+                  <Settings size={18} />
+                </button>
+              </header>
 
-                <div className={styles.visualNovelTopbarActions}>
-                  {visualNovelBgmSource && (
-                    <audio
-                      ref={visualNovelBgmAudioRef}
-                      src={visualNovelBgmSource}
-                      preload="none"
-                      loop
-                      playsInline
-                      className={styles.visualNovelHiddenAudio}
-                    />
-                  )}
-                  {allowTocInReader && (
-                    <button
-                      type="button"
-                      className={styles.visualNovelTopbarBtn}
-                      onClick={() => setIsTocOpen(!isTocOpen)}
+              {visualNovelBgmStartError && (
+                <div className={styles.visualNovelStatusNotice}>{visualNovelBgmStartError}</div>
+              )}
+
+              <div className={styles.visualNovelSceneShell}>
+                {isCurrentChapterLocked ? (
+                  <div className={styles.visualNovelGateWrap}>{premiumGateJSX}</div>
+                ) : currentVisualNovelScene ? (
+                  <div
+                    className={styles.visualNovelStageWrap}
+                    onClick={() => {
+                      if (!isVisualNovelInteractionBlocked) {
+                        handleNextLine();
+                      }
+                    }}
+                  >
+                    <div className={styles.visualNovelStageSurface}>
+                      <VisualNovelStage
+                        scene={currentVisualNovelScene}
+                        characters={characters}
+                        fallbackBackgroundUrl={activeStory.wideCoverUrl}
+                        variant="reader"
+                        presentation="immersiveReader"
+                        className={styles.visualNovelStage}
+                        hideNarratorFallback
+                      />
+                    </div>
+
+                    <div
+                      className={styles.visualNovelDialogueDock}
                     >
-                      <List size={18} />
-                      <span>สารบัญ</span>
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className={styles.visualNovelTopbarBtn}
-                    onClick={handleToggleLike}
-                  >
-                    <Heart size={18} fill={isCurrentChapterLiked ? 'currentColor' : 'none'} />
-                    <span>{storySettings.hideHeartCount ? 'หัวใจ' : likeCount}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.visualNovelTopbarBtn}
-                    onClick={handleToggleFavorite}
-                  >
-                    {isCurrentChapterFavorited ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}
-                    <span>{isCurrentChapterFavorited ? 'อยู่ในชั้น' : 'เก็บเข้าชั้น'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.visualNovelTopbarBtn} ${isVisualNovelBgmEnabled ? styles.visualNovelTopbarBtnActive : ''}`}
-                    onClick={handleToggleVisualNovelBgm}
-                    disabled={!visualNovelBgmSource}
-                  >
-                    {isVisualNovelBgmEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
-                    <span>{isVisualNovelBgmEnabled ? 'BGM: ON' : 'BGM: OFF'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.visualNovelTopbarBtn} ${isVisualNovelAutoPlayEnabled ? styles.visualNovelTopbarBtnActive : ''}`}
-                    onClick={() => setIsVisualNovelAutoPlayEnabled((prev) => !prev)}
-                  >
-                    {isVisualNovelAutoPlayEnabled ? <Pause size={18} /> : <Play size={18} />}
-                    <span>{isVisualNovelAutoPlayEnabled ? 'Auto Play: ON' : 'Auto Play: OFF'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.visualNovelTopbarBtn}
-                    onClick={() => setCurrentIndex(visualNovelScenes.length)}
-                    disabled={visualNovelScenes.length === 0 || currentIndex >= visualNovelScenes.length}
-                  >
-                    <span>ข้ามไปท้ายตอน</span>
-                  </button>
-                </div>
-                {visualNovelBgmStartError && (
-                  <span className={styles.visualNovelTapHint}>{visualNovelBgmStartError}</span>
+                      <div className={styles.visualNovelDialogueBox}>
+                        <div className={styles.visualNovelDialogueMeta}>
+                          {hasVisualNovelSpeaker ? (
+                            <span className={styles.visualNovelSpeakerTag}>{currentVisualNovelSpeaker?.name}</span>
+                          ) : (
+                            <span className={styles.visualNovelNarratorTag}>ผู้บรรยาย</span>
+                          )}
+                          <span className={styles.visualNovelProgressPill}>{visualNovelProgressLabel}</span>
+                        </div>
+                        <p className={`${styles.visualNovelDialogueText} ${!hasVisualNovelSpeaker ? styles.visualNovelDialogueTextNarration : ''}`}>
+                          {visualNovelDialogueText || '...'}
+                        </p>
+                        <div className={styles.visualNovelDialogueFooter}>
+                          <button
+                            type="button"
+                            className={`${styles.visualNovelAutoState} ${isVisualNovelAutoPlayEnabled ? styles.visualNovelAutoStateActive : ''}`}
+                            onClick={(event) => { event.stopPropagation(); setIsVisualNovelAutoPlayEnabled((prev) => !prev); }}
+                          >
+                            {isVisualNovelAutoPlayEnabled ? <Pause size={13} /> : <Play size={13} />}
+                            {isVisualNovelAutoPlayEnabled ? 'Auto Play: ON' : 'Auto Play: OFF'}
+                          </button>
+                          <span className={styles.visualNovelTapIndicator}>{visualNovelTapHint}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {shouldShowVisualNovelBranchPrompt && (
+                      <div
+                        className={styles.visualNovelBranchPrompt}
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        {showEndingNotice ? (
+                          <>
+                            <h3>จบเส้นทางแล้ว</h3>
+                            <p className={styles.branchChoiceInfo}>{visualNovelBranchPromptMessage}</p>
+                          </>
+                        ) : choicesErrorForRead ? (
+                          <p className={styles.branchChoiceError}>{choicesErrorForRead}</p>
+                        ) : (
+                          <>
+                            <p className={styles.branchChoiceInfo}>{visualNovelBranchPromptMessage}</p>
+                            {chapterChoicesForRead.length > 0 && (
+                              <span className={styles.visualNovelBranchPromptHint}>ใช้ปุ่มหลักด้านล่างเพื่อดำเนินต่อ</span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {showChoiceOverlay && chapterChoicesForRead.length > 0 && (
+                      <div
+                        className={styles.visualNovelChoiceOverlay}
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <BranchChoiceOverlay
+                          choices={chapterChoicesForRead}
+                          onSelect={handleSelectBranchChoice}
+                          timerSeconds={activeChapterChoiceTimerSeconds}
+                          remainingSeconds={choiceCountdownRemainingSeconds}
+                          progressPercent={choiceCountdownProgressPercent}
+                        />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className={styles.emptyState}>ตอนนี้ยังไม่มีฉาก</div>
                 )}
               </div>
 
-              {isCurrentChapterLocked ? (
-                <div className={styles.visualNovelGateWrap}>{premiumGateJSX}</div>
-              ) : currentVisualNovelScene ? (
-                <div
-                  className={styles.visualNovelStageWrap}
-                  onClick={() => {
-                    if (!showChoiceOverlay) {
-                      handleNextLine();
-                    }
-                  }}
-                >
-                  <VisualNovelStage
-                    scene={currentVisualNovelScene}
-                    characters={characters}
-                    fallbackBackgroundUrl={activeStory.wideCoverUrl}
-                    variant="reader"
-                    className={styles.visualNovelStage}
-                    hideNarratorFallback
-                    dialogueTextOverride={visualNovelTypedDialogueText}
-                    footerSlot={<span className={styles.visualNovelProgressPill}>{visualNovelProgressLabel}</span>}
-                  />
-
-                  {showVisualNovelBranchSection && !showChoiceOverlay && (
-                    <div
-                      className={styles.visualNovelBranchPrompt}
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      {isLoadingChoicesForRead ? (
-                        <p className={styles.branchChoiceInfo}>กำลังโหลดตัวเลือก...</p>
-                      ) : showEndingNotice ? (
-                        <>
-                          <h3>จบเส้นทางแล้ว</h3>
-                          <p className={styles.branchChoiceInfo}>ตอนนี้เป็นตอนจบของเส้นทางนี้</p>
-                        </>
-                      ) : chapterChoicesForRead.length > 0 ? (
-                        <button
-                          type="button"
-                          className={styles.branchChoiceBtn}
-                          onClick={() => setShowChoiceOverlay(true)}
-                        >
-                          <span>เลือกเส้นทางถัดไป ({chapterChoicesForRead.length} ทางเลือก)</span>
-                        </button>
-                      ) : choicesErrorForRead ? (
-                        <p className={styles.branchChoiceError}>{choicesErrorForRead}</p>
-                      ) : null}
-                    </div>
-                  )}
-
-                  {showChoiceOverlay && chapterChoicesForRead.length > 0 && (
-                    <div
-                      className={styles.visualNovelChoiceOverlay}
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      <BranchChoiceOverlay
-                        choices={chapterChoicesForRead}
-                        onSelect={handleSelectBranchChoice}
-                        timerSeconds={activeChapterChoiceTimerSeconds}
-                        remainingSeconds={choiceCountdownRemainingSeconds}
-                        progressPercent={choiceCountdownProgressPercent}
-                      />
-                    </div>
-                  )}
+              <footer className={styles.visualNovelBottomBar}>
+                <div className={styles.visualNovelBottomGroup}>
+                  <button
+                    type="button"
+                    className={`${styles.visualNovelBottomAction} ${isCurrentChapterLiked ? styles.visualNovelBottomActionLiked : ''}`}
+                    onClick={handleToggleLike}
+                  >
+                    <Heart size={18} fill={isCurrentChapterLiked ? 'currentColor' : 'none'} />
+                    <span>{storySettings.hideHeartCount ? 'หัวใจ' : likeCount.toLocaleString('th-TH')}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.visualNovelBottomAction}
+                    onClick={() => {
+                      if (!canOpenReaderComments) return;
+                      setIsVisualNovelSettingsOpen(false);
+                      setIsReaderCommentSheetOpen(true);
+                    }}
+                    disabled={!canOpenReaderComments}
+                  >
+                    <MessageSquare size={18} />
+                    <span>{storySettings.allowComments ? comments.length.toLocaleString('th-TH') : 'ปิด'}</span>
+                  </button>
                 </div>
-              ) : (
-                <div className={styles.emptyState}>ตอนนี้ยังไม่มีฉาก</div>
-              )}
+                <div className={styles.visualNovelBottomGroup}>
+                  <button
+                    type="button"
+                    className={styles.visualNovelBottomUtilityBtn}
+                    onClick={() => navigateToChapter(selectedChapterIndex, { mode: 'top' })}
+                  >
+                    <RefreshCcw size={16} />
+                    <span>เริ่มใหม่</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.visualNovelBottomPrimaryBtn} ${visualNovelPrimaryActionDisabled ? styles.visualNovelBottomPrimaryBtnDisabled : ''}`}
+                    onClick={() => {
+                      if (!visualNovelPrimaryActionHandler) return;
+                      setIsVisualNovelSettingsOpen(false);
+                      visualNovelPrimaryActionHandler();
+                    }}
+                    disabled={visualNovelPrimaryActionDisabled}
+                  >
+                    <span>{visualNovelPrimaryActionLabel}</span>
+                    {!visualNovelPrimaryActionDisabled && <ChevronLeft size={16} className={styles.visualNovelBottomPrimaryChevron} />}
+                  </button>
+                </div>
+              </footer>
             </div>
-          </>
+          </div>
         ) : (
           <>
             {/* Reader Top Navbar */}
@@ -4266,7 +4473,8 @@ export default function StoryPage({ params }: StoryPageProps) {
             </div>
           </div>
         )}
-        {chatCommentSheetJSX}
+        {visualNovelSettingsSheetJSX}
+        {readerCommentSheetJSX}
         {unlockConfirmChapter && (
           <div
             className={styles.unlockConfirmOverlay}
