@@ -622,7 +622,11 @@ export default function StoryPage({ params }: StoryPageProps) {
   const [showChoiceOverlay, setShowChoiceOverlay] = useState(false);
   const [isTocOpen, setIsTocOpen] = useState(false);
   const [isChatTopbarHidden, setIsChatTopbarHidden] = useState(false);
+  const [isNarrativeNavbarHidden, setIsNarrativeNavbarHidden] = useState(false);
   const [isChatOverflowOpen, setIsChatOverflowOpen] = useState(false);
+  const [chatFontSize, setChatFontSize] = useState(15);
+  const [chatLineHeight, setChatLineHeight] = useState(1.6);
+  const [chatBgTheme, setChatBgTheme] = useState('midnight');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const narrativeChoicePanelRef = useRef<HTMLDivElement>(null);
   const narrativeCompletionSentinelRef = useRef<HTMLDivElement>(null);
@@ -1606,6 +1610,37 @@ export default function StoryPage({ params }: StoryPageProps) {
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, [isChatStyle, isTocOpen, isChatOverflowOpen]);
+
+  useEffect(() => {
+    if (isChatStyle || isVisualNovelStyle) return;
+
+    let lastScrollY = window.scrollY;
+    let ticking = false;
+
+    const handleScroll = () => {
+      if (ticking) return;
+      ticking = true;
+
+      window.requestAnimationFrame(() => {
+        const currentScrollY = window.scrollY;
+        const deltaY = currentScrollY - lastScrollY;
+
+        if (currentScrollY <= 60) {
+          setIsNarrativeNavbarHidden(false);
+        } else if (deltaY > 10) {
+          setIsNarrativeNavbarHidden(true);
+        } else if (deltaY < -8) {
+          setIsNarrativeNavbarHidden(false);
+        }
+
+        lastScrollY = currentScrollY;
+        ticking = false;
+      });
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isChatStyle, isVisualNovelStyle, isTocOpen]);
 
   useEffect(() => {
     if (!isChatStyle || !isChatOverflowOpen) return;
@@ -3250,6 +3285,7 @@ export default function StoryPage({ params }: StoryPageProps) {
     ? 'หัวใจ'
     : `หัวใจ ${likeCount.toLocaleString('th-TH')}`;
   const shouldHideChatTopbar = isChatTopbarHidden && !isTocOpen && !isChatOverflowOpen;
+  const shouldHideNarrativeNavbar = isNarrativeNavbarHidden && !isTocOpen;
   const resolveChatCharacter = (message: ReaderChatMessage) => {
     const blockChar = characters.find((item) => item.id === message.characterId);
     return blockChar
@@ -3421,7 +3457,7 @@ export default function StoryPage({ params }: StoryPageProps) {
     </div>
   );
 
-  const themeWrapperClass = isChatStyle ? 'theme-midnight' : '';
+  const themeWrapperClass = isChatStyle ? `theme-${chatBgTheme}` : '';
 
   return (
     <div className={themeWrapperClass}>
@@ -3430,7 +3466,24 @@ export default function StoryPage({ params }: StoryPageProps) {
           <ChatReaderLayout
              story={dbStory}
              chapter={currentChapter}
-             coinBalance={coinBalance}
+             hasPrevChapter={selectedChapterIndex > 0}
+             hasNextChapter={selectedChapterIndex < (dbChapters?.length || 1) - 1}
+             onPrevChapter={() => navigateToChapter(selectedChapterIndex - 1)}
+             onNextChapter={() => navigateToChapter(selectedChapterIndex + 1)}
+             onOpenToc={() => setIsTocOpen(true)}
+             chatFontSize={chatFontSize}
+             chatLineHeight={chatLineHeight}
+             chatBgTheme={chatBgTheme}
+             onChatFontSizeChange={setChatFontSize}
+             onChatLineHeightChange={setChatLineHeight}
+             onChatBgThemeChange={setChatBgTheme}
+             isLiked={isCurrentChapterLiked}
+             isBookmarked={isCurrentChapterFavorited}
+             likeCount={likeCount}
+             commentCount={comments.length}
+             onToggleLike={handleToggleLike}
+             onToggleBookmark={handleToggleFavorite}
+             onOpenComments={() => setShowComments(true)}
              onPointerDown={handleChatContainerPointerDown}
              onPointerUp={handleChatContainerPointerUp}
              onPointerCancel={handleChatContainerPointerCancel}
@@ -3657,7 +3710,7 @@ export default function StoryPage({ params }: StoryPageProps) {
         ) : (
           <>
             {/* Reader Top Navbar */}
-            <nav className={styles.readerNavbar}>
+            <nav className={`${styles.readerNavbar} ${shouldHideNarrativeNavbar ? styles.readerNavbarHidden : ''}`}>
               <div className={styles.readerNavContext}>
                 <span className={styles.readerNavContextEyebrow}>{activeStory.title}</span>
                 <span className={styles.readerNavContextTitle}>{readerContextTitle}</span>
@@ -3980,7 +4033,7 @@ export default function StoryPage({ params }: StoryPageProps) {
                 </>
               )}
             </main>
-            <div className="ffMobileActionBar">
+            <div className={`ffMobileActionBar ${shouldHideNarrativeNavbar ? 'ffMobileActionBarHidden' : ''}`}>
               {readerMobileActions}
             </div>
 

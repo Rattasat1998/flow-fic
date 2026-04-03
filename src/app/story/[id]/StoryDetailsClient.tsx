@@ -480,6 +480,7 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
     const [isSynopsisExpanded, setIsSynopsisExpanded] = useState(false);
     const [unreadNotifCountState, setUnreadNotifCountState] = useState(0);
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+    const [isBottomBarHidden, setIsBottomBarHidden] = useState(false);
     const profileMenuRef = useRef<HTMLDivElement>(null);
     const unreadNotifCount = userId ? unreadNotifCountState : 0;
 
@@ -506,6 +507,35 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
         hasConsumedReturnIntentRef.current = false;
         isReturnNavigationRef.current = false;
     }, [storyId]);
+
+    useEffect(() => {
+        let lastScrollY = window.scrollY;
+        let ticking = false;
+
+        const handleScroll = () => {
+            if (ticking) return;
+            ticking = true;
+
+            window.requestAnimationFrame(() => {
+                const currentScrollY = window.scrollY;
+                const deltaY = currentScrollY - lastScrollY;
+
+                if (currentScrollY <= 80) {
+                    setIsBottomBarHidden(false);
+                } else if (deltaY > 10) {
+                    setIsBottomBarHidden(true);
+                } else if (deltaY < -8) {
+                    setIsBottomBarHidden(false);
+                }
+
+                lastScrollY = currentScrollY;
+                ticking = false;
+            });
+        };
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
     useClientLayoutEffect(() => {
         setReaderProgress(readStoredStoryProgress(storyId, userId));
@@ -1573,7 +1603,7 @@ export default function StoryDetailsClient({ storyId }: StoryDetailsClientProps)
                 </div>
             </section>
 
-            <footer className={styles.bottomBar}>
+            <footer className={`${styles.bottomBar} ${isBottomBarHidden ? styles.bottomBarHidden : ''}`}>
                 <button
                     type="button"
                     className={`${styles.likeButton} ${isLiked ? styles.likeButtonActive : ''}`.trim()}

@@ -178,12 +178,12 @@ body.ffMobileDrawerOpen {
 .ffMobileActionInner {
   display: flex;
   align-items: stretch;
-  gap: 0.7rem;
+  gap: 0.5rem;
 }
 
 .ffMobileActionBtn {
-  min-height: 52px;
-  border-radius: 18px;
+  min-height: 44px;
+  border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(15, 20, 32, 0.94);
   color: var(--foreground);
@@ -230,10 +230,11 @@ body.ffMobileDrawerOpen {
     z-index: 80;
     display: block;
     padding:
-      0.75rem
-      max(0.85rem, env(safe-area-inset-right))
-      calc(0.8rem + env(safe-area-inset-bottom))
-      max(0.85rem, env(safe-area-inset-left));
+      0.5rem
+      max(0.65rem, env(safe-area-inset-right))
+      calc(0.5rem + env(safe-area-inset-bottom))
+      max(0.65rem, env(safe-area-inset-left));
+    transition: transform 0.24s ease;
     background: linear-gradient(180deg, rgba(8, 12, 18, 0) 0%, rgba(8, 12, 18, 0.9) 34%, rgba(8, 12, 18, 0.98) 100%);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
@@ -242,6 +243,10 @@ body.ffMobileDrawerOpen {
   .ffMobileActionInner {
     width: min(var(--studio-page-width), 100%);
     margin: 0 auto;
+  }
+
+  .ffMobileActionBarHidden {
+    transform: translateY(calc(100% + 8px));
   }
 }
 

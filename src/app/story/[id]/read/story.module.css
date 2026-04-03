@@ -340,6 +340,11 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  transition: transform 0.24s ease;
+}
+
+.readerNavbarHidden {
+  transform: translateY(calc(-100% - 8px));
 }
 
 .readerNavRight {
@@ -734,15 +739,15 @@
   }
 
   .readerContent {
-    font-size: 1rem;
-    line-height: 1.8;
+    font-size: 1.02rem;
+    line-height: 1.72;
   }
 }
 
 @media (max-width: 720px) {
   .chatTopbar {
-    min-height: 60px;
-    padding-top: calc(var(--chat-safe-top) + 0.52rem);
+    min-height: 52px;
+    padding-top: calc(var(--chat-safe-top) + 0.42rem);
     padding-bottom: 0.52rem;
   }
 
@@ -767,11 +772,11 @@
 
   .readerContainer {
     max-width: 100%;
-    padding: 1.5rem 1rem calc(7.25rem + env(safe-area-inset-bottom, 0px));
+    padding: 1.5rem 1rem calc(5rem + env(safe-area-inset-bottom, 0px));
   }
 
   .chatContainer {
-    padding: 0.95rem 0.9rem calc(2.45rem + env(safe-area-inset-bottom, 0px));
+    padding: 0.95rem 0.9rem calc(1.8rem + env(safe-area-inset-bottom, 0px));
   }
 
   .chapterNav {
@@ -786,13 +791,13 @@
 
 @media (max-width: 560px) {
   .chatTopbar {
-    min-height: 56px;
+    min-height: 48px;
     padding-left: max(0.72rem, env(safe-area-inset-left));
     padding-right: max(0.72rem, env(safe-area-inset-right));
   }
 
   .chatTopbarTitle {
-    font-size: 0.9rem;
+    font-size: 0.86rem;
   }
 
   .chatTopbarEyebrow {
@@ -804,8 +809,8 @@
   }
 
   .chatTopbarMenuBtn {
-    width: 34px;
-    height: 34px;
+    width: 32px;
+    height: 32px;
     border-radius: 10px;
   }
 
@@ -818,26 +823,28 @@
   }
 
   .readerContainer {
-    padding: 1.4rem 0.95rem calc(7rem + env(safe-area-inset-bottom, 0px));
+    padding: 1.4rem 0.95rem calc(4.75rem + env(safe-area-inset-bottom, 0px));
   }
 
   .readerContent {
-    font-size: 0.94rem;
+    font-size: 1rem;
   }
 
   .readerContent p {
     text-indent: 1.35rem;
+    margin-bottom: 1.1rem;
   }
 
   .readerBookmarkRibbon {
-    right: 0.05rem;
-    width: 1.5rem;
-    height: 3.65rem;
+    right: -0.15rem;
+    width: 1.25rem;
+    height: 3.2rem;
     padding-top: 0.45rem;
+    opacity: 0.75;
   }
 
   .readerBlockAnchor {
-    padding-right: 1.85rem;
+    padding-right: 0;
   }
 
   .readerBookmarkGuide {
@@ -846,7 +853,7 @@
   }
 
   .chatContainer {
-    padding: 0.8rem 0.72rem calc(2.2rem + env(safe-area-inset-bottom, 0px));
+    padding: 0.8rem 0.72rem calc(1.5rem + env(safe-area-inset-bottom, 0px));
   }
 
   .chatStarterHint {
@@ -2297,15 +2304,15 @@
 @media (max-width: 640px) {
   .visualNovelViewport {
     padding:
-      calc(var(--vn-safe-top) + 0.6rem)
-      0.65rem
-      calc(var(--vn-safe-bottom) + 0.7rem);
-    --vn-topbar-height: 72px;
+      calc(var(--vn-safe-top) + 0.45rem)
+      0.5rem
+      calc(var(--vn-safe-bottom) + 0.5rem);
+    --vn-topbar-height: 64px;
   }
 
   .visualNovelTopbar {
-    gap: 0.55rem;
-    border-radius: 14px;
+    gap: 0.45rem;
+    border-radius: 12px;
   }
 
   .visualNovelStoryTitle {
@@ -2325,9 +2332,9 @@
   }
 
   .visualNovelTopbarBtn {
-    min-height: 34px;
-    padding: 0 0.72rem;
-    font-size: 0.75rem;
+    min-height: 30px;
+    padding: 0 0.58rem;
+    font-size: 0.72rem;
   }
 
   .visualNovelBranchPrompt {
